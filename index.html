@@ -12,26 +12,38 @@
 <style>
 :root{--v:#2f6b4f;--v2:#e4efe8;--b:#f4efe6;--b2:#e9e0d0;--t:#2b2b2b;--g:#7a7468;--ok:#3d9a5f;--am:#e0a526;--ro:#c9503f}
 *{box-sizing:border-box;margin:0}
-body{font-family:-apple-system,"Helvetica Neue",sans-serif;background:var(--b);color:var(--t);display:flex;height:100vh}
-nav{width:210px;background:#fff;padding:22px 14px;border-right:1px solid var(--b2);display:flex;flex-direction:column;gap:6px}
+body{font-family:-apple-system,"Helvetica Neue",sans-serif;background:var(--b);color:var(--t);display:flex;height:100vh;overflow:hidden}
+nav{width:210px;flex:none;background:#fff;padding:22px 14px;border-right:1px solid var(--b2);display:flex;flex-direction:column;gap:6px}
 .logo{display:block;width:100%;height:auto;margin:0 0 18px}
-nav button{border:0;background:none;text-align:left;padding:13px 14px;border-radius:12px;font-size:16px;color:var(--t)}
+nav button{border:0;background:none;text-align:left;padding:13px 14px;border-radius:12px;font-size:16px;color:var(--t);font-family:inherit}
 nav button.on{background:var(--v2);color:var(--v);font-weight:600}
 nav button.off{color:#b5afa3}
-main{flex:1;overflow:auto;padding:26px 30px}
-h1{font-size:26px;color:var(--v)} .sub{color:var(--g);margin:2px 0 20px}
+main{flex:1;min-width:0;display:flex;flex-direction:column}
+.top{display:flex;justify-content:space-between;align-items:center;gap:16px;padding:12px 30px;background:#faf7f1;border-bottom:1px solid var(--b2)}
+#crumbs{font-size:15px;color:var(--g)} #crumbs a{color:var(--v);cursor:pointer;font-weight:600} #crumbs i{font-style:normal;margin:0 4px} #crumbs b{color:var(--t)}
+.sb{position:relative;width:320px}
+.sb input{width:100%;padding:11px 14px;border:1px solid var(--b2);border-radius:12px;font-size:16px;background:#fff;font-family:inherit}
+#res{display:none;position:absolute;right:0;top:48px;width:420px;max-width:80vw;background:#fff;border-radius:14px;box-shadow:0 8px 30px rgba(60,40,10,.18);z-index:20;overflow:hidden}
+.ri{display:flex;align-items:center;gap:10px;padding:13px 16px;border-bottom:1px solid #f0ebe0;font-size:15px;cursor:pointer}
+.ri small{color:var(--g);margin-left:auto}
+#view{flex:1;overflow:auto;padding:22px 30px 40px}
+h1{font-size:26px;color:var(--v)} h2{font-size:20px;color:var(--v);margin-bottom:12px}
+.sub{color:var(--g);margin:2px 0 18px}
 .grid{display:grid;gap:16px}
 .k{grid-template-columns:repeat(4,1fr)}
 .c2{grid-template-columns:1.4fr 1fr}
 .c3{grid-template-columns:1fr 1fr 1fr}
+.cards{grid-template-columns:repeat(auto-fill,minmax(300px,1fr))}
 .card{background:#fff;border-radius:18px;padding:18px 20px;box-shadow:0 2px 10px rgba(80,60,20,.07)}
 .card h3{font-size:14px;color:var(--g);font-weight:600;text-transform:uppercase;letter-spacing:.6px;margin-bottom:12px}
 .big{font-size:30px;font-weight:700}
-.up{color:var(--ok)} .dn{color:var(--ro)}
-.row{display:flex;justify-content:space-between;align-items:center;padding:9px 0;border-bottom:1px solid #f0ebe0;font-size:15px}
-.row:last-child{border:0}
-.pill{padding:3px 10px;border-radius:20px;font-size:13px;font-weight:600}
-.pill.u{background:#e3f3e8;color:var(--ok)} .pill.d{background:#fbe6e2;color:var(--ro)}
+.up{color:var(--ok)} .dn{color:var(--ro)} .mut{color:#aaa}
+.row{display:flex;justify-content:space-between;align-items:center;padding:9px 0;border-bottom:1px solid #f0ebe0;font-size:15px;gap:10px}
+.row:last-child{border:0} .lk{cursor:pointer}
+.pill{padding:3px 10px;border-radius:20px;font-size:13px;font-weight:600;white-space:nowrap}
+.pill.u{background:#e3f3e8;color:var(--ok)} .pill.d{background:#fbe6e2;color:var(--ro)} .pill.n{background:var(--b2);color:var(--g)}
+.dot{display:inline-block;width:16px;height:16px;border-radius:50%;flex:none}
+.dot.verde{background:var(--ok)} .dot.amarillo{background:var(--am)} .dot.rojo{background:var(--ro)}
 .bars{display:flex;align-items:flex-end;gap:8px;height:150px}
 .bars div{flex:1;display:flex;flex-direction:column;align-items:center;justify-content:flex-end;height:100%;font-size:11px;color:var(--g)}
 .bars span{display:flex;gap:2px;align-items:flex-end;width:100%;justify-content:center;flex:1}
@@ -39,143 +51,373 @@ h1{font-size:26px;color:var(--v)} .sub{color:var(--g);margin:2px 0 20px}
 .a25{background:var(--b2)} .a26{background:var(--v)}
 .leg{font-size:12px;color:var(--g);margin-top:8px}
 .leg b{display:inline-block;width:10px;height:10px;border-radius:3px;margin:0 4px 0 10px}
-.zona{background:var(--v);color:#fff}
-.zona h3{color:#cfe3d7} .zona .big{font-size:24px}
+.zona{background:var(--v);color:#fff} .zona h3{color:#cfe3d7} .zona .big{font-size:24px}
 .zona p{margin-top:8px;color:#e4efe8;font-size:15px;line-height:1.5}
 .task{display:flex;gap:10px;padding:9px 0;font-size:15px;align-items:center}
 .task input{width:20px;height:20px;accent-color:var(--v)}
 .task input:checked+span{text-decoration:line-through;color:#aaa}
-.sem{width:18px;height:18px;border-radius:50%;display:inline-block}
-.head{display:flex;align-items:center;gap:16px;margin-bottom:18px}
-.head .sem{width:34px;height:34px}
+.head{display:flex;align-items:center;gap:16px;margin-bottom:6px}
+.hb{display:flex;justify-content:space-between;align-items:flex-start;gap:16px;margin-bottom:16px;flex-wrap:wrap}
+.hb .acts{display:flex;gap:10px;flex-wrap:wrap}
 .tag{background:var(--v2);color:var(--v);padding:6px 12px;border-radius:20px;font-size:14px;margin:0 6px 6px 0;display:inline-block}
 .hist{border-left:3px solid var(--v2);padding-left:12px;margin-bottom:12px;font-size:14px;line-height:1.45}
 .hist b{color:var(--v)}
-.view{display:none}.view.on{display:block}
+button{font-family:inherit}
+.b1,.b2{border-radius:12px;padding:12px 18px;font-size:16px;cursor:pointer;border:1px solid var(--v)}
+.b1{background:var(--v);color:#fff;font-weight:600} .b2{background:#fff;color:var(--v);font-weight:600}
+.b1.danger{background:var(--ro);border-color:var(--ro)} .b2.dng{color:var(--ro);border-color:var(--ro)}
+.b2[disabled]{opacity:.45}
+.filebtn{display:inline-block}
+.tb{width:100%;border-collapse:collapse;font-size:15px}
+.tb th{text-align:left;font-size:12px;color:var(--g);font-weight:600;text-transform:uppercase;letter-spacing:.5px;padding:8px 10px;border-bottom:2px solid var(--b2)}
+.tb td{padding:13px 10px;border-bottom:1px solid #f0ebe0} .tb tr[onclick]{cursor:pointer} .tb tr[onclick]:active{background:#faf7f1}
+.tb .r{text-align:right} .tb small{display:block;color:var(--g);font-size:12px}
+.sel{padding:10px 12px;border:1px solid var(--b2);border-radius:10px;font-size:15px;background:#fff}
+.semsel{display:flex;gap:10px;flex-wrap:wrap}
+.semsel button{display:flex;align-items:center;gap:8px;padding:11px 16px;border-radius:12px;border:2px solid var(--b2);background:#fff;font-size:15px;cursor:pointer}
+.semsel button.on{border-color:var(--t);font-weight:700}
+.stat{text-align:center} .stat .big{font-size:32px} .stat small{color:var(--g);font-size:13px}
+.big3{display:flex;gap:18px;justify-content:space-around}
+.banner{background:#fff3d6;border:1px solid #ecd48d;border-radius:14px;padding:12px 16px;margin-bottom:16px;display:flex;justify-content:space-between;align-items:center;gap:12px;font-size:15px}
+.hint{color:var(--g);font-size:14px;line-height:1.5;margin-top:10px}
+#modal .mb{position:fixed;inset:0;background:rgba(40,30,10,.45);display:flex;align-items:center;justify-content:center;z-index:50;padding:20px}
+.mc{background:#fff;border-radius:20px;padding:24px;width:min(640px,100%);max-height:90vh;overflow:auto}
+.fg{display:grid;grid-template-columns:1fr 1fr;gap:14px;margin:14px 0}
+.f{display:flex;flex-direction:column;gap:5px;font-size:13px;color:var(--g)} .f.w{grid-column:1/3}
+.f input,.f select,.f textarea,.mc>input,textarea#pega{padding:12px;border:1px solid var(--b2);border-radius:10px;font-size:16px;font-family:inherit;color:var(--t);width:100%}
+.acts{display:flex;gap:10px;justify-content:flex-end;margin-top:14px} .acts.l{justify-content:flex-start}
+.err{color:var(--ro);font-size:14px;min-height:18px} .msg{font-size:16px;line-height:1.5;margin:10px 0}
+.bad{border-color:var(--ro)!important}
+#toast{position:fixed;left:50%;bottom:28px;transform:translateX(-50%);z-index:60}
+#toast div{background:#2b2b2b;color:#fff;padding:12px 20px;border-radius:14px;font-size:15px} #toast div.e{background:var(--ro)}
+@media(max-width:900px){.k,.c3,.c2{grid-template-columns:1fr 1fr}nav{width:170px}}
 </style>
 </head>
 <body>
 <nav>
   <img class="logo" src="logo.png" alt="VickFlex descanso">
-  <button class="on" onclick="ir('panel',this)">Panel</button>
-  <button onclick="ir('ficha',this)">Ficha de cliente</button>
-  <button class="off">Representantes</button>
+  <button data-v="panel" onclick="go('panel')">Panel</button>
+  <button data-v="reps" onclick="go('reps')">Representantes</button>
+  <button data-v="copias" onclick="go('copias')">Copias de seguridad</button>
   <button class="off">Planificación</button>
 </nav>
 <main>
+  <div class="top"><div id="crumbs"></div>
+    <div class="sb"><input id="q" type="search" placeholder="Buscar cliente…" oninput="buscar(this.value)" autocomplete="off"><div id="res"></div></div>
+  </div>
+  <div id="view"></div>
+</main>
+<div id="modal"></div><div id="toast"></div>
+<script>
+const KEY='vickflex_data',UNDO='vickflex_undo',YEAR=new Date().getFullYear();
+const MES=['ene','feb','mar','abr','may','jun','jul','ago','sep','oct','nov','dic'];
+const $=s=>document.querySelector(s);
+const esc=s=>String(s==null?'':s).replace(/[&<>"']/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
+const uid=()=>'x'+Date.now().toString(36)+Math.random().toString(36).slice(2,6);
+const eur=n=>String(Math.round(n)).replace(/\B(?=(\d{3})+(?!\d))/g,'.')+' €';
+const sg=n=>(n>0?'+':n<0?'−':'')+eur(Math.abs(n));
+const fd=s=>{if(!s)return '';const p=s.split('-');return p[2]+'/'+p[1]+'/'+p[0]};
+const norm=s=>String(s||'').normalize('NFD').replace(/[\u0300-\u036f]/g,'').toLowerCase();
 
-<section id="panel" class="view on">
-  <h1>Buenos días</h1>
-  <p class="sub">Miércoles 14 de octubre de 2026 · Semana 42</p>
+/* ---------- Datos: se guardan en este iPad (localStorage) ---------- */
+function seed(){
+  const reps=[['r1','Miguel Ángel Torá',['Castellón','Teruel']],['r2','Carlos Martínez',['Valencia','Castellón']],['r3','Laura Pons',['Valencia']],['r4','Javier Ruiz',['Málaga','Granada']],['r5','Marta Sanz',['Alicante','Murcia']]];
+  const W=[.9,.95,1.1,1,1.1,.9,.6,.4,1,1.05,1.1,1.4];
+  const gen=(b,k,n,stop)=>W.map((w,i)=>i>=n?null:(stop!=null&&i>=stop)?0:Math.round(b*w*k*(1+Math.sin(i*7+b)*.12)/10)*10);
+  const S=[
+  ['Descanso Vinaròs','Vinaròs','Castellón','r1',3200,1.18,null,'verde'],
+  ['Hogar Benicàssim','Benicàssim','Castellón','r1',2600,1.05,null,'verde'],
+  ['Colchones Castelló Centro','Castelló de la Plana','Castellón','r1',4800,.82,null,'amarillo'],
+  ['Muebles Onda','Onda','Castellón','r1',2100,.55,null,'rojo'],
+  ['Dormitorios Segorbe','Segorbe','Castellón','r1',1800,1,null,'verde',1],
+  ['Mobiliario Alcañiz','Alcañiz','Teruel','r1',2400,1,2,'rojo'],
+  ['Muebles Sagunto','Sagunto','Valencia','r2',3500,1.3,null,'verde'],
+  ['Hogar Burriana','Burriana','Castellón','r2',2300,1.12,null,'verde'],
+  ['Muebles Gandía','Gandía','Valencia','r3',4200,1.08,null,'verde'],
+  ['Descanso Alzira','Alzira','Valencia','r3',3000,1.02,null,'verde'],
+  ['Colchones Xàtiva','Xàtiva','Valencia','r3',2000,.9,null,'amarillo'],
+  ['Descanso Sur','Málaga','Málaga','r4',3800,1,3,'rojo'],
+  ['Muebles Marbella','Marbella','Málaga','r4',5200,.85,null,'amarillo'],
+  ['Hogar Granada','Granada','Granada','r4',2900,.95,null,'amarillo'],
+  ['Hogar Levante','Alicante','Alicante','r5',3100,1,5,'rojo'],
+  ['Colchones Pérez','Murcia','Murcia','r5',2700,1,6,'rojo'],
+  ['Muebles Elche','Elche','Alicante','r5',4400,.88,null,'amarillo']];
+  const cl=S.map((s,i)=>({id:'c'+(i+2),codigo:'C'+(1002+i),nombre:s[0],poblacion:s[1],provincia:s[2],repId:s[3],semaforo:s[7],
+    fact:{[YEAR-1]:s[8]?Array(12).fill(0):gen(s[4],1,12),[YEAR]:gen(s[4],s[5],10,s[6])}}));
+  cl.unshift({id:'c1',codigo:'C1001',nombre:'Muebles Hermanos Ortega',poblacion:'Villarreal',provincia:'Castellón',repId:'r2',semaforo:'amarillo',
+    fact:{[YEAR-1]:[3000,3400,3900,3800,4200,3100,2200,1100,3600,3900,4400,5200],[YEAR]:[3200,2800,4100,3600,3900,2500,1800,900,3300,1200,null,null]},
+    exposicion:['Viscoelástica Nube','Muelles Aura','Látex Bosque'],
+    pend:[{t:'Enviar tarifa nueva',h:false},{t:'Reponer 2 expositores',h:false}],
+    visitas:[{f:YEAR+'-10-06',t:'Pedido de 3 colchones Nube. Piden mejor precio en volumen.'},{f:YEAR+'-09-18',t:'Revisión de exposición. Quieren renovar el escaparate.'},{f:YEAR+'-05-22',t:'Visita comercial. Interés en línea de látex.'}],
+    pedidos:[{f:YEAR+'-10-06',i:1200},{f:YEAR+'-09-18',i:3300},{f:YEAR+'-05-22',i:3900}],
+    obs:'Cliente fiel pero cae en verano. Dueño prefiere visitas por la mañana.'});
+  return {schema:1,reps:reps.map(r=>({id:r[0],nombre:r[1],provincias:r[2]})),clientes:cl,lastBackup:null,changes:0};
+}
+function migrate(d){
+  d.schema=1;d.reps=d.reps||[];d.clientes=d.clientes||[];
+  d.clientes.forEach(c=>{c.fact=c.fact||{};c.exposicion=c.exposicion||[];c.pend=c.pend||[];c.visitas=c.visitas||[];c.pedidos=c.pedidos||[];c.obs=c.obs||'';c.semaforo=c.semaforo||'amarillo';
+    if(!c.repHist||!c.repHist.length)c.repHist=[{r:c.repId,d:null}]});
+  if(d.changes==null)d.changes=0; if(d.lastBackup===undefined)d.lastBackup=null; return d;
+}
+function load(){
+  let raw=null;try{raw=localStorage.getItem(KEY)}catch(e){}
+  if(raw){try{return migrate(JSON.parse(raw))}catch(e){try{localStorage.setItem('vickflex_corrupto',raw)}catch(_){}}}
+  const d=migrate(seed());try{localStorage.setItem(KEY,JSON.stringify(d))}catch(e){}return d;
+}
+let D=load(),sortBy='fact';
+function persist(){try{localStorage.setItem(KEY,JSON.stringify(D));return true}catch(e){toast('No se ha podido guardar en este iPad. Haz una copia de seguridad.',1);return false}}
+function save(){D.changes=(D.changes||0)+1;return persist()}
+function snap(label){try{localStorage.setItem(UNDO,JSON.stringify({at:Date.now(),label:label,data:D}))}catch(e){}}
+function getUndo(){try{return JSON.parse(localStorage.getItem(UNDO))}catch(e){return null}}
+try{if(navigator.storage&&navigator.storage.persist)navigator.storage.persist()}catch(e){}
 
+/* ---------- Cálculos ---------- */
+const rep=id=>D.reps.find(r=>r.id===id), cli=id=>D.clientes.find(c=>c.id===id);
+const repNom=id=>{const r=rep(id);return r?r.nombre:'Sin representante'};
+const clientsOf=id=>D.clientes.filter(c=>c.repId===id);
+const fy=(c,y)=>(c.fact&&c.fact[y])||[];
+function corte(){let m=0;D.clientes.forEach(c=>fy(c,YEAR).forEach((v,i)=>{if(v!=null&&i+1>m)m=i+1}));return m||(new Date().getMonth()+1)}
+const acum=(c,y,m)=>fy(c,y).slice(0,m).reduce((a,v)=>a+(v||0),0);
+const hasBill=c=>Object.keys(c.fact).some(y=>fy(c,y).some(v=>v>0));
+function mesesSin(c,m){let n=0,y=YEAR,i=m-1;while(n<48){const a=c.fact[y];if(!a&&y<YEAR-3)break;const v=a?a[i]:null;if(v>0)return n;n++;i--;if(i<0){i=11;y--}}return n}
+const sinComprar=(c,m)=>hasBill(c)&&mesesSin(c,m)>=3;
+function stats(cs){const m=corte();let a=0,p=0,up=0,dn=0,nu=0,sc=0;const sem={verde:0,amarillo:0,rojo:0};
+  cs.forEach(c=>{const x=acum(c,YEAR,m),y=acum(c,YEAR-1,m);a+=x;p+=y;
+    if(y===0&&x>0)nu++;else if(x>y)up++;else if(x<y)dn++;
+    if(sinComprar(c,m))sc++;sem[c.semaforo||'amarillo']++});
+  return {m:m,a:a,p:p,d:a-p,up:up,dn:dn,nu:nu,sc:sc,sem:sem,n:cs.length}}
+function pctHTML(a,b){
+  if(b===0&&a>0)return '<span class="pill n">Nuevo</span>';
+  if(b===0)return '<span class="mut">—</span>';
+  const p=(a-b)/b*100;return `<span class="pill ${p>=0?'u':'d'}">${p>=0?'▲':'▼'} ${Math.abs(p).toFixed(1).replace('.',',')}%</span>`}
+const per=m=>MES[0]+'–'+MES[m-1];
+const dot=s=>`<span class="dot ${s}"></span>`;
+function barsHTML(a,b){const max=Math.max(1,...a.map(v=>v||0),...b.map(v=>v||0));
+  return '<div class="bars">'+a.map((v,i)=>`<div><span><i class="a25" style="height:${(v||0)/max*100}%"></i>${b[i]!=null?`<i class="a26" style="height:${b[i]/max*100}%"></i>`:''}</span>${'EFMAMJJASOND'[i]}</div>`).join('')+'</div>'+
+  `<div class="leg"><b class="a25"></b>${YEAR-1}<b class="a26"></b>${YEAR}</div>`}
+function lastPedido(c){return [...(c.pedidos||[])].sort((x,y)=>y.f.localeCompare(x.f))[0]}
+
+/* ---------- Pantallas ---------- */
+function banner(){
+  const dias=D.lastBackup?(Date.now()-D.lastBackup)/864e5:null;
+  if(!(D.changes>0&&(dias==null||dias>=7)))return '';
+  return `<div class="banner"><span>${dias==null?'Todavía no has hecho ninguna copia de seguridad.':'Hace '+Math.floor(dias)+' días de tu última copia.'} Tienes <b>${D.changes}</b> cambios sin copiar.</span><button class="b1" onclick="hacerCopia()">Hacer copia</button></div>`}
+
+function vPanel(){
+  const all=D.clientes,s=stats(all),m=s.m;
+  const t=y=>MES.map((_,i)=>all.reduce((a,c)=>a+(fy(c,y)[i]||0),0));
+  const t25=t(YEAR-1).map(v=>Math.round(v/1000)),t26=t(YEAR).map((v,i)=>i<m?Math.round(v/1000):null);
+  const rs=D.reps.map(r=>({r:r,s:stats(clientsOf(r.id))})).filter(x=>x.s.n);
+  const dej=all.filter(c=>sinComprar(c,m)).map(c=>({c:c,n:mesesSin(c,m)})).sort((a,b)=>b.n-a.n).slice(0,4);
+  return `<h1>Buenos días</h1><p class="sub">${new Date().toLocaleDateString('es-ES',{weekday:'long',day:'numeric',month:'long',year:'numeric'})} · cifras acumuladas ${per(m)}</p>
   <div class="grid k">
-    <div class="card"><h3>Facturación 2026</h3><div class="big" id="f26"></div></div>
-    <div class="card"><h3>Mismo periodo 2025</h3><div class="big" id="f25"></div></div>
-    <div class="card"><h3>Variación</h3><div class="big up" id="fv"></div></div>
-    <div class="card"><h3>Clientes en rojo</h3><div class="big dn">3</div></div>
+    <div class="card"><h3>Facturación ${YEAR}</h3><div class="big">${eur(s.a)}</div></div>
+    <div class="card"><h3>Mismo periodo ${YEAR-1}</h3><div class="big">${eur(s.p)}</div></div>
+    <div class="card"><h3>Variación</h3><div class="big ${s.d>=0?'up':'dn'}">${s.p?(s.d>=0?'▲ ':'▼ ')+Math.abs(s.d/s.p*100).toFixed(1).replace('.',',')+' %':'—'}</div></div>
+    <div class="card"><h3>Clientes en rojo</h3><div class="big dn">${s.sem.rojo}</div></div>
   </div>
-
   <div class="grid c2" style="margin-top:16px">
-    <div class="card"><h3>Facturación mensual (miles de €)</h3>
-      <div class="bars" id="graf"></div>
-      <div class="leg"><b class="a25"></b>2025<b class="a26"></b>2026</div>
-    </div>
-    <div class="card zona"><h3>Zona de esta semana</h3>
-      <div class="big">Levante</div>
-      <p>Valencia y Castellón<br>6 clientes por visitar · 2 ya visitados<br>Próxima visita: jueves 9:30, Muebles Ortega (Villarreal)</p>
-    </div>
+    <div class="card"><h3>Facturación mensual (miles de €)</h3>${barsHTML(t25,t26)}</div>
+    <div class="card zona"><h3>Zona de esta semana</h3><div class="big">Levante</div>
+      <p>Valencia y Castellón<br>6 clientes por visitar · 2 ya visitados<br>Próxima visita: jueves 9:30, Muebles Ortega (Villarreal)</p></div>
   </div>
-
   <div class="grid c3" style="margin-top:16px">
-    <div class="card"><h3>Representantes</h3>
-      <div class="row">Carlos M. <span class="pill u">▲ 12%</span></div>
-      <div class="row">Laura P. <span class="pill u">▲ 5%</span></div>
-      <div class="row">Javier R. <span class="pill d">▼ 9%</span></div>
-      <div class="row">Marta S. <span class="pill d">▼ 14%</span></div>
-    </div>
-    <div class="card"><h3>Han dejado de comprar</h3>
-      <div class="row"><span>Descanso Sur<br><small style="color:#999">Málaga</small></span><span class="dn">hace 7 meses</span></div>
-      <div class="row"><span>Hogar Levante<br><small style="color:#999">Alicante</small></span><span class="dn">hace 5 meses</span></div>
-      <div class="row"><span>Colchones Pérez<br><small style="color:#999">Murcia</small></span><span class="dn">hace 4 meses</span></div>
-    </div>
+    <div class="card"><h3>Representantes</h3>${rs.map(x=>`<div class="row lk" onclick="go('rep/${x.r.id}')">${esc(x.r.nombre)} ${pctHTML(x.s.a,x.s.p)}</div>`).join('')||'<span class="mut">Sin datos</span>'}</div>
+    <div class="card"><h3>Han dejado de comprar</h3>${dej.map(x=>`<div class="row lk" onclick="go('cli/${x.c.id}')"><span>${esc(x.c.nombre)}<br><small style="color:#999">${esc(x.c.poblacion)}</small></span><span class="dn">hace ${x.n} meses</span></div>`).join('')||'<span class="mut">Ninguno</span>'}</div>
     <div class="card"><h3>Avisos y tareas</h3>
       <label class="task"><input type="checkbox"><span>Enviar tarifa nueva a Ortega</span></label>
       <label class="task"><input type="checkbox"><span>Llamar a Colchones Pérez</span></label>
       <label class="task"><input type="checkbox" checked><span>Confirmar visita en Gandía</span></label>
-      <label class="task"><input type="checkbox"><span>Reponer expositor en Castellón</span></label>
-    </div>
-  </div>
-</section>
+      <label class="task"><input type="checkbox"><span>Reponer expositor en Castellón</span></label></div>
+  </div>`}
 
-<section id="ficha" class="view">
-  <div class="head">
-    <span class="sem" style="background:var(--am)"></span>
-    <div><h1>Muebles Hermanos Ortega</h1>
-    <p class="sub" style="margin:0">Villarreal, Castellón · Representante: Carlos M.</p></div>
-  </div>
+function vReps(){
+  const rs=[...D.reps].sort((a,b)=>a.nombre.localeCompare(b.nombre,'es'));
+  return `<div class="hb"><div><h1>Representantes</h1><p class="sub" style="margin-bottom:0">${D.reps.length} representantes · ${D.clientes.length} clientes</p></div>
+    <div class="acts"><button class="b1" onclick="repForm()">+ Nuevo representante</button></div></div>
+  ${rs.length?`<div class="grid cards">${rs.map(r=>{const s=stats(clientsOf(r.id));return `<div class="card lk" onclick="go('rep/${r.id}')" style="cursor:pointer">
+    <div class="row" style="border:0;padding:0"><b style="font-size:19px">${esc(r.nombre)}</b>${pctHTML(s.a,s.p)}</div>
+    <p class="sub" style="margin:4px 0 14px">${esc(r.provincias.join(' · ')||'Sin provincia')}</p>
+    <div class="row" style="border:0"><span>Clientes</span><b>${s.n}</b></div>
+    <div class="row" style="border:0"><span>Facturación ${YEAR} (${per(s.m)})</span><b>${eur(s.a)}</b></div>
+    <div style="display:flex;gap:14px;margin-top:8px;font-size:15px">${dot('verde')} ${s.sem.verde} ${dot('amarillo')} ${s.sem.amarillo} ${dot('rojo')} ${s.sem.rojo}</div></div>`}).join('')}</div>`
+  :'<div class="card">Todavía no hay representantes. Pulsa <b>+ Nuevo representante</b>.</div>'}`}
 
+function vRep(id){
+  const r=rep(id),cs=clientsOf(id),s=stats(cs),m=s.m;
+  const fn={fact:(a,b)=>acum(b,YEAR,m)-acum(a,YEAR,m),nombre:(a,b)=>a.nombre.localeCompare(b.nombre,'es'),
+    caida:(a,b)=>vr(a,m)-vr(b,m),sin:(a,b)=>mesesSin(b,m)-mesesSin(a,m)}[sortBy];
+  const rows=[...cs].sort(fn).map((c,i)=>{const x=acum(c,YEAR,m),y=acum(c,YEAR-1,m),lp=lastPedido(c),ms=sinComprar(c,m)?mesesSin(c,m):0;
+    return `<tr onclick="go('cli/${c.id}')"><td>${i+1}</td><td><b>${esc(c.nombre)}</b><small>${esc(c.poblacion)}${c.provincia?', '+esc(c.provincia):''}</small></td>
+    <td class="r">${eur(x)}</td><td class="r">${eur(y)}</td><td class="r">${pctHTML(x,y)}</td>
+    <td>${lp?fd(lp.f):'<span class="mut">sin fecha</span>'}${ms?`<small class="dn">sin facturar ${ms} meses</small>`:''}</td>
+    <td onclick="event.stopPropagation();cycSem('${c.id}')" title="Pulsa para cambiar el estado">${dot(c.semaforo)}</td></tr>`}).join('');
+  return `<div class="hb"><div><h1>${esc(r.nombre)}</h1><p class="sub" style="margin-bottom:0">${esc(r.provincias.join(' · ')||'Sin provincia')}</p></div>
+    <div class="acts"><button class="b1" onclick="cliForm(null,'${r.id}')">+ Nuevo cliente</button><button class="b2" onclick="repForm('${r.id}')">Editar</button><button class="b2 dng" onclick="delRep('${r.id}')">Eliminar</button><button class="b2" disabled>Importar facturación (Fase D)</button></div></div>
   <div class="grid k">
-    <div class="card"><h3>Acumulado 2026</h3><div class="big" id="c26"></div></div>
-    <div class="card"><h3>Mismo periodo 2025</h3><div class="big" id="c25"></div></div>
-    <div class="card"><h3>Variación</h3><div class="big dn" id="cv"></div></div>
-    <div class="card"><h3>Última compra</h3><div class="big" style="font-size:24px">6 oct 2026</div></div>
+    <div class="card"><h3>Clientes</h3><div class="big">${s.n}</div></div>
+    <div class="card"><h3>Facturación ${YEAR} (${per(m)})</h3><div class="big">${eur(s.a)}</div></div>
+    <div class="card"><h3>Mismo periodo ${YEAR-1}</h3><div class="big">${eur(s.p)}</div></div>
+    <div class="card"><h3>Diferencia</h3><div class="big ${s.d>=0?'up':'dn'}" style="font-size:26px">${sg(s.d)}</div><div style="margin-top:6px">${pctHTML(s.a,s.p)}</div></div>
   </div>
-
   <div class="grid c2" style="margin-top:16px">
-    <div class="card"><h3>Facturación mensual (€)</h3>
-      <div class="bars" id="gc"></div>
-      <div class="leg"><b class="a25"></b>2025<b class="a26"></b>2026</div>
-    </div>
-    <div class="card"><h3>En exposición ahora</h3>
-      <span class="tag">Viscoelástica Nube</span><span class="tag">Muelles Aura</span><span class="tag">Látex Bosque</span>
-      <h3 style="margin-top:14px">Compromisos pendientes</h3>
-      <label class="task"><input type="checkbox"><span>Enviar tarifa nueva</span></label>
-      <label class="task"><input type="checkbox"><span>Reponer 2 expositores</span></label>
-    </div>
+    <div class="card"><h3>Evolución de sus clientes</h3><div class="big3">
+      <div class="stat"><div class="big up">${s.up}</div><small>▲ Suben</small></div>
+      <div class="stat"><div class="big dn">${s.dn}</div><small>▼ Bajan</small></div>
+      <div class="stat"><div class="big">${s.nu}</div><small>Nuevos</small></div>
+      <div class="stat"><div class="big dn">${s.sc}</div><small>Sin comprar 3+ meses</small></div></div></div>
+    <div class="card"><h3>Semáforo</h3><div class="big3">
+      <div class="stat">${dot('verde')}<div class="big">${s.sem.verde}</div></div>
+      <div class="stat">${dot('amarillo')}<div class="big">${s.sem.amarillo}</div></div>
+      <div class="stat">${dot('rojo')}<div class="big">${s.sem.rojo}</div></div></div></div>
   </div>
+  <div class="card" style="margin-top:16px"><div class="hb" style="margin-bottom:8px"><h3 style="margin:0">Clientes de ${esc(r.nombre)}</h3>
+    <select class="sel" onchange="setSort(this.value)"><option value="fact" ${sortBy==='fact'?'selected':''}>Ranking por facturación</option><option value="nombre" ${sortBy==='nombre'?'selected':''}>Nombre A–Z</option><option value="caida" ${sortBy==='caida'?'selected':''}>Mayor caída primero</option><option value="sin" ${sortBy==='sin'?'selected':''}>Más meses sin comprar</option></select></div>
+    ${cs.length?`<table class="tb"><thead><tr><th>#</th><th>Cliente</th><th class="r">${YEAR}</th><th class="r">${YEAR-1}</th><th class="r">Dif.</th><th>Última compra</th><th>Estado</th></tr></thead><tbody>${rows}</tbody></table>
+    <p class="hint">Importes acumulados ${per(m)} de cada año, comparados con el mismo periodo. Si el informe no trae fechas de pedidos, la última compra aparece como «sin fecha». Pulsa el círculo para cambiar el estado.</p>`
+    :'<p class="msg">Este representante todavía no tiene clientes. Pulsa <b>+ Nuevo cliente</b>.</p>'}</div>`}
+function vr(c,m){const a=acum(c,YEAR,m),b=acum(c,YEAR-1,m);return b?(a-b)/b:(a>0?1e9:0)}
 
+function vCli(id){
+  const c=cli(id),r=rep(c.repId),m=corte(),a=acum(c,YEAR,m),p=acum(c,YEAR-1,m),lp=lastPedido(c),ms=mesesSin(c,m);
+  const ant=[...new Set((c.repHist||[]).slice(0,-1).map(h=>h.r))].filter(x=>x!==c.repId).map(x=>rep(x)).filter(Boolean).map(x=>esc(x.nombre));
+  const dd=(l,v)=>`<div class="row"><span style="color:var(--g)">${l}</span><span>${v?esc(v):'<span class="mut">—</span>'}</span></div>`;
+  const get=y=>MES.map((_,i)=>fy(c,y)[i]);
+  return `<div class="hb"><div class="head">${dot(c.semaforo)}<div><h1>${esc(c.nombre)}</h1><p class="sub" style="margin:0">${esc(c.poblacion)}${c.provincia?', '+esc(c.provincia):''} · Representante: ${r?`<a style="color:var(--v);font-weight:600;cursor:pointer" onclick="go('rep/${r.id}')">${esc(r.nombre)}</a>`:'sin asignar'}</p></div></div>
+    <div class="acts"><button class="b2" onclick="cliForm('${c.id}')">Editar</button><button class="b2 dng" onclick="delCli('${c.id}')">Eliminar</button></div></div>
+  <div class="card" style="margin-bottom:16px"><h3>Estado comercial (se cambia a mano)</h3><div class="semsel">
+    ${['verde','amarillo','rojo'].map(s=>`<button class="${c.semaforo===s?'on':''}" onclick="setSem('${c.id}','${s}')">${dot(s)} ${{verde:'Verde · va bien',amarillo:'Amarillo · seguimiento',rojo:'Rojo · atención'}[s]}</button>`).join('')}</div></div>
+  <div class="grid k">
+    <div class="card"><h3>Acumulado ${YEAR}</h3><div class="big">${eur(a)}</div></div>
+    <div class="card"><h3>Mismo periodo ${YEAR-1}</h3><div class="big">${eur(p)}</div></div>
+    <div class="card"><h3>Variación</h3><div class="big" style="font-size:24px">${pctHTML(a,p)}</div><div style="margin-top:6px">${p||a?sg(a-p):''}</div></div>
+    <div class="card"><h3>Última compra</h3><div class="big" style="font-size:24px">${lp?fd(lp.f):'<span class="mut" style="font-size:18px">Sin fecha en los datos</span>'}</div>${ms>0&&hasBill(c)?`<div class="dn" style="margin-top:6px;font-size:14px">Sin facturar desde hace ${ms} meses</div>`:''}</div>
+  </div>
   <div class="grid c2" style="margin-top:16px">
-    <div class="card"><h3>Historial de visitas</h3>
-      <div class="hist"><b>6 oct 2026</b> · Pedido de 3 colchones Nube. Piden mejor precio en volumen.</div>
-      <div class="hist"><b>18 sep 2026</b> · Revisión de exposición. Quieren renovar el escaparate.</div>
-      <div class="hist"><b>22 may 2026</b> · Visita comercial. Interés en línea de látex.</div>
-    </div>
-    <div class="card"><h3>Últimos pedidos</h3>
-      <div class="row">06/10/2026<span>1.200 €</span></div>
-      <div class="row">18/09/2026<span>3.300 €</span></div>
-      <div class="row">22/05/2026<span>3.900 €</span></div>
-      <h3 style="margin-top:14px">Observaciones</h3>
-      <p style="font-size:14px;line-height:1.5;color:#555">Cliente fiel pero cae en verano. Dueño prefiere visitas por la mañana.</p>
-    </div>
+    <div class="card"><h3>Facturación mensual (€)</h3>${barsHTML(get(YEAR-1),get(YEAR))}</div>
+    <div class="card"><h3>Datos generales</h3>${dd('Código',c.codigo)}${dd('Población',c.poblacion)}${dd('Provincia',c.provincia)}${dd('Dirección',c.direccion)}${dd('Teléfono',c.telefono)}${dd('Contacto',c.contacto)}${dd('Representante',r&&r.nombre)}${ant.length?dd('Antes con',ant.join(', ')):''}</div>
   </div>
-</section>
+  <div class="grid c2" style="margin-top:16px">
+    <div class="card"><h3>En exposición ahora</h3>${c.exposicion.length?c.exposicion.map(t=>`<span class="tag">${esc(t)}</span>`).join(''):'<span class="mut">Sin datos todavía</span>'}
+      <h3 style="margin-top:14px">Compromisos pendientes</h3>${c.pend.length?c.pend.map((t,i)=>`<label class="task"><input type="checkbox" ${t.h?'checked':''} onchange="togglePend('${c.id}',${i})"><span>${esc(t.t)}</span></label>`).join(''):'<span class="mut">Ninguno</span>'}</div>
+    <div class="card"><h3>Historial de visitas</h3>${c.visitas.length?c.visitas.map(v=>`<div class="hist"><b>${fd(v.f)}</b> · ${esc(v.t)}</div>`).join(''):'<span class="mut">Sin visitas registradas todavía</span>'}</div>
+  </div>
+  <div class="grid c2" style="margin-top:16px">
+    <div class="card"><h3>Últimos pedidos</h3>${c.pedidos.length?[...c.pedidos].sort((x,y)=>y.f.localeCompare(x.f)).map(o=>`<div class="row">${fd(o.f)}<span>${eur(o.i)}</span></div>`).join(''):'<span class="mut">Sin pedidos con fecha</span>'}</div>
+    <div class="card"><h3>Observaciones</h3><p style="font-size:15px;line-height:1.5;color:#555">${c.obs?esc(c.obs):'<span class="mut">Sin observaciones</span>'}</p></div>
+  </div>
+  <p class="hint">Ficha provisional: el catálogo, la exposición, las compras, las visitas y las alertas se completan en las fases B y C.</p>`}
 
-</main>
-<script>
-const eur=n=>n.toLocaleString("es-ES")+" €";
-const pct=(a,b)=>((a/b-1)*100).toFixed(1).replace(".",",")+" %";
-function barras(id,a25,a26){
-  const max=Math.max(...a25,...a26),m="EFMAMJJASOND";
-  document.getElementById(id).innerHTML=a25.map((v,i)=>`<div><span><i class="a25" style="height:${v/max*100}%"></i>${a26[i]!=null?`<i class="a26" style="height:${a26[i]/max*100}%"></i>`:""}</span>${m[i]}</div>`).join("");
-}
-const p25=[88,95,110,102,118,96,70,40,105,112,118,142];
-const p26=[96,101,118,112,125,104,74,42,110,59];
-const s=a=>a.reduce((x,y)=>x+y,0);
-const t26=s(p26)*1000,t25=s(p25.slice(0,10))*1000;
-f26.textContent=eur(t26);f25.textContent=eur(t25);fv.textContent="▲ "+pct(t26,t25).replace("-","");
-barras("graf",p25,p26);
-const c25=[3000,3400,3900,3800,4200,3100,2200,1100,3600,3900,4400,5200];
-const c26=[3200,2800,4100,3600,3900,2500,1800,900,3300,1200];
-const a=s(c26),b=s(c25.slice(0,10));
-document.getElementById("c26").textContent=eur(a);document.getElementById("c25").textContent=eur(b);
-document.getElementById("cv").textContent="▼ "+pct(a,b).replace("-","");
-barras("gc",c25,c26);
-function ir(id,btn){
-  document.querySelectorAll(".view").forEach(v=>v.classList.remove("on"));
-  document.getElementById(id).classList.add("on");
-  document.querySelectorAll("nav button").forEach(x=>x.classList.remove("on"));
-  btn.classList.add("on");
-}
+function vCopias(){
+  const lb=D.lastBackup?new Date(D.lastBackup).toLocaleDateString('es-ES',{day:'numeric',month:'long',year:'numeric'}):'Nunca',u=getUndo();
+  return `<h1>Copias de seguridad</h1><p class="sub">Tus datos están solo en este iPad. Haz copias con frecuencia.</p>
+  <div class="grid c2">
+   <div class="card"><h3>Copia completa</h3><p style="line-height:1.7">Última copia: <b>${lb}</b><br>Cambios desde entonces: <b>${D.changes}</b></p>
+    <div class="acts l"><button class="b1" onclick="hacerCopia()">Hacer copia</button><button class="b2" onclick="copiarTexto()">Copiar como texto</button></div>
+    <p class="hint">Se abre la hoja de compartir: elige <b>Guardar en Archivos</b>, mejor en iCloud Drive. Después comprueba que el archivo está en Archivos.</p></div>
+   <div class="card"><h3>Restaurar una copia</h3>
+    <label class="b2 filebtn">Elegir archivo de copia<input type="file" accept=".json,application/json" onchange="leerArchivo(this)" hidden></label>
+    <textarea id="pega" rows="3" style="margin-top:12px" placeholder="…o pega aquí el texto de la copia"></textarea>
+    <div class="acts l"><button class="b2" onclick="restaurarTexto()">Restaurar desde el texto</button></div>
+    <p class="hint">Antes de restaurar, la app guarda una copia interna de lo que hay ahora.</p></div>
+   <div class="card"><h3>Deshacer</h3>${u?`<p style="line-height:1.6">Último cambio importante: <b>${esc(u.label)}</b> (${new Date(u.at).toLocaleString('es-ES')})</p><div class="acts l"><button class="b2" onclick="deshacer()">Volver a antes de ese cambio</button></div>`:'<p class="mut">Todavía no hay nada que deshacer.</p>'}</div>
+   <div class="card"><h3>Empezar con datos reales</h3><p style="line-height:1.5">Vacía todos los datos de ejemplo para empezar de cero. Hazlo después de una copia.</p><div class="acts l"><button class="b2 dng" onclick="vaciar()">Vaciar todos los datos</button></div></div>
+  </div>`}
+
+/* ---------- Navegación ---------- */
+function go(h){if(location.hash==='#'+h)render();else location.hash=h}
+function crumbs(v,id){
+  const l=(h,t)=>`<a onclick="go('${h}')">${esc(t)}</a>`,s=' <i>›</i> ';
+  if(v==='panel')return '<b>Panel</b>';if(v==='reps')return '<b>Representantes</b>';if(v==='copias')return '<b>Copias de seguridad</b>';
+  if(v==='rep')return l('reps','Representantes')+s+'<b>'+esc(rep(id).nombre)+'</b>';
+  const c=cli(id),r=rep(c.repId);return l('reps','Representantes')+s+(r?l('rep/'+r.id,r.nombre)+s:'')+'<b>'+esc(c.nombre)+'</b>'}
+function render(keep){
+  const p=(location.hash.slice(1)||'panel').split('/');let v=p[0],id=p[1];
+  if(v==='rep'&&!rep(id))v='reps';if(v==='cli'&&!cli(id))v='reps';if(['panel','reps','rep','cli','copias'].indexOf(v)<0)v='panel';
+  const f={panel:vPanel,reps:vReps,rep:()=>vRep(id),cli:()=>vCli(id),copias:vCopias}[v];
+  const st=$('#view').scrollTop;
+  $('#view').innerHTML=(v==='copias'?'':banner())+f();
+  $('#crumbs').innerHTML=crumbs(v,id);
+  document.querySelectorAll('nav button[data-v]').forEach(b=>b.classList.toggle('on',b.dataset.v===((v==='rep'||v==='cli')?'reps':v)));
+  $('#view').scrollTop=keep===true?st:0}
+window.addEventListener('hashchange',()=>render());
+document.addEventListener('click',e=>{if(!e.target.closest('.sb')){$('#res').style.display='none'}});
+
+/* ---------- Buscador ---------- */
+function buscar(q){
+  const box=$('#res');q=norm(q.trim());if(q.length<2){box.style.display='none';box.innerHTML='';return}
+  const rs=D.clientes.filter(c=>norm([c.nombre,c.codigo,c.poblacion,c.provincia,repNom(c.repId)].join(' ')).indexOf(q)>=0).slice(0,10);
+  box.style.display='block';
+  box.innerHTML=rs.length?rs.map(c=>`<div class="ri" onclick="abrirRes('${c.id}')">${dot(c.semaforo)}<b>${esc(c.nombre)}</b><small>${esc(c.poblacion)} · ${esc(repNom(c.repId))}</small></div>`).join(''):'<div class="ri mut">Sin resultados</div>'}
+function abrirRes(id){$('#q').value='';$('#res').style.display='none';go('cli/'+id)}
+
+/* ---------- Ventanas y formularios ---------- */
+function modal(h){$('#modal').innerHTML='<div class="mb"><div class="mc">'+h+'</div></div>'}
+function closeModal(){$('#modal').innerHTML=''}
+function toast(t,e){const el=document.createElement('div');el.textContent=t;if(e)el.className='e';$('#toast').appendChild(el);setTimeout(()=>el.remove(),3500)}
+function ask(msg,label,fn,typed){
+  modal(`<h2>Confirmar</h2><p class="msg">${msg}</p>${typed?`<input id="tp" placeholder="Escribe ${typed} para confirmar">`:''}<div class="acts"><button class="b2" onclick="closeModal()">Cancelar</button><button class="b1 danger" id="okc">${label}</button></div>`);
+  $('#okc').onclick=()=>{if(typed&&$('#tp').value.trim().toUpperCase()!==typed){$('#tp').classList.add('bad');return}closeModal();fn()}}
+function formModal(title,fields,vals,onSave){
+  const provs=[...new Set(D.reps.flatMap(r=>r.provincias).concat(D.clientes.map(c=>c.provincia)).filter(Boolean))];
+  const h=fields.map(f=>`<label class="f ${f.w||''}"><span>${f.l}</span>${f.t==='select'?`<select name="${f.n}">${f.o.map(o=>`<option value="${esc(o[0])}" ${o[0]===vals[f.n]?'selected':''}>${esc(o[1])}</option>`).join('')}</select>`:f.t==='area'?`<textarea name="${f.n}" rows="3">${esc(vals[f.n])}</textarea>`:`<input name="${f.n}" value="${esc(vals[f.n])}" ${f.list?'list="provs"':''} ${f.ph?`placeholder="${esc(f.ph)}"`:''}>`}</label>`).join('');
+  modal(`<h2>${title}</h2><form id="frm"><div class="fg">${h}</div><datalist id="provs">${provs.map(p=>`<option value="${esc(p)}">`).join('')}</datalist><p class="err" id="err"></p><div class="acts"><button type="button" class="b2" onclick="closeModal()">Cancelar</button><button type="submit" class="b1">Guardar</button></div></form>`);
+  const fm=$('#frm');
+  fm.onsubmit=e=>{e.preventDefault();const o={};fields.forEach(f=>o[f.n]=fm.elements[f.n].value.trim());const r=onSave(o);if(typeof r==='string'){$('#err').textContent=r}else if(r!==true){closeModal()}}}
+
+function repForm(id){
+  const r=id?rep(id):null;
+  formModal(r?'Editar representante':'Nuevo representante',[{n:'nombre',l:'Nombre y apellidos',w:'w'},{n:'prov',l:'Provincias que lleva (separadas por comas)',ph:'Castellón, Teruel',w:'w'}],
+   {nombre:r?r.nombre:'',prov:r?r.provincias.join(', '):''},o=>{
+    if(!o.nombre)return 'Escribe el nombre del representante.';
+    const pv=o.prov.split(',').map(x=>x.trim()).filter(Boolean);
+    if(r){r.nombre=o.nombre;r.provincias=pv;save();render(true)}else{const n={id:uid(),nombre:o.nombre,provincias:pv};D.reps.push(n);save();go('rep/'+n.id)}})}
+function delRep(id){
+  const r=rep(id),n=clientsOf(id).length;
+  if(n)return modal(`<h2>No se puede eliminar</h2><p class="msg"><b>${esc(r.nombre)}</b> tiene ${n} clientes. Para no perder su historial, primero cambia cada cliente a otro representante (Editar cliente → Representante).</p><div class="acts"><button class="b1" onclick="closeModal()">Entendido</button></div>`);
+  ask(`¿Eliminar al representante <b>${esc(r.nombre)}</b>?`,'Eliminar',()=>{snap('Eliminar representante '+r.nombre);D.reps=D.reps.filter(x=>x.id!==id);save();go('reps');toast('Representante eliminado. Puedes deshacerlo en Copias de seguridad.')})}
+function cliForm(id,repId){
+  const c=id?cli(id):null,r0=c?c.repId:repId,rp=rep(r0);
+  formModal(c?'Editar cliente':'Nuevo cliente',[
+   {n:'nombre',l:'Nombre comercial',w:'w'},{n:'codigo',l:'Código de cliente (si existe)'},{n:'poblacion',l:'Población'},
+   {n:'provincia',l:'Provincia',list:1},{n:'repId',l:'Representante asignado',t:'select',o:D.reps.map(r=>[r.id,r.nombre])},
+   {n:'direccion',l:'Dirección',w:'w'},{n:'telefono',l:'Teléfono'},{n:'contacto',l:'Persona de contacto'},
+   {n:'semaforo',l:'Estado comercial',t:'select',o:[['verde','Verde'],['amarillo','Amarillo'],['rojo','Rojo']]},{n:'obs',l:'Observaciones generales',t:'area',w:'w'}],
+   {nombre:c?c.nombre:'',codigo:c?c.codigo:'',poblacion:c?c.poblacion:'',provincia:c?c.provincia:(rp&&rp.provincias[0])||'',repId:r0,direccion:c?c.direccion:'',telefono:c?c.telefono:'',contacto:c?c.contacto:'',semaforo:c?c.semaforo:'amarillo',obs:c?c.obs:''},
+   o=>{
+    if(!o.nombre)return 'Escribe el nombre comercial del cliente.';
+    if(!c){const n={id:uid(),codigo:o.codigo,nombre:o.nombre,poblacion:o.poblacion,provincia:o.provincia,direccion:o.direccion,telefono:o.telefono,contacto:o.contacto,repId:o.repId,semaforo:o.semaforo,obs:o.obs,fact:{},exposicion:[],pend:[],visitas:[],pedidos:[],repHist:[{r:o.repId,d:Date.now()}]};
+      D.clientes.push(n);save();go('cli/'+n.id);return}
+    const apply=()=>{['nombre','codigo','poblacion','provincia','direccion','telefono','contacto','semaforo','obs'].forEach(k=>c[k]=o[k]);
+      if(o.repId!==c.repId){c.repId=o.repId;c.repHist.push({r:o.repId,d:Date.now()})}save();render(true)};
+    if(o.repId!==c.repId){ask(`Vas a pasar <b>${esc(c.nombre)}</b> de <b>${esc(repNom(c.repId))}</b> a <b>${esc(repNom(o.repId))}</b>. Se conserva todo su historial.`,'Cambiar de representante',apply);return true}
+    apply()})}
+function delCli(id){
+  const c=cli(id);
+  ask(`¿Eliminar a <b>${esc(c.nombre)}</b>? Se borrarán su ficha, su facturación y su historial. Después podrás deshacerlo en Copias de seguridad.`,'Eliminar',()=>{snap('Eliminar cliente '+c.nombre);const r=c.repId;D.clientes=D.clientes.filter(x=>x.id!==id);save();go(rep(r)?'rep/'+r:'reps');toast('Cliente eliminado.')})}
+function setSem(id,s){cli(id).semaforo=s;save();render(true)}
+function cycSem(id){const c=cli(id),o=['verde','amarillo','rojo'];c.semaforo=o[(o.indexOf(c.semaforo)+1)%3];save();render(true)}
+function togglePend(id,i){const t=cli(id).pend[i];t.h=!t.h;save();render(true)}
+function setSort(v){sortBy=v;render(true)}
+
+/* ---------- Copias de seguridad ---------- */
+const backupText=()=>JSON.stringify({app:'vickflex',schema:1,exportedAt:new Date().toISOString(),data:D},null,1);
+function marcaCopia(){D.lastBackup=Date.now();D.changes=0;persist();render(true)}
+async function hacerCopia(){
+  const name='vickflex-copia-'+new Date().toISOString().slice(0,10)+'.json',file=new File([backupText()],name,{type:'application/json'});
+  try{if(navigator.canShare&&navigator.canShare({files:[file]})){await navigator.share({files:[file],title:name});marcaCopia();toast('Copia hecha. Comprueba que está en Archivos.');return}}catch(e){if(e&&e.name==='AbortError')return}
+  const a=document.createElement('a');a.href=URL.createObjectURL(file);a.download=name;document.body.appendChild(a);a.click();a.remove();marcaCopia();toast('Copia descargada. Comprueba que está en Archivos.')}
+function copiarTexto(){try{navigator.clipboard.writeText(backupText()).then(()=>{marcaCopia();toast('Texto copiado. Pégalo en Notas para guardarlo.')},()=>toast('No se ha podido copiar.',1))}catch(e){toast('No se ha podido copiar.',1)}}
+function restaurar(txt){
+  let o;try{o=JSON.parse(txt)}catch(e){return toast('Ese texto no es una copia válida.',1)}
+  const d=o&&o.data?o.data:o;if(!d||!Array.isArray(d.reps)||!Array.isArray(d.clientes))return toast('Ese archivo no parece una copia de VickFlex.',1);
+  ask(`Vas a sustituir los datos actuales por la copia (${d.reps.length} representantes, ${d.clientes.length} clientes). Antes se guarda una copia interna por si quieres deshacerlo.`,'Restaurar',()=>{snap('Restaurar copia');D=migrate(d);D.changes=0;persist();go('reps');toast('Copia restaurada.')})}
+function leerArchivo(inp){const f=inp.files[0];if(!f)return;const r=new FileReader();r.onload=()=>restaurar(r.result);r.readAsText(f);inp.value=''}
+function restaurarTexto(){const t=$('#pega').value.trim();if(!t)return toast('Pega primero el texto de la copia.',1);restaurar(t)}
+function deshacer(){const u=getUndo();if(!u)return;ask(`Volverás a los datos de antes de: <b>${esc(u.label)}</b>.`,'Deshacer',()=>{snap('Deshacer: '+u.label);D=migrate(u.data);persist();render();toast('Hecho.')})}
+function vaciar(){ask('Se borrarán <b>todos</b> los representantes y clientes. Se guarda una copia interna, pero haz antes una copia de seguridad.','Vaciar todo',()=>{snap('Vaciar todos los datos');D={schema:1,reps:[],clientes:[],lastBackup:D.lastBackup,changes:0};save();go('reps');toast('Datos vaciados.')},'BORRAR')}
+
+render();
 </script>
 </body>
 </html>
