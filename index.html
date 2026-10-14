@@ -280,7 +280,7 @@ function lastPedido(c){return [...(c.pedidos||[])].sort((x,y)=>y.f.localeCompare
    Trimestre en curso: solo se comparan los meses disponibles con los mismos meses del año anterior.
    Los acumulados importados sin desglose mensual no entran aquí (no se pueden repartir por trimestres). */
 let QY=YEAR,QC='todas';
-const QNAME=['1.º trimestre','2.º trimestre','3.º trimestre','4.º trimestre'],QMES=['ene–mar','abr–jun','jul–sep','oct–dic'];
+const QNAME=['1T','2T','3T','4T'],QMES=['ene, feb, mar','abr, may, jun','jul, ago, sep','oct, nov, dic'];
 const monV=(cs,y,i,k)=>{let s=null;cs.forEach(c=>{const v=fy(c,y,k)[i];if(v!=null)s=(s||0)+v});return s};
 const catAct=(cs,y,t)=>cs.some(c=>rawF(c,y,t).some(v=>v!=null));
 function perCalc(cs,y,k,ms){
@@ -308,9 +308,9 @@ function perCalc(cs,y,k,ms){
   return {s:A.s,p:B.s,d:A.s-B.s,ok:ok,why:why,ha:A.h,hp:B.h,enCurso:enCurso,mc:mc,mp:mp,estado:estado,pend:pend,span:span}}
 function setQY(y){QY=+y;render(true)}
 function setQC(k){QC=k;render(true)}
+function qYears(cs){const ys=[...new Set(cs.flatMap(c=>Object.keys(c.fact||{}).concat(Object.keys(c.comp||{}))).map(Number).concat([YEAR]))].filter(y=>y>2000&&y<=YEAR).sort((a,b)=>b-a);if(ys.indexOf(QY)<0)QY=YEAR;return ys}
 function qCard(cs){
-  const ys=[...new Set(cs.flatMap(c=>Object.keys(c.fact||{}).concat(Object.keys(c.comp||{}))).map(Number).concat([YEAR]))].filter(y=>y>2000&&y<=YEAR).sort((a,b)=>b-a);
-  if(ys.indexOf(QY)<0)QY=YEAR;
+  const ys=qYears(cs);
   const ks=QC==='todas'?['principal','comp','total']:[QC],multi=ks.length>1;
   const G=[0,1,2,3].map(q=>({n:QNAME[q],sub:QMES[q],ms:[q*3,q*3+1,q*3+2]})).concat([{n:'Total anual',sub:'ene–dic',ms:[0,1,2,3,4,5,6,7,8,9,10,11],tot:1}]);
   const body=G.map(g=>{const R=ks.map(k=>perCalc(cs,QY,k,g.ms)),f=R[0],worst=R.find(x=>x.mc.length)||R.find(x=>!x.ok&&x.ha)||f;
@@ -325,6 +325,27 @@ function qCard(cs){
    <table class="tb"><thead><tr><th>Trimestre</th>${multi?'<th>Tipo</th>':''}<th class="r">${QY-1}</th><th class="r">${QY}</th><th class="r">Dif. €</th><th class="r">Dif. %</th></tr></thead><tbody>${body}</tbody></table>
    ${notas.length?`<p class="hint dn">Datos incompletos o sin comparar: ${esc(notas.join(' · '))}.</p>`:''}
    <p class="hint">Principal + complementos = total. Los trimestres se calculan solos sumando los meses cargados. «—» y «Faltan datos» significan que falta información: no es lo mismo que 0 €. En un trimestre en curso se comparan solo los meses disponibles con esos mismos meses del año anterior. Los acumulados importados sin desglose mensual no se reparten por trimestres.</p></div>`}
+
+/* Tabla mensual (12 meses) + gráfico del representante. Misma regla: mes sin dato = «—», nunca 0 €. */
+function mCard(cs){
+  const ys=qYears(cs),y=QY,cal=new Date().getMonth();let sinC=[];
+  const rows=MES.map((n,i)=>{const P=monV(cs,y,i,'principal'),C=monV(cs,y,i,'comp'),T=monV(cs,y,i,'total'),pv=monV(cs,y-1,i,'total'),o=perCalc(cs,y,'total',[i]),en=y===YEAR&&i===cal;
+    if(T!=null&&!o.ok)sinC.push(n);
+    return `<tr><td><b>${cap(n)}</b>${en?'<span class="qs">en curso</span>':''}</td><td class="r">${ev(P)}</td><td class="r">${ev(C)}</td><td class="r"><b>${ev(T)}</b></td><td class="r">${ev(pv)}</td>
+    <td class="r ${T!=null&&o.ok?(o.d>=0?'up':'dn'):''}">${T!=null&&o.ok?sg(o.d):mut}</td><td class="r">${T!=null?cmpHTML({a:o.s,p:o.p,ok:o.ok,why:o.why}):mut}</td></tr>`}).join('');
+  const all=[0,1,2,3,4,5,6,7,8,9,10,11],oT=perCalc(cs,y,'total',all),oP=perCalc(cs,y,'principal',all),oC=perCalc(cs,y,'comp',all);
+  const lab=oT.enCurso&&oT.span.length?'Acumulado ene–'+MES[oT.span[oT.span.length-1]]:'Total '+y;
+  const tot=`<tr class="tot g1"><td>${lab}${oT.mc.length?'<span class="qs dn">⚠ datos incompletos</span>':''}</td><td class="r">${oP.ha?eur(oP.s):mut}</td><td class="r">${oC.ha?eur(oC.s):mut}</td><td class="r">${oT.ha?eur(oT.s):mut}</td><td class="r">${oT.hp?eur(oT.p):mut}</td>
+    <td class="r ${oT.ok?(oT.d>=0?'up':'dn'):''}">${oT.ok?sg(oT.d):mut}</td><td class="r">${cmpHTML({a:oT.s,p:oT.p,ok:oT.ok,why:oT.why})}</td></tr>`;
+  const sel=`<select class="sel" onchange="setQY(this.value)" title="Ejercicio">${ys.map(a=>`<option ${a===y?'selected':''}>${a}</option>`).join('')}</select>`;
+  return `<div class="card qt" style="margin-top:16px"><div class="hb" style="margin-bottom:8px"><h3 style="margin:0">Facturación mensual · ${y} frente a ${y-1}</h3><div class="acts">${sel}</div></div>
+   <table class="tb"><thead><tr><th>Mes</th><th class="r">Principal ${y}</th><th class="r">Complementos ${y}</th><th class="r">Total ${y}</th><th class="r">Total ${y-1}</th><th class="r">Dif. €</th><th class="r">Dif. %</th></tr></thead><tbody>${rows}${tot}</tbody></table>
+   ${sinC.length?`<p class="hint dn">Meses sin comparar por falta de datos: ${esc(sinC.join(', '))}.</p>`:''}
+   <p class="hint">Total = principal + complementos. «—» = sin dato (no es 0 €). Solo se comparan meses con dato en ambos años; el acumulado compara los mismos meses de los dos años.</p></div>`}
+function repChart(cs){
+  const m=corte(),t=(y,k)=>MES.map((_,i)=>cs.reduce((a,c)=>a+(fy(c,y,k)[i]||0),0)),th=a=>a.map(v=>Math.round(v/1000));
+  const stk=VC==='total'&&cs.some(c=>has(c,YEAR,12,'comp'))?{p:th(t(YEAR,'principal')),c:th(t(YEAR,'comp'))}:null;
+  return `<div class="card" style="margin-top:16px"><h3>Facturación mensual ${CAT[VC].toLowerCase()} (miles de €)</h3>${barsHTML(th(t(YEAR-1,VC)),th(t(YEAR,VC)).map((v,i)=>i<m?v:null),stk)}</div>`}
 function filtrarCli(v){const q=norm(v.trim());document.querySelectorAll('#view tr[data-s]').forEach(tr=>{tr.style.display=q&&tr.dataset.s.indexOf(q)<0?'none':''})}
 
 /* ---------- Pantallas ---------- */
@@ -354,6 +375,7 @@ function vPanel(){
       const cw=D.semanas.find(x=>t>=x.ini&&t<=x.fin);if(cw){const S=semStats(cw);return `<div class="card zona"><h3>🚐 Coche expositor · esta semana</h3><div class="big">${esc(cw.prov||'Sin provincia')}</div><p>Con ${esc(repNom(cw.repId))} · ${ESTADOS[cw.estado]}<br>${S.n} visitas · ${S.clientes} clientes</p><button class="b2" style="margin-top:10px" onclick="go('semana/${cw.id}')">Abrir semana</button></div>`}
       return `<div class="card zona"><h3>Zona de esta semana</h3>${pl.length?`<div class="big">${esc(pr.join(' · ')||'Sin provincia')}</div><p>${pl.length} visitas planificadas · ${pl.filter(x=>x.hecha).length} ya hechas<br>${nx&&nc?'Próxima visita: '+DIAS[(parseD(nx.f).getDay()+6)%7].toLowerCase()+' '+fcorta(nx.f)+(nx.h?' '+esc(nx.h):'')+', '+esc(nc.nombre)+' ('+esc(nc.poblacion)+')':'No quedan visitas pendientes esta semana'}</p>`:`<div class="big">Sin planificar</div><p>Todavía no hay visitas esta semana.</p>`}<button class="b2" style="margin-top:10px" onclick="go('plan')">Abrir planificación</button></div>`})()}
   </div>
+  ${mCard(all)}
   ${qCard(all)}
   <div class="grid c3" style="margin-top:16px">
     <div class="card"><h3>Representantes · ranking ${CAT[VC].toLowerCase()}</h3>${rs.map((x,i)=>`<div class="row lk" onclick="go('rep/${x.r.id}')"><span>${i+1}. ${esc(x.r.nombre)}<br><small style="color:#999">${x.s.ha?eur(x.s.a):'sin datos'}</small></span>${cmpHTML(x.s)}</div>`).join('')||'<span class="mut">Sin datos</span>'}</div>
@@ -411,7 +433,7 @@ function vRep(id){
       <div class="stat">${dot('amarillo')}<div class="big">${s.sem.amarillo}</div></div>
       <div class="stat">${dot('rojo')}<div class="big">${s.sem.rojo}</div></div></div></div>
   </div>
-  ${cs.length?qCard(cs):''}
+  ${cs.length?repChart(cs)+mCard(cs)+qCard(cs):''}
   <div class="card" style="margin-top:16px"><div class="hb" style="margin-bottom:8px"><h3 style="margin:0">Clientes de ${esc(r.nombre)}</h3>
     <input class="sel" style="min-width:260px" placeholder="Filtrar por nombre, población o código postal" oninput="filtrarCli(this.value)"><select class="sel" onchange="setSort(this.value)"><option value="fact" ${sortBy==='fact'?'selected':''}>Ranking por facturación total</option><option value="principal" ${sortBy==='principal'?'selected':''}>Ranking por facturación principal</option><option value="comp" ${sortBy==='comp'?'selected':''}>Ranking por complementos</option><option value="nombre" ${sortBy==='nombre'?'selected':''}>Nombre A–Z</option><option value="cp" ${sortBy==='cp'?'selected':''}>Código postal (por zonas)</option><option value="caida" ${sortBy==='caida'?'selected':''}>Mayor caída primero (${CAT[VC].toLowerCase()})</option><option value="sin" ${sortBy==='sin'?'selected':''}>Más meses sin comprar</option></select></div>
     ${cs.length?`<table class="tb"><thead><tr><th>#</th><th>Cliente</th><th class="r">Principal ${YEAR}</th><th class="r">Compl. ${YEAR}</th><th class="r">Total ${YEAR}</th><th class="r">${CAT[VC]} ${YEAR-1}</th><th class="r">Dif. ${CAT[VC].toLowerCase()}</th><th>Última compra</th><th>Estado</th></tr></thead><tbody>${rows}</tbody></table>
@@ -474,6 +496,7 @@ function vCli(id){
     </div>
   </div>
 
+  ${mCard([c])}
   ${qCard([c])}
 
   <h2 class="sec">Catálogo, exposición y compras</h2>
