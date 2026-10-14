@@ -155,9 +155,9 @@ function seed(){
 }
 function migrate(d){
   d.schema=1;d.reps=d.reps||[];d.clientes=d.clientes||[];
-  d.clientes.forEach(c=>{c.fact=c.fact||{};c.exposicion=c.exposicion||[];c.pend=c.pend||[];c.visitas=c.visitas||[];c.pedidos=c.pedidos||[];c.obs=c.obs||'';c.semaforo=c.semaforo||'amarillo';
+  d.clientes.forEach(c=>{c.fact=c.fact||{};c.exposicion=c.exposicion||[];c.pend=c.pend||[];c.visitas=c.visitas||[];c.pedidos=c.pedidos||[];c.obs=c.obs||'';c.codigo=c.codigo||'';c.nombreFact=c.nombreFact||'';c.semaforo=c.semaforo||'amarillo';
     if(!c.repHist||!c.repHist.length)c.repHist=[{r:c.repId,d:null}]});
-  if(d.changes==null)d.changes=0; if(d.lastBackup===undefined)d.lastBackup=null; return d;
+  d.equiv=Array.isArray(d.equiv)?d.equiv:[];if(d.changes==null)d.changes=0; if(d.lastBackup===undefined)d.lastBackup=null; return d;
 }
 function load(){
   let raw=null;try{raw=localStorage.getItem(KEY)}catch(e){}
@@ -295,7 +295,7 @@ function vCli(id){
   </div>
   <div class="grid c2" style="margin-top:16px">
     <div class="card"><h3>Facturación mensual (€)</h3>${barsHTML(get(YEAR-1),get(YEAR))}</div>
-    <div class="card"><h3>Datos generales</h3>${dd('Código',c.codigo)}${dd('Población',c.poblacion)}${dd('Provincia',c.provincia)}${dd('Dirección',c.direccion)}${dd('Teléfono',c.telefono)}${dd('Contacto',c.contacto)}${dd('Representante',r&&r.nombre)}${ant.length?dd('Antes con',ant.join(', ')):''}</div>
+    <div class="card"><h3>Datos generales</h3>${dd('Nombre comercial',c.nombre)}${dd('Nombre de facturación',c.nombreFact)}${dd('Código VICKFLEX',c.codigo)}${dd('Población',c.poblacion)}${dd('Provincia',c.provincia)}${dd('Dirección',c.direccion)}${dd('Teléfono',c.telefono)}${dd('Contacto',c.contacto)}${dd('Representante',r&&r.nombre)}${ant.length?dd('Antes con',ant.join(', ')):''}</div>
   </div>
   <div class="grid c2" style="margin-top:16px">
     <div class="card"><h3>En exposición ahora</h3>${c.exposicion.length?c.exposicion.map(t=>`<span class="tag">${esc(t)}</span>`).join(''):'<span class="mut">Sin datos todavía</span>'}
@@ -306,6 +306,7 @@ function vCli(id){
     <div class="card"><h3>Últimos pedidos</h3>${c.pedidos.length?[...c.pedidos].sort((x,y)=>y.f.localeCompare(x.f)).map(o=>`<div class="row">${fd(o.f)}<span>${eur(o.i)}</span></div>`).join(''):'<span class="mut">Sin pedidos con fecha</span>'}</div>
     <div class="card"><h3>Observaciones</h3><p style="font-size:15px;line-height:1.5;color:#555">${c.obs?esc(c.obs):'<span class="mut">Sin observaciones</span>'}</p></div>
   </div>
+  <div class="card" style="margin-top:16px"><h3>Nombres de facturación reconocidos</h3><p class="mut" style="margin-bottom:8px">La app usa estos nombres (y el código VICKFLEX) para saber a qué cliente corresponde cada línea de los Excel de fábrica.</p>${(c.nombreFact?`<div class="row"><span>${esc(c.nombreFact)} <span class="mut">(principal)</span></span></div>`:'')+equivOf(c.id).map((e,i)=>`<div class="row"><span>${esc(e.n)}</span><button class="b2" onclick="delEquiv('${c.id}',${i})">Quitar</button></div>`).join('')||'<span class="mut">Ninguno todavía</span>'}<div style="margin-top:10px"><button class="b2" onclick="addEquiv('${c.id}')">+ Añadir otro nombre de facturación</button></div></div>
   <p class="hint">Ficha provisional: el catálogo, la exposición, las compras, las visitas y las alertas se completan en las fases B y C.</p>`}
 
 function vCopias(){
@@ -346,7 +347,7 @@ document.addEventListener('click',e=>{if(!e.target.closest('.sb')){$('#res').sty
 /* ---------- Buscador ---------- */
 function buscar(q){
   const box=$('#res');q=norm(q.trim());if(q.length<2){box.style.display='none';box.innerHTML='';return}
-  const rs=D.clientes.filter(c=>norm([c.nombre,c.codigo,c.poblacion,c.provincia,repNom(c.repId)].join(' ')).indexOf(q)>=0).slice(0,10);
+  const rs=D.clientes.filter(c=>norm([c.nombre,c.nombreFact,c.codigo,equivOf(c.id).map(e=>e.n).join(' '),c.poblacion,c.provincia,repNom(c.repId)].join(' ')).indexOf(q)>=0).slice(0,10);
   box.style.display='block';
   box.innerHTML=rs.length?rs.map(c=>`<div class="ri" onclick="abrirRes('${c.id}')">${dot(c.semaforo)}<b>${esc(c.nombre)}</b><small>${esc(c.poblacion)} · ${esc(repNom(c.repId))}</small></div>`).join(''):'<div class="ri mut">Sin resultados</div>'}
 function abrirRes(id){$('#q').value='';$('#res').style.display='none';go('cli/'+id)}
@@ -379,22 +380,52 @@ function delRep(id){
 function cliForm(id,repId){
   const c=id?cli(id):null,r0=c?c.repId:repId,rp=rep(r0);
   formModal(c?'Editar cliente':'Nuevo cliente',[
-   {n:'nombre',l:'Nombre comercial',w:'w'},{n:'codigo',l:'Código de cliente (si existe)'},{n:'poblacion',l:'Población'},
+   {n:'nombre',l:'Nombre comercial (el que usas tú)',w:'w'},{n:'nombreFact',l:'Nombre de facturación / razón social (el de fábrica)',w:'w'},{n:'codigo',l:'Código de cliente VICKFLEX (si existe)'},{n:'poblacion',l:'Población'},
    {n:'provincia',l:'Provincia',list:1},{n:'repId',l:'Representante asignado',t:'select',o:D.reps.map(r=>[r.id,r.nombre])},
    {n:'direccion',l:'Dirección',w:'w'},{n:'telefono',l:'Teléfono'},{n:'contacto',l:'Persona de contacto'},
    {n:'semaforo',l:'Estado comercial',t:'select',o:[['verde','Verde'],['amarillo','Amarillo'],['rojo','Rojo']]},{n:'obs',l:'Observaciones generales',t:'area',w:'w'}],
-   {nombre:c?c.nombre:'',codigo:c?c.codigo:'',poblacion:c?c.poblacion:'',provincia:c?c.provincia:(rp&&rp.provincias[0])||'',repId:r0,direccion:c?c.direccion:'',telefono:c?c.telefono:'',contacto:c?c.contacto:'',semaforo:c?c.semaforo:'amarillo',obs:c?c.obs:''},
+   {nombre:c?c.nombre:'',nombreFact:c?c.nombreFact:'',codigo:c?c.codigo:'',poblacion:c?c.poblacion:'',provincia:c?c.provincia:(rp&&rp.provincias[0])||'',repId:r0,direccion:c?c.direccion:'',telefono:c?c.telefono:'',contacto:c?c.contacto:'',semaforo:c?c.semaforo:'amarillo',obs:c?c.obs:''},
    o=>{
     if(!o.nombre)return 'Escribe el nombre comercial del cliente.';
-    if(!c){const n={id:uid(),codigo:o.codigo,nombre:o.nombre,poblacion:o.poblacion,provincia:o.provincia,direccion:o.direccion,telefono:o.telefono,contacto:o.contacto,repId:o.repId,semaforo:o.semaforo,obs:o.obs,fact:{},exposicion:[],pend:[],visitas:[],pedidos:[],repHist:[{r:o.repId,d:Date.now()}]};
+    const dup=chkDup(o,c?c.id:null);if(dup)return dup;
+    if(!c){const n={id:uid(),codigo:o.codigo,nombreFact:o.nombreFact,nombre:o.nombre,poblacion:o.poblacion,provincia:o.provincia,direccion:o.direccion,telefono:o.telefono,contacto:o.contacto,repId:o.repId,semaforo:o.semaforo,obs:o.obs,fact:{},exposicion:[],pend:[],visitas:[],pedidos:[],repHist:[{r:o.repId,d:Date.now()}]};
       D.clientes.push(n);save();go('cli/'+n.id);return}
-    const apply=()=>{['nombre','codigo','poblacion','provincia','direccion','telefono','contacto','semaforo','obs'].forEach(k=>c[k]=o[k]);
+    const apply=()=>{['nombre','nombreFact','codigo','poblacion','provincia','direccion','telefono','contacto','semaforo','obs'].forEach(k=>c[k]=o[k]);
       if(o.repId!==c.repId){c.repId=o.repId;c.repHist.push({r:o.repId,d:Date.now()})}save();render(true)};
     if(o.repId!==c.repId){ask(`Vas a pasar <b>${esc(c.nombre)}</b> de <b>${esc(repNom(c.repId))}</b> a <b>${esc(repNom(o.repId))}</b>. Se conserva todo su historial.`,'Cambiar de representante',apply);return true}
     apply()})}
+
+/* ---- Identificación del cliente: nombre comercial / nombre de facturación / código VICKFLEX ----
+   El cliente se identifica internamente por su id (no cambia nunca). Renombrar el nombre comercial no pierde nada.
+   D.equiv = equivalencias confirmadas a mano: [{n:'Nombre tal como viene en el Excel', c:'id del cliente'}] */
+const equivOf=id=>(D.equiv||[]).filter(e=>e.c===id);
+const nc=s=>norm(String(s||'').replace(/\s+/g,' ').trim());
+function chkDup(o,selfId){
+  const cod=nc(o.codigo),nf=nc(o.nombreFact);
+  for(const x of D.clientes){if(x.id===selfId)continue;
+    if(cod&&nc(x.codigo)===cod)return 'Ese código VICKFLEX ya lo tiene el cliente «'+x.nombre+'».';
+    if(nf&&nc(x.nombreFact)===nf)return 'Ese nombre de facturación ya lo tiene el cliente «'+x.nombre+'».';
+    if(nf&&equivOf(x.id).some(e=>nc(e.n)===nf))return 'Ese nombre ya está guardado como equivalencia del cliente «'+x.nombre+'».'}
+  return ''}
+/* Para la importación (Fase D). Solo coincidencias exactas; ante cualquier duda devuelve null y se pregunta al usuario.
+   1) código VICKFLEX  2) nombre de facturación o equivalencia guardada  3) null = asociación manual */
+function matchCliente(codigo,nombre){
+  const cod=nc(codigo),nm=nc(nombre);
+  if(cod){const r=D.clientes.filter(x=>nc(x.codigo)===cod);if(r.length===1)return {cli:r[0],por:'código'};if(r.length>1)return null}
+  if(nm){const r=D.clientes.filter(x=>nc(x.nombreFact)===nm||equivOf(x.id).some(e=>nc(e.n)===nm));
+    const ids=[...new Set(r.map(x=>x.id))];if(ids.length===1)return {cli:r[0],por:'nombre de facturación'}}
+  return null}
+function addEquiv(cid){
+  formModal('Otro nombre de facturación',[{n:'n',l:'Nombre tal como aparece en el Excel de fábrica',w:'w'}],{n:''},o=>{
+    if(!o.n)return 'Escribe el nombre.';
+    const d=chkDup({codigo:'',nombreFact:o.n},cid);if(d)return d;
+    D.equiv.push({n:o.n,c:cid});save();render(true)})}
+function delEquiv(cid,i){
+  const e=equivOf(cid)[i];
+  ask(`¿Quitar la equivalencia <b>${esc(e.n)}</b>? Dejará de reconocerse automáticamente en las importaciones.`,'Quitar',()=>{D.equiv.splice(D.equiv.indexOf(e),1);save();render(true)})}
 function delCli(id){
   const c=cli(id);
-  ask(`¿Eliminar a <b>${esc(c.nombre)}</b>? Se borrarán su ficha, su facturación y su historial. Después podrás deshacerlo en Copias de seguridad.`,'Eliminar',()=>{snap('Eliminar cliente '+c.nombre);const r=c.repId;D.clientes=D.clientes.filter(x=>x.id!==id);save();go(rep(r)?'rep/'+r:'reps');toast('Cliente eliminado.')})}
+  ask(`¿Eliminar a <b>${esc(c.nombre)}</b>? Se borrarán su ficha, su facturación y su historial. Después podrás deshacerlo en Copias de seguridad.`,'Eliminar',()=>{snap('Eliminar cliente '+c.nombre);const r=c.repId;D.clientes=D.clientes.filter(x=>x.id!==id);D.equiv=D.equiv.filter(e=>e.c!==id);save();go(rep(r)?'rep/'+r:'reps');toast('Cliente eliminado.')})}
 function setSem(id,s){cli(id).semaforo=s;save();render(true)}
 function cycSem(id){const c=cli(id),o=['verde','amarillo','rojo'];c.semaforo=o[(o.indexOf(c.semaforo)+1)%3];save();render(true)}
 function togglePend(id,i){const t=cli(id).pend[i];t.h=!t.h;save();render(true)}
