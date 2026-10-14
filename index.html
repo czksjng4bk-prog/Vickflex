@@ -4,14 +4,17 @@
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1">
 <meta name="apple-mobile-web-app-capable" content="yes">
-<title>VICKFLEX Descanso</title>
+<meta name="mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-title" content="VickFlex">
+<link rel="apple-touch-icon" href="icon.png">
+<link rel="icon" href="icon.png">
+<title>VickFlex Descanso</title>
 <style>
 :root{--v:#2f6b4f;--v2:#e4efe8;--b:#f4efe6;--b2:#e9e0d0;--t:#2b2b2b;--g:#7a7468;--ok:#3d9a5f;--am:#e0a526;--ro:#c9503f}
 *{box-sizing:border-box;margin:0}
 body{font-family:-apple-system,"Helvetica Neue",sans-serif;background:var(--b);color:var(--t);display:flex;height:100vh}
 nav{width:210px;background:#fff;padding:22px 14px;border-right:1px solid var(--b2);display:flex;flex-direction:column;gap:6px}
-.logo{font-weight:700;color:var(--v);font-size:20px;line-height:1.1;margin-bottom:18px}
-.logo small{display:block;font-weight:400;font-size:12px;color:var(--g);letter-spacing:2px}
+.logo{display:block;width:100%;height:auto;margin:0 0 18px}
 nav button{border:0;background:none;text-align:left;padding:13px 14px;border-radius:12px;font-size:16px;color:var(--t)}
 nav button.on{background:var(--v2);color:var(--v);font-weight:600}
 nav button.off{color:#b5afa3}
@@ -53,7 +56,7 @@ h1{font-size:26px;color:var(--v)} .sub{color:var(--g);margin:2px 0 20px}
 </head>
 <body>
 <nav>
-  <div class="logo">VICKFLEX<small>DESCANSO</small></div>
+  <img class="logo" src="logo.png" alt="VickFlex descanso">
   <button class="on" onclick="ir('panel',this)">Panel</button>
   <button onclick="ir('ficha',this)">Ficha de cliente</button>
   <button class="off">Representantes</button>
@@ -151,18 +154,16 @@ h1{font-size:26px;color:var(--v)} .sub{color:var(--g);margin:2px 0 20px}
 <script>
 const eur=n=>n.toLocaleString("es-ES")+" €";
 const pct=(a,b)=>((a/b-1)*100).toFixed(1).replace(".",",")+" %";
-function barras(id,a25,a26,k){
+function barras(id,a25,a26){
   const max=Math.max(...a25,...a26),m="EFMAMJJASOND";
   document.getElementById(id).innerHTML=a25.map((v,i)=>`<div><span><i class="a25" style="height:${v/max*100}%"></i>${a26[i]!=null?`<i class="a26" style="height:${a26[i]/max*100}%"></i>`:""}</span>${m[i]}</div>`).join("");
 }
-// Panel (datos ficticios, en miles €)
 const p25=[88,95,110,102,118,96,70,40,105,112,118,142];
 const p26=[96,101,118,112,125,104,74,42,110,59];
 const s=a=>a.reduce((x,y)=>x+y,0);
 const t26=s(p26)*1000,t25=s(p25.slice(0,10))*1000;
 f26.textContent=eur(t26);f25.textContent=eur(t25);fv.textContent="▲ "+pct(t26,t25).replace("-","");
 barras("graf",p25,p26);
-// Ficha cliente
 const c25=[3000,3400,3900,3800,4200,3100,2200,1100,3600,3900,4400,5200];
 const c26=[3200,2800,4100,3600,3900,2500,1800,900,3300,1200];
 const a=s(c26),b=s(c25.slice(0,10));
