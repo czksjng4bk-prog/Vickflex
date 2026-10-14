@@ -190,7 +190,7 @@ function seed(){
 }
 function migrate(d){
   d.schema=1;d.reps=d.reps||[];d.clientes=d.clientes||[];
-  d.clientes.forEach(c=>{c.fact=c.fact||{};c.exposicion=c.exposicion||[];c.pend=c.pend||[];c.visitas=c.visitas||[];c.pedidos=c.pedidos||[];c.obs=c.obs||'';c.visitas=c.visitas.map(v=>{v.id=v.id||uid();if(v.hablamos==null)v.hablamos=v.t||'';['pidio','compromisos','productos','prox','proxF','persona','expoNueva','expoPend','pedT','pedTxt','pedI','obs','repId','sem'].forEach(k=>{if(v[k]==null)v[k]=''});v.proxH=!!v.proxH;return v});c.codigo=c.codigo||'';c.comp=c.comp&&typeof c.comp==='object'?c.comp:{};c.catalogo=c.catalogo&&typeof c.catalogo==='object'?c.catalogo:{ok:null,f:''};c.prodPend=c.prodPend||[];c.expObs=c.expObs||'';c.nombreFact=c.nombreFact||'';c.semaforo=c.semaforo||'amarillo';
+  d.clientes.forEach(c=>{c.fact=c.fact||{};c.exposicion=c.exposicion||[];c.pend=c.pend||[];c.visitas=c.visitas||[];c.pedidos=c.pedidos||[];c.obs=c.obs||'';c.visitas=c.visitas.map(v=>{v.id=v.id||uid();if(v.hablamos==null)v.hablamos=v.t||'';['pidio','compromisos','productos','prox','proxF','persona','expoNueva','expoPend','pedT','pedTxt','pedI','obs','repId','sem'].forEach(k=>{if(v[k]==null)v[k]=''});v.proxH=!!v.proxH;return v});c.codigo=c.codigo||'';c.email=c.email||'';c.acumul=c.acumul&&typeof c.acumul==='object'?c.acumul:{};c.comp=c.comp&&typeof c.comp==='object'?c.comp:{};c.catalogo=c.catalogo&&typeof c.catalogo==='object'?c.catalogo:{ok:null,f:''};c.prodPend=c.prodPend||[];c.expObs=c.expObs||'';c.nombreFact=c.nombreFact||'';c.semaforo=c.semaforo||'amarillo';
     if(!c.repHist||!c.repHist.length)c.repHist=[{r:c.repId,d:null}]});
   d.equiv=Array.isArray(d.equiv)?d.equiv:[];d.imports=Array.isArray(d.imports)?d.imports:[];d.plan=Array.isArray(d.plan)?d.plan:[];d.semanas=Array.isArray(d.semanas)?d.semanas:[];if(d.changes==null)d.changes=0; if(d.lastBackup===undefined)d.lastBackup=null; return d;
 }
@@ -215,20 +215,28 @@ let VC='total',FY=YEAR,repSort='fact';
 const rawF=(c,y,k)=>k==='comp'?((c.comp&&c.comp[y])||[]):((c.fact&&c.fact[y])||[]);
 /* Facturación principal = c.fact (lo que ya había). Complementos = c.comp. Total = suma. Un mes sin dato es null (no 0). */
 function fy(c,y,k){k=k||'total';if(k!=='total')return rawF(c,y,k);const a=rawF(c,y,'principal'),b=rawF(c,y,'comp');return MES.map((_,i)=>{const x=a[i],z=b[i];return(x==null&&z==null)?null:(x||0)+(z||0)})}
-function corte(){let m=0;D.clientes.forEach(c=>fy(c,YEAR).forEach((v,i)=>{if(v!=null&&i+1>m)m=i+1}));return m||(new Date().getMonth()+1)}
-const acum=(c,y,m,k)=>fy(c,y,k||VC).slice(0,m).reduce((a,v)=>a+(v||0),0);
-const has=(c,y,m,k)=>fy(c,y,k||VC).slice(0,m).some(v=>v!=null);
-const hasBill=c=>[...Object.keys(c.fact||{}),...Object.keys(c.comp||{})].some(y=>fy(c,y).some(v=>v>0));
+/* Acumulados importados de informes «ventas entre fechas» (1 enero – fin de mes): c.acumul[categoría][año][mes]=importe.
+   No hay desglose mensual: solo se usan para ese mismo periodo y nunca se suman a datos mensuales. */
+const accRec=(c,y,k)=>((c.acumul&&c.acumul[k]&&c.acumul[k][y])||{});
+const CATS2=['principal','comp'];
+const hasAny=(c,y,k)=>k==='total'?CATS2.some(t=>hasAny(c,y,t)):(rawF(c,y,k).some(v=>v!=null)||Object.keys(accRec(c,y,k)).length>0);
+const hasMon=c=>[YEAR,YEAR-1].some(y=>fy(c,y).some(v=>v!=null));
+function accK(c,y,m,k){const mon=rawF(c,y,k).slice(0,m),n=mon.filter(v=>v!=null).length,r=accRec(c,y,k);
+  if(n===m)return mon.reduce((a,v)=>a+(v||0),0);if(r[m]!=null)return r[m];return n?mon.reduce((a,v)=>a+(v||0),0):null}
+function corte(){let m=0;D.clientes.forEach(c=>{fy(c,YEAR).forEach((v,i)=>{if(v!=null&&i+1>m)m=i+1});CATS2.forEach(k=>Object.keys(accRec(c,YEAR,k)).forEach(x=>{if(+x>m)m=+x}))});return m||(new Date().getMonth()+1)}
+const acum=(c,y,m,k)=>{k=k||VC;if(k==='total')return(accK(c,y,m,'principal')||0)+(accK(c,y,m,'comp')||0);return accK(c,y,m,k)||0};
+const has=(c,y,m,k)=>{k=k||VC;if(k==='total')return has(c,y,m,'principal')||has(c,y,m,'comp');return rawF(c,y,k).slice(0,m).some(v=>v!=null)||accRec(c,y,k)[m]!=null};
+const hasBill=c=>[...Object.keys(c.fact||{}),...Object.keys(c.comp||{}),...Object.keys((c.acumul&&c.acumul.principal)||{}),...Object.keys((c.acumul&&c.acumul.comp)||{})].some(y=>fy(c,y).some(v=>v>0)||CATS2.some(k=>Object.values(accRec(c,y,k)).some(v=>v>0)));
 function mesesSin(c,m){let n=0,y=YEAR,i=m-1;while(n<48){const a=fy(c,y);if(y<YEAR-3&&!a.some(v=>v!=null))break;const v=a[i];if(v>0)return n;n++;i--;if(i<0){i=11;y--}}return n}
-const sinComprar=(c,m)=>hasBill(c)&&mesesSin(c,m)>=3;
-const lastM=(cs,y,k)=>{let m=0;cs.forEach(c=>fy(c,y,k).forEach((v,i)=>{if(v!=null&&i+1>m)m=i+1}));return m};
+const sinComprar=(c,m)=>hasBill(c)&&hasMon(c)&&mesesSin(c,m)>=3;
+const lastM=(cs,y,k)=>{let m=0;cs.forEach(c=>{fy(c,y,k).forEach((v,i)=>{if(v!=null&&i+1>m)m=i+1});(k==='total'?CATS2:[k]).forEach(t=>Object.keys(accRec(c,y,t)).forEach(x=>{if(+x>m)m=+x}))});return m};
 /* Comparación de periodos equivalentes (ene–mm del año y frente a ene–mm del anterior).
    Si faltan datos en alguno de los dos periodos NO se calcula porcentaje: ok=false y why explica el motivo. */
 function cmpL(cs,y,mm,k){k=k||VC;let a=0,p=0;cs.forEach(c=>{a+=acum(c,y,mm,k);p+=acum(c,y-1,mm,k)});
   const cats=k==='total'?['principal','comp']:[k];
   const ha=cs.some(c=>has(c,y,mm,k)),hp=cs.some(c=>has(c,y-1,mm,k));let ok=true,why='';
   if(!ha){ok=false;why='Faltan datos de '+y}else if(!hp){ok=false;why='Faltan datos de '+(y-1)}
-  else for(const t of cats){const hy=cs.some(c=>has(c,y,12,t)),hz=cs.some(c=>has(c,y-1,12,t));
+  else for(const t of cats){const hy=cs.some(c=>hasAny(c,y,t)),hz=cs.some(c=>hasAny(c,y-1,t));
     if(k==='total'&&hy!==hz){ok=false;why='Faltan datos de '+CATL[t]+' en '+(hy?y-1:y);break}
     if(hy&&lastM(cs,y,t)<mm){ok=false;why='La facturación '+CATL[t]+' de '+y+' solo llega hasta '+MES[lastM(cs,y,t)-1];break}
     if(hz&&lastM(cs,y-1,t)<mm){ok=false;why='La facturación '+CATL[t]+' de '+(y-1)+' solo llega hasta '+MES[lastM(cs,y-1,t)-1];break}}
@@ -326,8 +334,8 @@ function vRep(id){
     <td class="r">${cell('principal')}</td><td class="r">${cell('comp')}</td><td class="r"><b>${cell('total')}</b></td><td class="r">${o.hp?eur(o.p):mut}</td><td class="r">${cmpHTML(o)}</td>
     <td>${lp?fd(lp.f):'<span class="mut">sin fecha</span>'}${ms?`<small class="dn">sin facturar ${ms} meses</small>`:''}</td>
     <td onclick="event.stopPropagation();cycSem('${c.id}')" title="Pulsa para cambiar el estado">${dot(c.semaforo)}</td></tr>`}).join('');
-  return `<div class="hb"><div><h1>${esc(r.nombre)}</h1><p class="sub" style="margin-bottom:0">${esc(r.provincias.join(' · ')||'Sin provincia')}</p></div>
-    <div class="acts"><button class="b1" onclick="cliForm(null,'${r.id}')">+ Nuevo cliente</button><button class="b2" onclick="repForm('${r.id}')">Editar</button><button class="b2 dng" onclick="delRep('${r.id}')">Eliminar</button><button class="b2" disabled>Importar principal (Fase D)</button><button class="b2" disabled>Importar complementos (Fase D)</button></div></div>
+  return `<div class="hb"><div><h1>${esc(r.nombre)}</h1><p class="sub" style="margin-bottom:0">${esc(r.provincias.join(' · ')||'Sin provincia')}${r.codigoFab?' · Cód. fábrica '+esc(r.codigoFab):''}</p></div>
+    <div class="acts"><button class="b1" onclick="cliForm(null,'${r.id}')">+ Nuevo cliente</button><button class="b2" onclick="repForm('${r.id}')">Editar</button><button class="b2 dng" onclick="delRep('${r.id}')">Eliminar</button><button class="b1" onclick="impOpen('${r.id}','principal')">Importar principal</button><button class="b1" onclick="impOpen('${r.id}','comp')">Importar complementos</button></div></div>
   <div class="bar2">${catSel()}<span class="mut">Las cifras de abajo muestran: <b>${CAT[VC]}</b></span></div>
   <div class="grid k">
     <div class="card"><h3>Clientes</h3><div class="big">${s.n}</div></div>
@@ -354,7 +362,8 @@ function vRep(id){
     <p class="hint">Importes acumulados ${per(m)}, comparados con el mismo periodo del año anterior. «Faltan datos» significa que falta información de algún periodo: no es lo mismo que 0 €. Si el informe no trae fechas de pedidos, la última compra aparece como «sin fecha». Pulsa el círculo para cambiar el estado.</p>`
     :'<p class="msg">Este representante todavía no tiene clientes. Pulsa <b>+ Nuevo cliente</b>.</p>'}</div>
   ${repCoche(r)}
-  ${cs.length?provTable(cs):''}`}
+  ${cs.length?provTable(cs):''}
+  ${impHist(r)}`}
 function vr(c,m){const a=acum(c,YEAR,m),b=acum(c,YEAR-1,m);return b?(a-b)/b:(a>0?1e9:0)}
 
 function vCli(id){
@@ -365,7 +374,7 @@ function vCli(id){
   const oT=cmpL([c],YEAR,m,'total'),oV=cmpL([c],YEAR,m,VC),hasPrev=['principal','comp'].some(t=>has(c,YEAR-1,12,t));
   const totP=acum(c,YEAR-1,12,'total');
   const dd0=lp?diasDesde(lp.f):null;
-  const yrsAll=[...new Set(Object.keys(c.fact||{}).concat(Object.keys(c.comp||{})).map(Number))].filter(y=>fy(c,y).some(v=>v!=null)).sort((x,y)=>y-x);
+  const yrsAll=[...new Set(Object.keys(c.fact||{}).concat(Object.keys(c.comp||{}),Object.keys((c.acumul&&c.acumul.principal)||{}),Object.keys((c.acumul&&c.acumul.comp)||{})).map(Number))].filter(y=>hasAny(c,y,'total')).sort((x,y)=>y-x);
   const fyr=FY,mm3=fyr===YEAR?m:12;
   const yopt=[...new Set(yrsAll.concat([YEAR]))].sort((x,y)=>y-x);
   const m3=MES.map((n,i)=>`<tr><td>${cap(n)}</td><td class="r">${ev(fy(c,fyr,'principal')[i])}</td><td class="r">${ev(fy(c,fyr,'comp')[i])}</td><td class="r"><b>${ev(fy(c,fyr)[i])}</b></td></tr>`).join('');
@@ -373,8 +382,8 @@ function vCli(id){
   const pvA=fy(c,YEAR-1,VC),xA=fy(c,YEAR,VC);
   const mrows=MES.map((n,i)=>{const pv=pvA[i],x=xA[i],ok=x!=null&&pv!=null;
     return `<tr><td>${cap(n)}</td><td class="r">${ev(pv)}</td><td class="r">${ev(x)}</td><td class="r ${ok&&x-pv>=0?'up':'dn'}">${ok?sg(x-pv):mut}</td><td class="r">${ok?pctHTML(x,pv):(x!=null?'<span class="pill m">Faltan datos</span>':mut)}</td></tr>`}).join('');
-  const hrows=yrsAll.map(y=>{const cur=y===YEAR,mm=cur?m:12,o=cmpL([c],y,mm,VC),pa=['principal','comp'].some(t=>has(c,y-1,12,t)),h=k=>has(c,y,mm,k)?eur(acum(c,y,mm,k)):mut;
-    return `<tr><td>${y}${cur?' <small>ene–'+MES[m-1]+'</small>':''}</td><td class="r">${h('principal')}</td><td class="r">${h('comp')}</td><td class="r"><b>${h('total')}</b></td><td class="r">${pa?cmpHTML(o):mut}</td></tr>`}).join('');
+  const hrows=yrsAll.map(y=>{const cur=y===YEAR,bm=cur?m:(CATS2.some(t=>rawF(c,y,t).some(v=>v!=null))?12:(Math.max(0,...CATS2.flatMap(t=>Object.keys(accRec(c,y,t)).map(Number)))||12)),mm=bm,o=cmpL([c],y,mm,VC),pa=CATS2.some(t=>hasAny(c,y-1,t)),h=k=>has(c,y,mm,k)?eur(acum(c,y,mm,k)):mut;
+    return `<tr><td>${y}${mm<12?' <small>ene–'+MES[mm-1]+'</small>':''}</td><td class="r">${h('principal')}</td><td class="r">${h('comp')}</td><td class="r"><b>${h('total')}</b></td><td class="r">${pa?cmpHTML(o):mut}</td></tr>`}).join('');
   const stk=VC==='total'&&has(c,YEAR,12,'comp')?{p:fy(c,YEAR,'principal').map(v=>v||0),c:fy(c,YEAR,'comp').map(v=>v||0)}:null;
   return `<div class="hb"><div class="head">${dot(c.semaforo)}<div><h1>${esc(c.nombre)}</h1><p class="sub" style="margin:0">${esc(c.poblacion)}${c.provincia?', '+esc(c.provincia):''} · Representante: ${r?`<a style="color:var(--v);font-weight:600;cursor:pointer" onclick="go('rep/${r.id}')">${esc(r.nombre)}</a>`:'sin asignar'}</p></div></div>
     <div class="acts"><button class="b2" onclick="cliForm('${c.id}')">Editar</button><button class="b2 dng" onclick="delCli('${c.id}')">Eliminar</button></div></div>
@@ -384,7 +393,7 @@ function vCli(id){
     <div class="card"><h3>Total ${YEAR-1} (año completo)</h3><div class="big">${hasPrev?eur(totP):'<span class="mut" style="font-size:20px">Sin datos</span>'}</div></div>
     <div class="card"><h3>Acumulado total ${YEAR} (${per(m)})</h3><div class="big">${oT.ha?eur(a):'<span class="mut" style="font-size:20px">Sin datos</span>'}</div></div>
     <div class="card"><h3>Total vs mismo periodo ${YEAR-1}</h3><div class="big" style="font-size:24px">${cmpHTML(oT)}</div><div style="margin-top:6px;font-size:14px" class="${a-p>=0?'up':'dn'}">${oT.ok?sg(a-p)+' <span class="mut">(antes '+eur(p)+')</span>':'<span class="mut">'+esc(oT.why)+'</span>'}</div></div>
-    <div class="card"><h3>Última compra</h3><div class="big" style="font-size:24px">${lp?fd(lp.f):'<span class="mut" style="font-size:18px">Sin fecha en los datos</span>'}</div>${ms>0&&hasBill(c)?`<div class="dn" style="margin-top:6px;font-size:14px">Sin facturar desde hace ${ms} meses</div>`:''}</div>
+    <div class="card"><h3>Última compra</h3><div class="big" style="font-size:24px">${lp?fd(lp.f):'<span class="mut" style="font-size:18px">Sin fecha en los datos</span>'}</div>${ms>0&&hasBill(c)&&hasMon(c)?`<div class="dn" style="margin-top:6px;font-size:14px">Sin facturar desde hace ${ms} meses</div>`:''}</div>
   </div>
 
   <h2 class="sec">Facturación</h2>
@@ -404,7 +413,8 @@ function vCli(id){
     </div>
     <div>
       <div class="card"><h3>Gráfico mensual · ${CAT[VC].toLowerCase()}</h3>${barsHTML(get(YEAR-1),get(YEAR),stk)}</div>
-      <div class="card" style="margin-top:16px"><h3>Histórico de ejercicios</h3>${hrows?`<table class="tb"><thead><tr><th>Año</th><th class="r">Principal</th><th class="r">Compl.</th><th class="r">Total</th><th class="r">Dif. ${CAT[VC].toLowerCase()}</th></tr></thead><tbody>${hrows}</tbody></table><p class="hint">${YEAR}: acumulado ${per(m)} frente al mismo periodo de ${YEAR-1}. Los demás años, ejercicio completo frente al anterior.</p>`:'<span class="mut">Sin facturación registrada</span>'}</div>
+      <div class="card" style="margin-top:16px"><h3>Histórico de ejercicios</h3>${hrows?`<table class="tb"><thead><tr><th>Año</th><th class="r">Principal</th><th class="r">Compl.</th><th class="r">Total</th><th class="r">Dif. ${CAT[VC].toLowerCase()}</th></tr></thead><tbody>${hrows}</tbody></table><p class="hint">${YEAR}: acumulado ${per(m)} frente al mismo periodo de ${YEAR-1}. Los demás años, ejercicio completo frente al anterior (o hasta el mes importado).</p>`:'<span class="mut">Sin facturación registrada</span>'}</div>
+      ${accCard(c)}
     </div>
   </div>
 
@@ -419,7 +429,7 @@ function vCli(id){
       <div class="row"><span>Importe de la última compra</span><b>${lp?eur(lp.i):'<span class="mut">sin dato</span>'}</b></div>
       <div class="row"><span>Días desde la última compra</span><b>${lp&&dd0!=null?dd0+' días':'<span class="mut">sin fecha</span>'}</b></div>
       <div class="row"><span>¿Ha repetido compra en ${YEAR}?</span><b class="${repitio(c)?'up':'dn'}">${repitio(c)?'SÍ':'NO'}</b></div>
-      <div class="row"><span>Meses sin comprar</span><b class="${ms>=3&&hasBill(c)?'dn':''}">${hasBill(c)?ms:'<span class="mut">—</span>'}</b></div>
+      <div class="row"><span>Meses sin comprar</span><b class="${ms>=3&&hasBill(c)&&hasMon(c)?'dn':''}">${hasBill(c)&&hasMon(c)?ms:'<span class="mut">—</span>'}</b></div>
       <p class="hint">«Repetido» = al menos 2 compras en ${YEAR}, contando pedidos con fecha o meses con facturación. «Meses sin comprar» se calcula con la facturación mensual. La fecha y el importe de la última compra solo salen de pedidos que tú apuntas: la app nunca los inventa.</p></div>
   </div>
   <div class="grid c2" style="margin-top:16px">
@@ -443,7 +453,7 @@ function vCli(id){
     <div class="card"><h3>Observaciones y alertas</h3>${alertasCli(c)}<p style="font-size:15px;line-height:1.5;color:#555;margin-top:12px;border-top:1px solid #f0ebe0;padding-top:10px">${c.obs?esc(c.obs):'<span class="mut">Sin observaciones generales</span>'}</p></div>
   </div>
   <h2 class="sec">Datos del cliente</h2>
-  <div class="grid c2"><div class="card"><h3>Datos generales</h3>${dd('Nombre comercial',c.nombre)}${dd('Nombre de facturación',c.nombreFact)}${dd('Código VICKFLEX',c.codigo)}${dd('Población',c.poblacion)}${dd('Provincia',c.provincia)}${dd('Dirección',c.direccion)}${dd('Teléfono',c.telefono)}${dd('Contacto',c.contacto)}${dd('Representante',r&&r.nombre)}${ant.length?dd('Antes con',ant.join(', ')):''}</div>
+  <div class="grid c2"><div class="card"><h3>Datos generales</h3>${dd('Nombre comercial',c.nombre)}${dd('Nombre de facturación',c.nombreFact)}${dd('Código VICKFLEX',c.codigo)}${dd('Población',c.poblacion)}${dd('Provincia',c.provincia)}${dd('Dirección',c.direccion)}${dd('Teléfono',c.telefono)}${dd('Contacto',c.contacto)}<div class="row"><span style="color:var(--g)">Correo electrónico</span><span>${c.email?`<a href="mailto:${esc(c.email)}">${esc(c.email)}</a>`:'<span class="mut">—</span>'}</span></div>${dd('Representante',r&&r.nombre)}${ant.length?dd('Antes con',ant.join(', ')):''}</div>
   <div class="card"><h3>Planificar</h3><p style="line-height:1.5;margin-bottom:12px">${(()=>{const pl=D.plan.filter(x=>x.cliId===c.id&&!x.hecha&&x.f>=hoy()).sort((a,b)=>a.f.localeCompare(b.f))[0];return pl?'Próxima visita planificada: <b>'+fd(pl.f)+'</b>'+(pl.h?' a las '+esc(pl.h):''):'No hay ninguna visita planificada.'})()}</p><button class="b2" onclick="planForm(null,{cliId:'${c.id}'})">+ Planificar visita</button></div></div>
   <div class="card" style="margin-top:16px"><h3>Nombres de facturación reconocidos</h3><p class="mut" style="margin-bottom:8px">La app usa estos nombres (y el código VICKFLEX) para saber a qué cliente corresponde cada línea de los Excel de fábrica.</p>${(c.nombreFact?`<div class="row"><span>${esc(c.nombreFact)} <span class="mut">(principal)</span></span></div>`:'')+equivOf(c.id).map((e,i)=>`<div class="row"><span>${esc(e.n)}</span><button class="b2" onclick="delEquiv('${c.id}',${i})">Quitar</button></div>`).join('')||'<span class="mut">Ninguno todavía</span>'}<div style="margin-top:10px"><button class="b2" onclick="addEquiv('${c.id}')">+ Añadir otro nombre de facturación</button></div></div>
   `}
@@ -486,7 +496,7 @@ document.addEventListener('click',e=>{if(!e.target.closest('.sb')){$('#res').sty
 /* ---------- Buscador ---------- */
 function buscar(q){
   const box=$('#res');q=norm(q.trim());if(q.length<2){box.style.display='none';box.innerHTML='';return}
-  const rs=D.clientes.filter(c=>norm([c.nombre,c.nombreFact,c.codigo,equivOf(c.id).map(e=>e.n).join(' '),c.poblacion,c.provincia,repNom(c.repId)].join(' ')).indexOf(q)>=0).slice(0,10);
+  const rs=D.clientes.filter(c=>norm([c.nombre,c.nombreFact,c.codigo,c.email,equivOf(c.id).map(e=>e.n).join(' '),c.poblacion,c.provincia,repNom(c.repId)].join(' ')).indexOf(q)>=0).slice(0,10);
   box.style.display='block';
   box.innerHTML=rs.length?rs.map(c=>`<div class="ri" onclick="abrirRes('${c.id}')">${dot(c.semaforo)}<b>${esc(c.nombre)}</b><small>${esc(c.poblacion)} · ${esc(repNom(c.repId))}</small></div>`).join(''):'<div class="ri mut">Sin resultados</div>'}
 function abrirRes(id){$('#q').value='';$('#res').style.display='none';go('cli/'+id)}
@@ -507,11 +517,11 @@ function formModal(title,fields,vals,onSave,opts){opts=opts||{};
 
 function repForm(id){
   const r=id?rep(id):null;
-  formModal(r?'Editar representante':'Nuevo representante',[{n:'nombre',l:'Nombre y apellidos',w:'w'},{n:'prov',l:'Provincias que lleva (separadas por comas)',ph:'Castellón, Teruel',w:'w'}],
-   {nombre:r?r.nombre:'',prov:r?r.provincias.join(', '):''},o=>{
+  formModal(r?'Editar representante':'Nuevo representante',[{n:'nombre',l:'Nombre y apellidos',w:'w'},{n:'codigoFab',l:'Código de vendedor en fábrica (ej. V12)'},{n:'prov',l:'Provincias que lleva (separadas por comas)',ph:'Castellón, Teruel',w:'w'}],
+   {nombre:r?r.nombre:'',codigoFab:r?(r.codigoFab||''):'',prov:r?r.provincias.join(', '):''},o=>{
     if(!o.nombre)return 'Escribe el nombre del representante.';
     const pv=o.prov.split(',').map(x=>x.trim()).filter(Boolean);
-    if(r){r.nombre=o.nombre;r.provincias=pv;save();render(true)}else{const n={id:uid(),nombre:o.nombre,provincias:pv};D.reps.push(n);save();go('rep/'+n.id)}})}
+    if(r){r.nombre=o.nombre;r.codigoFab=o.codigoFab;r.provincias=pv;save();render(true)}else{const n={id:uid(),nombre:o.nombre,codigoFab:o.codigoFab,provincias:pv};D.reps.push(n);save();go('rep/'+n.id)}})}
 function delRep(id){
   const r=rep(id),n=clientsOf(id).length;
   if(n)return modal(`<h2>No se puede eliminar</h2><p class="msg"><b>${esc(r.nombre)}</b> tiene ${n} clientes. Para no perder su historial, primero cambia cada cliente a otro representante (Editar cliente → Representante).</p><div class="acts"><button class="b1" onclick="closeModal()">Entendido</button></div>`);
@@ -521,15 +531,15 @@ function cliForm(id,repId){
   formModal(c?'Editar cliente':'Nuevo cliente',[
    {n:'nombre',l:'Nombre comercial (el que usas tú)',w:'w'},{n:'nombreFact',l:'Nombre de facturación / razón social (el de fábrica)',w:'w'},{n:'codigo',l:'Código de cliente VICKFLEX (si existe)'},{n:'poblacion',l:'Población'},
    {n:'provincia',l:'Provincia',list:1},{n:'repId',l:'Representante asignado',t:'select',o:D.reps.map(r=>[r.id,r.nombre])},
-   {n:'direccion',l:'Dirección',w:'w'},{n:'telefono',l:'Teléfono'},{n:'contacto',l:'Persona de contacto'},
+   {n:'direccion',l:'Dirección',w:'w'},{n:'telefono',l:'Teléfono'},{n:'contacto',l:'Persona de contacto'},{n:'email',l:'Correo electrónico'},
    {n:'semaforo',l:'Estado comercial',t:'select',o:[['verde','Verde'],['amarillo','Amarillo'],['rojo','Rojo']]},{n:'obs',l:'Observaciones generales',t:'area',w:'w'}],
-   {nombre:c?c.nombre:'',nombreFact:c?c.nombreFact:'',codigo:c?c.codigo:'',poblacion:c?c.poblacion:'',provincia:c?c.provincia:(rp&&rp.provincias[0])||'',repId:r0,direccion:c?c.direccion:'',telefono:c?c.telefono:'',contacto:c?c.contacto:'',semaforo:c?c.semaforo:'amarillo',obs:c?c.obs:''},
+   {nombre:c?c.nombre:'',nombreFact:c?c.nombreFact:'',codigo:c?c.codigo:'',poblacion:c?c.poblacion:'',provincia:c?c.provincia:(rp&&rp.provincias[0])||'',repId:r0,direccion:c?c.direccion:'',telefono:c?c.telefono:'',contacto:c?c.contacto:'',email:c?c.email:'',semaforo:c?c.semaforo:'amarillo',obs:c?c.obs:''},
    o=>{
     if(!o.nombre)return 'Escribe el nombre comercial del cliente.';
     const dup=chkDup(o,c?c.id:null);if(dup)return dup;
-    if(!c){const n={id:uid(),codigo:o.codigo,nombreFact:o.nombreFact,nombre:o.nombre,poblacion:o.poblacion,provincia:o.provincia,direccion:o.direccion,telefono:o.telefono,contacto:o.contacto,repId:o.repId,semaforo:o.semaforo,obs:o.obs,fact:{},comp:{},catalogo:{ok:null,f:''},prodPend:[],expObs:'',exposicion:[],pend:[],visitas:[],pedidos:[],repHist:[{r:o.repId,d:Date.now()}]};
+    if(!c){const n={id:uid(),codigo:o.codigo,nombreFact:o.nombreFact,nombre:o.nombre,poblacion:o.poblacion,provincia:o.provincia,direccion:o.direccion,telefono:o.telefono,contacto:o.contacto,email:o.email,acumul:{},repId:o.repId,semaforo:o.semaforo,obs:o.obs,fact:{},comp:{},catalogo:{ok:null,f:''},prodPend:[],expObs:'',exposicion:[],pend:[],visitas:[],pedidos:[],repHist:[{r:o.repId,d:Date.now()}]};
       D.clientes.push(n);save();go('cli/'+n.id);return}
-    const apply=()=>{['nombre','nombreFact','codigo','poblacion','provincia','direccion','telefono','contacto','semaforo','obs'].forEach(k=>c[k]=o[k]);
+    const apply=()=>{['nombre','nombreFact','codigo','poblacion','provincia','direccion','telefono','contacto','email','semaforo','obs'].forEach(k=>c[k]=o[k]);
       if(o.repId!==c.repId){c.repId=o.repId;c.repHist.push({r:o.repId,d:Date.now()})}save();render(true)};
     if(o.repId!==c.repId){ask(`Vas a pasar <b>${esc(c.nombre)}</b> de <b>${esc(repNom(c.repId))}</b> a <b>${esc(repNom(o.repId))}</b>. Se conserva todo su historial.`,'Cambiar de representante',apply);return true}
     apply()})}
@@ -539,18 +549,19 @@ function cliForm(id,repId){
    D.equiv = equivalencias confirmadas a mano: [{n:'Nombre tal como viene en el Excel', c:'id del cliente'}] */
 const equivOf=id=>(D.equiv||[]).filter(e=>e.c===id);
 const nc=s=>norm(String(s||'').replace(/\s+/g,' ').trim());
+const nz=s=>{s=nc(s);return /^\d+$/.test(s)?(s.replace(/^0+/,'')||'0'):s};
 function chkDup(o,selfId){
-  const cod=nc(o.codigo),nf=nc(o.nombreFact);
+  const cod=nz(o.codigo),nf=nc(o.nombreFact);
   for(const x of D.clientes){if(x.id===selfId)continue;
-    if(cod&&nc(x.codigo)===cod)return 'Ese código VICKFLEX ya lo tiene el cliente «'+x.nombre+'».';
+    if(cod&&nz(x.codigo)===cod)return 'Ese código VICKFLEX ya lo tiene el cliente «'+x.nombre+'».';
     if(nf&&nc(x.nombreFact)===nf)return 'Ese nombre de facturación ya lo tiene el cliente «'+x.nombre+'».';
     if(nf&&equivOf(x.id).some(e=>nc(e.n)===nf))return 'Ese nombre ya está guardado como equivalencia del cliente «'+x.nombre+'».'}
   return ''}
 /* Para la importación (Fase D). Solo coincidencias exactas; ante cualquier duda devuelve null y se pregunta al usuario.
    1) código VICKFLEX  2) nombre de facturación o equivalencia guardada  3) null = asociación manual */
 function matchCliente(codigo,nombre){
-  const cod=nc(codigo),nm=nc(nombre);
-  if(cod){const r=D.clientes.filter(x=>nc(x.codigo)===cod);if(r.length===1)return {cli:r[0],por:'código'};if(r.length>1)return null}
+  const cod=nz(codigo),nm=nc(nombre);
+  if(cod){const r=D.clientes.filter(x=>nz(x.codigo)===cod);if(r.length===1)return {cli:r[0],por:'código'};if(r.length>1)return null}
   if(nm){const r=D.clientes.filter(x=>nc(x.nombreFact)===nm||equivOf(x.id).some(e=>nc(e.n)===nm));
     const ids=[...new Set(r.map(x=>x.id))];if(ids.length===1)return {cli:r[0],por:'nombre de facturación'}}
   return null}
@@ -807,7 +818,7 @@ function nuevoClienteForm(){const x=semOf(PK.sem),f=PK.f,sem=PK.sem;
     if(!o.nombre)return 'Escribe el nombre comercial.';
     const dup=D.clientes.find(c=>nc(c.nombre)===nc(o.nombre)&&nc(c.poblacion)===nc(o.poblacion));
     if(dup)return 'Ya existe «'+dup.nombre+'»'+(dup.poblacion?' en '+dup.poblacion:'')+'. Búscalo en la lista para no duplicarlo.';
-    const n={id:uid(),codigo:'',nombreFact:'',nombre:o.nombre,poblacion:o.poblacion,provincia:o.provincia,direccion:'',telefono:o.telefono,contacto:o.contacto,repId:o.repId,semaforo:'amarillo',obs:'',fact:{},comp:{},catalogo:{ok:null,f:''},prodPend:[],expObs:'',exposicion:[],pend:[],visitas:[],pedidos:[],repHist:[{r:o.repId,d:Date.now()}]};
+    const n={id:uid(),codigo:'',nombreFact:'',nombre:o.nombre,poblacion:o.poblacion,provincia:o.provincia,direccion:'',telefono:o.telefono,contacto:o.contacto,email:'',acumul:{},repId:o.repId,semaforo:'amarillo',obs:'',fact:{},comp:{},catalogo:{ok:null,f:''},prodPend:[],expObs:'',exposicion:[],pend:[],visitas:[],pedidos:[],repHist:[{r:o.repId,d:Date.now()}]};
     D.clientes.push(n);save();toast('Cliente dado de alta: '+n.nombre+'. Ahora registra la visita.');
     visitaForm(n.id,null,null,f,{sem:sem,repId:o.repId});return true})}
 function vSemana(id){
@@ -849,6 +860,9 @@ function repCoche(r){
    ${ws.length?`<div style="margin-top:12px">${ws.map((x,i)=>`<div class="row lk" onclick="go('semana/${x.id}')"><span><b>${fd(x.ini)}</b> – ${fd(x.fin)} · ${esc(x.prov||'—')}</span><span>${ESTADOS[x.estado]} · ${st[i].n} visitas</span></div>`).join('')}</div>`:'<p class="mut" style="margin-top:10px">Sin semanas este año con este representante.</p>'}
    ${cl.size?`<div style="margin-top:12px"><h3>Clientes visitados</h3>${[...cl.values()].map(c=>`<span class="tag" style="cursor:pointer" onclick="go('cli/${c.id}')">${esc(c.nombre)}</span>`).join('')}</div>`:''}
    ${cp.length?`<div style="margin-top:12px"><h3>Compromisos pendientes</h3>${cp.slice(0,6).map(x=>`<div class="row"><span><b>${esc(x.c.nombre)}</b> · ${esc(x.t)}</span></div>`).join('')}</div>`:''}</div>`}
+function accCard(c){const L=[];CATS2.forEach(k=>Object.keys((c.acumul&&c.acumul[k])||{}).forEach(y=>Object.keys(c.acumul[k][y]).forEach(mm=>L.push({k:k,y:+y,m:+mm,v:c.acumul[k][y][mm]}))));
+  if(!L.length)return '';L.sort((a,b)=>b.y-a.y||a.m-b.m||a.k.localeCompare(b.k));
+  return `<div class="card" style="margin-top:16px"><h3>Acumulados importados (sin desglose mensual)</h3>${L.map(x=>`<div class="row"><span>${x.k==='comp'?'Complementos':'Principal'} · ene–${MES[x.m-1]} ${x.y}</span><b>${eur(x.v)}</b></div>`).join('')}<p class="hint">Vienen de informes «ventas entre fechas». Solo se usan para comparar ese mismo periodo; no se reparten por meses ni se suman a otros datos.</p></div>`}
 function delCli(id){
   const c=cli(id);
   ask(`¿Eliminar a <b>${esc(c.nombre)}</b>? Se borrarán su ficha, su facturación y su historial. Después podrás deshacerlo en Copias de seguridad.`,'Eliminar',()=>{snap('Eliminar cliente '+c.nombre);const r=c.repId;D.clientes=D.clientes.filter(x=>x.id!==id);D.equiv=D.equiv.filter(e=>e.c!==id);D.plan=D.plan.filter(x=>x.cliId!==id);save();go(rep(r)?'rep/'+r:'reps');toast('Cliente eliminado.')})}
@@ -873,6 +887,292 @@ function leerArchivo(inp){const f=inp.files[0];if(!f)return;const r=new FileRead
 function restaurarTexto(){const t=$('#pega').value.trim();if(!t)return toast('Pega primero el texto de la copia.',1);restaurar(t)}
 function deshacer(){const u=getUndo();if(!u)return;ask(`Volverás a los datos de antes de: <b>${esc(u.label)}</b>.`,'Deshacer',()=>{snap('Deshacer: '+u.label);D=migrate(u.data);persist();render();toast('Hecho.')})}
 function vaciar(){ask('Se borrarán <b>todos</b> los representantes y clientes. Se guarda una copia interna, pero haz antes una copia de seguridad.','Vaciar todo',()=>{snap('Vaciar todos los datos');D={schema:1,reps:[],clientes:[],lastBackup:D.lastBackup,changes:0};save();go('reps');toast('Datos vaciados.')},'BORRAR')}
+
+/* ======================= FASE D: IMPORTAR FACTURACIÓN =======================
+   Lee un informe de fábrica (Excel .xlsx, CSV o texto pegado), enseña una VISTA PREVIA y solo escribe cuando confirmas.
+   - Mes completo  -> sustituye el valor de ese mes (nunca suma).
+   - Acumulado desde 1 de enero -> se guarda aparte (c.acumul), sin repartirlo por meses y sin sumarlo a los meses.
+   - Cualquier otro periodo se rechaza. */
+const PROVCP={'01':'Álava','02':'Albacete','03':'Alicante','04':'Almería','05':'Ávila','06':'Badajoz','07':'Illes Balears','08':'Barcelona','09':'Burgos','10':'Cáceres','11':'Cádiz','12':'Castellón','13':'Ciudad Real','14':'Córdoba','15':'A Coruña','16':'Cuenca','17':'Girona','18':'Granada','19':'Guadalajara','20':'Gipuzkoa','21':'Huelva','22':'Huesca','23':'Jaén','24':'León','25':'Lleida','26':'La Rioja','27':'Lugo','28':'Madrid','29':'Málaga','30':'Murcia','31':'Navarra','32':'Ourense','33':'Asturias','34':'Palencia','35':'Las Palmas','36':'Pontevedra','37':'Salamanca','38':'Santa Cruz de Tenerife','39':'Cantabria','40':'Segovia','41':'Sevilla','42':'Soria','43':'Tarragona','44':'Teruel','45':'Toledo','46':'Valencia','47':'Valladolid','48':'Bizkaia','49':'Zamora','50':'Zaragoza','51':'Ceuta','52':'Melilla'};
+const eur2=n=>{const s=Math.abs(n).toFixed(2).split('.');return (n<0?'-':'')+s[0].replace(/\B(?=(\d{3})+(?!\d))/g,'.')+','+s[1]+' €'};
+const AMT=/^-?(\d{1,3}(\.\d{3})+|\d+),\d{1,2}$|^-?\d+\.\d{1,2}$/;
+let IM=null;
+const mismoNombre=(a,b)=>{const x=nc(a).split(' ').filter(Boolean),y=nc(b).split(' ').filter(Boolean);if(!x.length||!y.length)return false;const [c,d]=x.length<=y.length?[x,y]:[y,x];return c.length>=2&&c.every(w=>d.includes(w))};
+
+/* ---- lector mínimo de .xlsx (un .xlsx es un zip con XML dentro) ---- */
+async function unzipX(buf){
+  const u8=new Uint8Array(buf),dv=new DataView(buf);let e=-1;
+  for(let i=u8.length-22;i>=Math.max(0,u8.length-70000);i--){if(dv.getUint32(i,true)===0x06054b50){e=i;break}}
+  if(e<0)throw new Error('zip');
+  const n=dv.getUint16(e+10,true);let p=dv.getUint32(e+16,true);const files={};
+  for(let i=0;i<n;i++){
+    if(dv.getUint32(p,true)!==0x02014b50)break;
+    const meth=dv.getUint16(p+10,true),cs=dv.getUint32(p+20,true),nl=dv.getUint16(p+28,true),el=dv.getUint16(p+30,true),cl=dv.getUint16(p+32,true),lo=dv.getUint32(p+42,true);
+    const name=new TextDecoder().decode(u8.subarray(p+46,p+46+nl));
+    files[name]={meth,cs,lo};p+=46+nl+el+cl}
+  const get=async nm=>{const f=files[nm];if(!f)return null;
+    const ln=dv.getUint16(f.lo+26,true),le=dv.getUint16(f.lo+28,true),st=f.lo+30+ln+le,data=u8.subarray(st,st+f.cs);
+    if(f.meth===0)return new TextDecoder().decode(data);
+    if(typeof DecompressionStream==='undefined')throw new Error('nodecomp');
+    const ab=await new Response(new Blob([data]).stream().pipeThrough(new DecompressionStream('deflate-raw'))).arrayBuffer();
+    return new TextDecoder().decode(ab)};
+  return {names:Object.keys(files),get}}
+const colIdx=r=>{let n=0;const m=/^[A-Z]+/.exec(r)[0];for(const ch of m)n=n*26+ch.charCodeAt(0)-64;return n-1};
+async function readXlsx(buf){
+  const z=await unzipX(buf),dp=new DOMParser();
+  const ss=[],sx=await z.get('xl/sharedStrings.xml');
+  if(sx){const d=dp.parseFromString(sx,'text/xml');[...d.getElementsByTagName('si')].forEach(si=>ss.push([...si.getElementsByTagName('t')].map(t=>t.textContent).join('')))}
+  let best=[];
+  for(const nm of z.names.filter(n=>/^xl\/worksheets\/sheet\d+\.xml$/.test(n))){
+    const d=dp.parseFromString(await z.get(nm),'text/xml'),rows=[];
+    [...d.getElementsByTagName('row')].forEach(r=>{const row=[];
+      [...r.getElementsByTagName('c')].forEach(c=>{const ref=c.getAttribute('r');if(!ref)return;const t=c.getAttribute('t'),v=c.getElementsByTagName('v')[0];let val=null;
+        if(t==='s'&&v)val=ss[+v.textContent];else if(t==='inlineStr')val=[...c.getElementsByTagName('t')].map(x=>x.textContent).join('');
+        else if(v){val=(t==='str'||t==='e'||t==='b')?v.textContent:parseFloat(v.textContent)}
+        row[colIdx(ref)]=val});
+      rows.push(Array.from(row,x=>x==null?null:x))});
+    if(rows.length>best.length)best=rows}
+  return best}
+
+/* ---- CSV / texto ---- */
+function parseCSV(t){
+  const first=t.split(/\r?\n/).find(l=>l.trim())||'';
+  const dl=first.indexOf(';')>=0?';':first.indexOf('\t')>=0?'\t':',';
+  const rows=[];let row=[],cur='',q=false;
+  for(let i=0;i<t.length;i++){const ch=t[i];
+    if(q){if(ch==='"'){if(t[i+1]==='"'){cur+='"';i++}else q=false}else cur+=ch}
+    else if(ch==='"')q=true;else if(ch===dl){row.push(cur);cur=''}
+    else if(ch==='\n'||ch==='\r'){if(ch==='\r'&&t[i+1]==='\n')i++;row.push(cur);rows.push(row);row=[];cur=''}
+    else cur+=ch}
+  if(cur!==''||row.length){row.push(cur);rows.push(row)}
+  return rows.filter(r=>r.some(x=>String(x).trim()!==''))}
+function parseTextoLibre(t){
+  const ls=t.split(/\r?\n/).filter(l=>l.trim());
+  const tabs=ls.filter(l=>l.indexOf('\t')>=0).length;
+  if(ls.length&&tabs>=ls.length*0.5)return ls.map(l=>l.split('\t'));
+  const semis=ls.filter(l=>(l.match(/;/g)||[]).length>=3).length;
+  if(ls.length&&semis>=ls.length*0.5)return parseCSV(t);
+  return ls.map(l=>[l])}   // una sola celda por línea -> se analiza como informe impreso
+
+/* ---- de filas (tabla) a registros ---- */
+const tx=v=>v==null?'':String(v).replace(/\s+/g,' ').trim();
+function serialDate(n){if(typeof n!=='number'||n<30000||n>80000)return null;const d=new Date(Date.UTC(1899,11,30)+n*86400000);return d.getUTCFullYear()+'-'+String(d.getUTCMonth()+1).padStart(2,'0')+'-'+String(d.getUTCDate()).padStart(2,'0')}
+function parseLineaImpresa(s){
+  s=tx(s);const tk=s.split(' ');
+  if(tk.length<3)return null;
+  if(!/^[A-Za-z]{0,2}\d{3,8}$/.test(tk[0]))return null;
+  const last=tk[tk.length-1];
+  const imp=AMT.test(last)?num(last):null;
+  const mid=tk.slice(1,imp==null?tk.length:tk.length-1).join(' ');
+  return splitMid(tk[0],mid,imp)}
+function splitMid(cod,mid,imp){
+  let nombre=mid,email='',rest='';
+  const em=/[\w.+-]+@[\w-]+(\.[\w-]+)+/.exec(mid);
+  if(em){nombre=mid.slice(0,em.index).trim();email=em[0];rest=mid.slice(em.index+em[0].length).trim()}
+  else{const cp=/\b\d{5}\b/.exec(mid);if(cp){nombre=mid.slice(0,cp.index).trim();rest=mid.slice(cp.index).trim()}}
+  return {cod:cod,nombre:nombre,email:email,pobRaw:rest,imp:imp}}
+function analizar(rows){
+  const meta={vend:'',vcod:'',ini:null,fin:null,ctrl:null,ctrlG:null};
+  const out=[];let ign=0;
+  // cabecera por nombres
+  let hi=-1,map={};
+  for(let i=0;i<Math.min(rows.length,60);i++){const r=rows[i].map(tx);
+    if(r.filter(Boolean).length<3)continue;
+    const mc=r.findIndex(x=>/^c[oó]d/i.test(x)),mi=r.findIndex(x=>/ventas|importe|facturaci|total/i.test(x));
+    if(mc>=0&&mi>=0&&mc!==mi){hi=i;map={cod:mc,imp:mi,nom:r.findIndex(x=>/raz[oó]n|nombre|cliente/i.test(x)),em:r.findIndex(x=>/correo|e-?mail/i.test(x)),pob:r.findIndex(x=>/poblaci|localidad/i.test(x))};break}}
+  rows.forEach((raw,i)=>{
+    const cells=raw.map(tx),line=cells.filter(Boolean).join(' ');
+    if(!line)return;
+    // metadatos
+    let m;
+    if(!meta.vend&&(m=/^vendedor[\s:]+([^\d'"]*?)(?:\s{2,}|\s+c[oó]digo|$)/i.exec(line)))meta.vend=m[1].trim();
+    if(!meta.vcod&&(m=/c[oó]digo\s+desde[^'"]*['"]?([A-Za-z]*\d+)['"]?/i.exec(line)))meta.vcod=m[1];
+    if(/fecha/i.test(line)&&!meta.ini){
+      const ds=[];const rx=/(\d{1,2})[\/.-](\d{1,2})[\/.-](\d{4})/g;let q;
+      while((q=rx.exec(line)))ds.push(q[3]+'-'+q[2].padStart(2,'0')+'-'+q[1].padStart(2,'0'));
+      if(ds.length<2)raw.forEach(v=>{const s=serialDate(v);if(s)ds.push(s)});
+      if(ds.length>=2){meta.ini=ds[0];meta.fin=ds[1]}}
+    if(/^total/i.test(line)||/^total/i.test(cells[0]||'')){
+      const nums=cells.concat(line.split(' ')).map(x=>AMT.test(x)?num(x):(typeof raw[cells.indexOf(x)]==='number'?raw[cells.indexOf(x)]:null)).filter(x=>x!=null&&!isNaN(x));
+      const v=nums.length?nums[nums.length-1]:null;
+      if(v!=null){if(/vendedor/i.test(line)&&meta.ctrl==null)meta.ctrl=v;else if(meta.ctrlG==null)meta.ctrlG=v}
+      return}
+    if(hi>=0){
+      if(i<=hi)return;
+      const cod=cells[map.cod];if(!cod)return;
+      let imp=raw[map.imp];imp=typeof imp==='number'?imp:(tx(imp)===''?null:num(imp));if(imp!=null&&isNaN(imp))imp=null;
+      const o={cod:cod,nombre:map.nom>=0?cells[map.nom]:'',email:map.em>=0?cells[map.em]:'',pobRaw:map.pob>=0?cells[map.pob]:'',imp:imp};
+      if(!o.nombre&&!o.cod)return;out.push(o);return}
+    if(cells.length===1||cells.filter(Boolean).length===1){const o=parseLineaImpresa(line);if(o)out.push(o);else if(/\d/.test(line)&&line.length>25&&!/p[aá]g|fecha|vendedor|c[oó]digo|clientes por/i.test(line))ign++;return}
+    // tabla sin cabecera detectada: intentamos como línea impresa
+    const o=parseLineaImpresa(line);if(o)out.push(o);else ign++});
+  // población / provincia / email
+  out.forEach(o=>{
+    const pr=o.pobRaw||'';const cp=/^(\d{5})\s*(.*)$/.exec(pr);
+    o.cp=cp?cp[1]:'';let pob=(cp?cp[2]:pr).replace(/\s*\(.*$/,'').trim();
+    o.pob=pob;o.prov=o.cp&&PROVCP[o.cp.slice(0,2)]||'';
+    if(!o.email){const e=/[\w.+-]+@[\w-]+(\.[\w-]+)+/.exec(pr);if(e)o.email=e[0]}});
+  return {meta:meta,rows:out,ign:ign}}
+
+/* ---- periodo ---- */
+function detPeriodo(ini,fin){
+  if(!ini||!fin)return {modo:null,msg:'El informe no trae fechas claras: elige tú el periodo.'};
+  const a=ini.split('-').map(Number),b=fin.split('-').map(Number);
+  const ult=new Date(b[0],b[1],0).getDate();
+  if(a[0]!==b[0]||b[2]!==ult)return {modo:'bad',msg:'Periodo '+fd(ini)+' – '+fd(fin)+': no termina en fin de mes o cruza de año.'};
+  if(a[1]===b[1]&&a[2]===1)return {modo:'mes',y:b[0],m:b[1]};
+  if(a[1]===1&&a[2]===1)return {modo:'acum',y:b[0],m:b[1]};
+  return {modo:'bad',msg:'Periodo '+fd(ini)+' – '+fd(fin)+': solo se admiten un mes completo o un acumulado desde el 1 de enero.'}}
+
+/* ---- ventana ---- */
+function modalW(h){$('#modal').innerHTML='<div class="mb"><div class="mc" style="width:min(1180px,100%)">'+h+'</div></div>'}
+function impOpen(repId,tipo){
+  IM={rep:repId,tipo:tipo,fase:1,rows:[],meta:null,per:null,y:YEAR,m:1,modo:'mes',ign:0,archivo:'',zero:false,okVend:false,okCtrl:false,msg:''};
+  impFase1()}
+function impFase1(){
+  const r=rep(IM.rep);
+  modalW(`<h2>Importar facturación ${CATL[IM.tipo]} · ${esc(r.nombre)}</h2>
+  <p class="hint" style="margin:0 0 10px">Sube el informe de fábrica (<b>Excel .xlsx</b> o <b>CSV</b>) o pega su texto. No se guardará nada hasta que veas la vista previa y confirmes. Informes admitidos: <b>un mes completo</b> o <b>acumulado desde el 1 de enero</b>.</p>
+  <div class="grid c2"><div class="card"><h3>1) Archivo</h3><input type="file" id="impf" accept=".xlsx,.csv,.txt,.tsv,.xls" onchange="impFile(this)"><p class="hint">Si es un PDF o una foto, no se puede leer aquí de forma fiable: ábrelo, copia el texto y pégalo a la derecha (o pásame la foto por el chat).</p></div>
+  <div class="card"><h3>2) Texto pegado</h3><textarea id="impt" rows="6" style="width:100%;padding:12px;border:1px solid var(--b2);border-radius:10px;font-size:15px;font-family:inherit" placeholder="Pega aquí las líneas del informe (código, razón social, correo, población, ventas)"></textarea><div class="acts"><button class="b1" onclick="impTexto()">Leer texto</button></div></div></div>
+  <p class="err" id="err">${esc(IM.msg)}</p><div class="acts"><button class="b2" onclick="IM=null;closeModal()">Cancelar</button></div>`)}
+async function impFile(inp){
+  const f=inp.files[0];if(!f)return;IM.archivo=f.name;let rows;
+  try{
+    if(/\.xlsx$/i.test(f.name))rows=await readXlsx(await f.arrayBuffer());
+    else if(/\.xls$/i.test(f.name)){IM.msg='Los .xls antiguos no se pueden leer. En Excel/Numbers guarda como .xlsx o CSV, o copia y pega el texto.';return impFase1()}
+    else{let t=await f.text();if(t.indexOf('�')>=0)t=new TextDecoder('windows-1252').decode(await f.arrayBuffer());rows=parseCSV(t);
+      if(rows.length&&rows.every(r=>r.length===1))rows=parseTextoLibre(t)}
+  }catch(e){IM.msg=e.message==='nodecomp'?'Este navegador no puede abrir .xlsx. Guarda el informe como CSV o pega el texto.':'No he podido leer ese archivo. Prueba a guardarlo como CSV o a pegar el texto.';return impFase1()}
+  impCargar(rows)}
+function impTexto(){const t=$('#impt').value;if(!t.trim()){IM.msg='Pega primero el texto del informe.';return impFase1()}IM.archivo='texto pegado';impCargar(parseTextoLibre(t))}
+function impCargar(rows){
+  const a=analizar(rows);
+  if(!a.rows.length){IM.msg='No he encontrado filas de clientes en ese informe. Revisa que incluya código, razón social e importe.';return impFase1()}
+  IM.meta=a.meta;IM.ign=a.ign;IM.per=detPeriodo(a.meta.ini,a.meta.fin);
+  if(IM.per.modo==='mes'||IM.per.modo==='acum'){IM.modo=IM.per.modo;IM.y=IM.per.y;IM.m=IM.per.m}
+  const seen={};
+  IM.rows=a.rows.map((o,i)=>{const mt=matchCliente(o.cod,o.nombre);
+    return Object.assign(o,{i:i,sel:mt?mt.cli.id:'',por:mt?mt.por:'',nota:''})});
+  impRevisar();IM.fase=2;impRender()}
+/* marca dudas: cliente de otro representante, mismo cliente dos veces, nombre distinto al guardado */
+function impRevisar(){
+  const usados={};
+  IM.rows.forEach(o=>{o.nota='';
+    if(o.sel&&o.sel!=='new'&&o.sel!=='skip'){const c=cli(o.sel);
+      if(c&&c.repId!==IM.rep){o.nota='Este cliente pertenece a '+repNom(c.repId)+'.';o.warn=1}
+      if(usados[o.sel]!=null){o.nota='Dos filas del informe apuntan al mismo cliente: no se suman, decide cuál vale.';o.warn=1}
+      usados[o.sel]=o.i;
+      if(c&&!o.nota&&o.por==='código'&&c.nombreFact&&nc(c.nombreFact)!==nc(o.nombre)&&!equivOf(c.id).some(e=>nc(e.n)===nc(o.nombre)))o.nota='Mismo código, nombre distinto al guardado («'+c.nombreFact+'»). Se guardará como equivalencia.';}
+    if(o.sel==='new'){const d=chkDup({codigo:o.cod,nombreFact:o.nombre},null);if(d){o.nota=d;o.warn=1}}
+    if(o.imp==null&&o.sel!=='skip')o.nota=(o.nota?o.nota+' ':'')+'Sin importe en el informe: escríbelo o se omitirá.'});
+  // en filas con aviso y cliente de otro rep / duplicado, no se importa hasta que el usuario lo confirme eligiendo de nuevo
+  const dupCli={};IM.rows.forEach(o=>{if(o.sel&&o.sel.length>3&&o.sel!=='skip'&&o.sel!=='new'){(dupCli[o.sel]=dupCli[o.sel]||[]).push(o)}});
+  Object.values(dupCli).forEach(l=>{if(l.length>1)l.slice(1).forEach(o=>{o.sel='';o.por=''})});
+  IM.rows.forEach(o=>{const c=o.sel&&o.sel!=='new'&&o.sel!=='skip'?cli(o.sel):null;if(c&&c.repId!==IM.rep&&!o.ok){o.sel='';o.por='';o.warn=1}})}
+function impSet(i,v){const o=IM.rows[i];o.sel=v;o.por=v&&v!=='new'&&v!=='skip'?'manual':'';o.ok=1;
+  if(v==='new'||(v&&v!=='skip')){/* limpia avisos si decide el usuario */}
+  keepScroll(()=>{impAvisos();impRender()})}
+function impImp(i,v){const o=IM.rows[i];if(v.trim()===''){o.imp=null}else{const n=num(v);if(isNaN(n)){toast('Importe no válido.',1);return impRender()}o.imp=n}keepScroll(()=>{impAvisos();impRender()})}
+function impAvisos(){IM.rows.forEach(o=>{if(o.sel&&o.sel!=='skip'&&o.sel!=='new'){const c=cli(o.sel);o.nota=c&&c.repId!==IM.rep?'Cliente de '+repNom(c.repId)+': lo has elegido tú.':'';o.warn=0}
+  else if(o.sel==='new'){const d=chkDup({codigo:o.cod,nombreFact:o.nombre},null);o.nota=d;o.warn=d?1:0}else o.nota='';
+  if(o.imp==null&&o.sel!=='skip')o.nota=(o.nota?o.nota+' ':'')+'Sin importe: se omitirá.'})}
+function keepScroll(fn){const mc=document.querySelector('.mc'),t=mc?mc.scrollTop:0;fn();const m2=document.querySelector('.mc');if(m2)m2.scrollTop=t}
+function impPer(k,v){if(k==='modo')IM.modo=v;else IM[k]=+v;keepScroll(impRender)}
+function impSetTodos(){/* no usado */}
+
+function impHash(){
+  const ls=IM.rows.filter(o=>o.imp!=null).map(o=>nz(o.cod)+':'+Math.round(o.imp*100)).sort().join('|');
+  const s=IM.rep+'|'+IM.tipo+'|'+IM.modo+'|'+IM.y+'|'+IM.m+'|'+ls;let h=5381;for(let i=0;i<s.length;i++)h=((h<<5)+h+s.charCodeAt(i))|0;return String(h)}
+function impPrevio(o){
+  if(!o.sel||o.sel==='new'||o.sel==='skip'||o.imp==null)return null;const c=cli(o.sel);if(!c)return null;
+  const k=IM.tipo;
+  if(IM.modo==='mes'){const a=rawF(c,IM.y,k);return a[IM.m-1]!=null?a[IM.m-1]:null}
+  const r=accRec(c,IM.y,k);return r[IM.m]!=null?r[IM.m]:null}
+function impImpRows(){return IM.rows.filter(o=>o.sel&&o.sel!=='skip'&&o.imp!=null&&!(o.sel==='new'&&chkDup({codigo:o.cod,nombreFact:o.nombre},null)))}
+function impRender(){
+  const r=rep(IM.rep),M=IM.meta,P=IM.per;
+  const conImp=IM.rows.filter(o=>o.imp!=null),suma=Math.round(conImp.reduce((a,o)=>a+o.imp,0)*100)/100;
+  const ctrl=M.ctrl!=null?M.ctrl:M.ctrlG;
+  const cuadra=ctrl!=null&&Math.abs(ctrl-suma)<0.015;
+  const aplic=impImpRows(),sumaAp=Math.round(aplic.reduce((a,o)=>a+o.imp,0)*100)/100;
+  const sinDec=IM.rows.filter(o=>!o.sel).length,sinImp=IM.rows.filter(o=>o.imp==null&&o.sel!=='skip').length;
+  const vOk=(M.vcod&&r.codigoFab&&nc(M.vcod)===nc(r.codigoFab))||(M.vend&&mismoNombre(M.vend,r.nombre));
+  const vTxt=(M.vend||M.vcod)?`${esc(M.vend)}${M.vcod?' ('+esc(M.vcod)+')':''}`:'';
+  const h=IM.hashV=impHash(),yaMismo=(D.imports||[]).find(x=>x.hash===h);
+  const mismoPer=(D.imports||[]).find(x=>x.rep===IM.rep&&x.tipo===IM.tipo&&x.modo===IM.modo&&x.y===IM.y&&x.m===IM.m&&x.hash!==h);
+  const perBad=P&&P.modo==='bad';
+  const bloq=perBad||!aplic.length||(vTxt&&!vOk&&!IM.okVend)||(ctrl!=null&&!cuadra&&!IM.okCtrl);
+  const optsCli=c0=>`<option value="">— Decidir —</option><option value="new" ${c0==='new'?'selected':''}>➕ Crear cliente nuevo</option><option value="skip" ${c0==='skip'?'selected':''}>⛔ No importar</option>`+
+     [...D.clientes].sort((a,b)=>a.nombre.localeCompare(b.nombre,'es')).map(c=>`<option value="${c.id}" ${c0===c.id?'selected':''}>${esc(c.nombre)}${c.poblacion?' · '+esc(c.poblacion):''}${c.repId!==IM.rep?' ['+esc(repNom(c.repId))+']':''}</option>`).join('');
+  const filas=IM.rows.map(o=>{const pv=impPrevio(o),c=o.sel&&o.sel!=='new'&&o.sel!=='skip'?cli(o.sel):null;
+    const est=o.sel==='skip'?'<span class="mut">No se importa</span>':o.sel==='new'?'<b class="up">Cliente nuevo</b>':c?(o.por==='código'?'<span class="up">✔ por código</span>':o.por==='nombre de facturación'?'<span class="up">✔ por nombre</span>':'<span class="up">✔ asignado</span>'):'<b class="dn">Sin asociar</b>';
+    return `<tr${o.warn?' style="background:#fff6ea"':''}><td>${esc(o.cod)}</td><td><b>${esc(o.nombre)}</b>${o.email?`<small>${esc(o.email)}</small>`:''}<small>${esc((o.cp?o.cp+' ':'')+o.pob)}${o.prov?' · '+esc(o.prov):''}</small></td>
+    <td class="r"><input style="width:110px;text-align:right;padding:8px;border:1px solid var(--b2);border-radius:8px;font-size:15px" value="${o.imp==null?'':String(o.imp).replace('.',',')}" placeholder="—" onchange="impImp(${o.i},this.value)">${pv!=null&&o.imp!=null&&Math.abs(pv-o.imp)>0.004?`<small class="dn">hoy: ${eur2(pv)} (se sustituye)</small>`:pv!=null&&o.imp!=null?'<small>igual que lo guardado</small>':''}</td>
+    <td>${est}${o.nota?`<small class="${o.warn?'dn':''}">${esc(o.nota)}</small>`:''}</td>
+    <td><select style="max-width:230px;padding:8px;border:1px solid var(--b2);border-radius:8px;font-size:14px" onchange="impSet(${o.i},this.value)">${optsCli(o.sel)}</select></td></tr>`}).join('');
+  const ausentes=clientsOf(IM.rep).filter(c=>!IM.rows.some(o=>o.sel===c.id));
+  modalW(`<h2>Vista previa · ${CATL[IM.tipo]} · ${esc(r.nombre)}</h2>
+  <p class="hint" style="margin:0 0 10px">Archivo: <b>${esc(IM.archivo)}</b>. Revisa las filas. <b>Todavía no se ha guardado nada.</b></p>
+  <div class="grid c2">
+   <div class="card"><h3>Periodo</h3>
+    ${perBad?`<p class="dn"><b>${esc(P.msg)}</b></p><p class="hint">Pide a fábrica el informe de un mes completo o del acumulado desde el 1 de enero.</p>`:`
+    ${P&&P.modo===null?`<p class="hint">${esc(P.msg)}</p>`:`<p class="hint" style="margin-top:0">Fechas del informe: ${fd(M.ini)} – ${fd(M.fin)}</p>`}
+    <div class="fg"><label class="f"><span>Tipo de informe</span><select onchange="impPer('modo',this.value)"><option value="mes" ${IM.modo==='mes'?'selected':''}>Un mes completo</option><option value="acum" ${IM.modo==='acum'?'selected':''}>Acumulado desde el 1 de enero</option></select></label>
+    <label class="f"><span>Año</span><select onchange="impPer('y',this.value)">${[YEAR+1,YEAR,YEAR-1,YEAR-2,YEAR-3].map(a=>`<option ${a===IM.y?'selected':''}>${a}</option>`).join('')}</select></label>
+    <label class="f"><span>${IM.modo==='mes'?'Mes':'Hasta el mes'}</span><select onchange="impPer('m',this.value)">${MESN.map((n,i)=>`<option value="${i+1}" ${IM.m===i+1?'selected':''}>${n}</option>`).join('')}</select></label></div>
+    <p class="hint">${IM.modo==='mes'?`Se guardará como facturación de <b>${MESN[IM.m-1].toLowerCase()} ${IM.y}</b>, sustituyendo lo que hubiera en ese mes.`:`Se guardará como <b>acumulado ene–${MES[IM.m-1]} ${IM.y}</b>. No se reparte por meses ni se suma a los meses ya cargados.`}</p>`}
+   </div>
+   <div class="card"><h3>Comprobaciones</h3>
+    <div class="row"><span>Filas leídas</span><b>${IM.rows.length}</b></div>
+    <div class="row"><span>Suma de las filas con importe</span><b>${eur2(suma)}</b></div>
+    <div class="row"><span>Total que dice el informe</span><b>${ctrl!=null?eur2(ctrl):'—'}</b></div>
+    ${ctrl!=null?(cuadra?'<p class="up"><b>✔ El total cuadra con las filas.</b></p>':`<p class="dn"><b>✖ No cuadra: diferencia de ${eur2(suma-ctrl)}.</b> Falta o sobra alguna fila, o hay un importe mal leído.</p><label style="display:flex;gap:8px;align-items:center"><input type="checkbox" ${IM.okCtrl?'checked':''} onchange="IM.okCtrl=this.checked;impRender()"> Continuar aunque no cuadre</label>`):'<p class="hint">El informe no trae total para comparar.</p>'}
+    ${vTxt?`<div class="row" style="margin-top:8px"><span>Vendedor del informe</span><b>${vTxt}</b></div>${vOk?'<p class="up"><b>✔ Coincide con '+esc(r.nombre)+'.</b></p>':`<p class="dn"><b>El vendedor del informe no coincide con ${esc(r.nombre)}${r.codigoFab?' (código '+esc(r.codigoFab)+')':''}.</b></p><label style="display:flex;gap:8px;align-items:center"><input type="checkbox" ${IM.okVend?'checked':''} onchange="IM.okVend=this.checked;impRender()"> Confirmo que este informe es de ${esc(r.nombre)}</label>`}`:'<p class="hint">No he detectado el vendedor en el informe.</p>'}
+    ${yaMismo?`<p class="dn"><b>Este mismo informe ya se importó el ${fd(new Date(yaMismo.at).toISOString().slice(0,10))}.</b> Si lo aplicas otra vez no se duplica nada: se sustituyen los mismos valores.</p>`:''}
+    ${mismoPer?`<p class="dn">Ya hay otro informe distinto de este mismo periodo: se sustituirán sus valores.</p>`:''}
+    ${IM.ign?`<p class="hint">${IM.ign} línea(s) del texto no se han reconocido como cliente y se han ignorado.</p>`:''}
+   </div></div>
+  <div class="card" style="margin-top:12px"><div style="overflow:auto"><table class="tb"><thead><tr><th>Código</th><th>Cliente según el informe</th><th class="r">Importe</th><th>Estado</th><th>Asignar a</th></tr></thead><tbody>${filas}</tbody></table></div>
+   <p class="hint">Las filas «Sin asociar» no se importan hasta que elijas un cliente, crees uno nuevo o las marques como «No importar». Nunca se crea ni asigna nada sin que tú lo decidas.</p></div>
+  ${ausentes.length?`<p class="hint">${ausentes.length} cliente(s) de ${esc(r.nombre)} no aparecen en el informe.</p><label style="display:flex;gap:8px;align-items:center;margin-bottom:6px"><input type="checkbox" ${IM.zero?'checked':''} onchange="IM.zero=this.checked;impRender()"> Poner <b>0 €</b> en ese ${IM.modo==='mes'?'mes':'acumulado'} a esos clientes (solo si el informe lista a todos los que compraron)</label>`:''}
+  <div class="row"><span>Se importarán</span><b>${aplic.length} clientes · ${eur2(sumaAp)}</b></div>
+  ${sinDec||sinImp?`<p class="dn">${sinDec?sinDec+' fila(s) sin asociar. ':''}${sinImp?sinImp+' fila(s) sin importe. ':''}No se importarán.</p>`:''}
+  <div class="acts"><button class="b2" onclick="IM.fase=1;impFase1()">← Volver</button><button class="b2" onclick="IM=null;closeModal()">Cancelar</button><button class="b1" ${bloq?'disabled style="opacity:.45"':''} onclick="impConfirmar()">Importar</button></div>`)}
+function impConfirmar(){
+  const aplic=impImpRows(),nuevos=aplic.filter(o=>o.sel==='new').length,pisa=aplic.filter(o=>{const p=impPrevio(o);return p!=null&&Math.abs(p-o.imp)>0.004}).length;
+  const k=CATL[IM.tipo],per=IM.modo==='mes'?MESN[IM.m-1].toLowerCase()+' '+IM.y:'acumulado ene–'+MES[IM.m-1]+' '+IM.y;
+  ask(`Vas a importar facturación <b>${k}</b> de <b>${esc(repNom(IM.rep))}</b> (${per}): <b>${aplic.length}</b> clientes${nuevos?`, <b>${nuevos}</b> nuevos`:''}${pisa?`, <b>${pisa}</b> valores sustituidos`:''}. Antes se guarda una copia interna para poder deshacerlo.`,'Importar',impAplicar)}
+function impAplicar(){
+  const aplic=impImpRows(),k=IM.tipo,y=IM.y,m=IM.m,modo=IM.modo,hash=impHash(),tr=rep(IM.rep);
+  snap('Importar facturación '+CATL[k]+' '+tr.nombre);
+  let nuevos=0,omit=0;const tocados=new Set();
+  const poner=(c,v)=>{
+    if(modo==='mes'){const t=k==='comp'?(c.comp=c.comp||{}):(c.fact=c.fact||{});const a=t[y]=t[y]||MES.map(()=>null);while(a.length<12)a.push(null);a[m-1]=v}
+    else{c.acumul=c.acumul||{};c.acumul[k]=c.acumul[k]||{};c.acumul[k][y]=c.acumul[k][y]||{};c.acumul[k][y][m]=v}
+    tocados.add(c.id)};
+  aplic.forEach(o=>{let c;
+    if(o.sel==='new'){
+      if(chkDup({codigo:o.cod,nombreFact:o.nombre},null)){omit++;return}
+      c={id:uid(),codigo:o.cod,nombreFact:o.nombre,nombre:o.nombre,poblacion:o.pob,provincia:o.prov,direccion:'',telefono:'',contacto:'',email:o.email,repId:IM.rep,semaforo:'amarillo',obs:'',fact:{},comp:{},acumul:{},catalogo:{ok:null,f:''},prodPend:[],expObs:'',exposicion:[],pend:[],visitas:[],pedidos:[],repHist:[{r:IM.rep,d:Date.now()}]};
+      D.clientes.push(c);nuevos++}
+    else{c=cli(o.sel);if(!c){omit++;return}
+      if(!c.codigo&&o.cod&&!chkDup({codigo:o.cod,nombreFact:''},c.id))c.codigo=o.cod;
+      if(!c.nombreFact&&o.nombre&&!chkDup({codigo:'',nombreFact:o.nombre},c.id))c.nombreFact=o.nombre;
+      else if(o.nombre&&nc(o.nombre)!==nc(c.nombreFact)&&nc(o.nombre)!==nc(c.nombre)&&!chkDup({codigo:'',nombreFact:o.nombre},c.id))D.equiv.push({n:o.nombre,c:c.id});
+      if(!c.email&&o.email)c.email=o.email;
+      if(!c.poblacion&&o.pob)c.poblacion=o.pob;
+      if(!c.provincia&&o.prov)c.provincia=o.prov}
+    poner(c,Math.round(o.imp*100)/100)});
+  if(IM.zero)clientsOf(IM.rep).forEach(c=>{if(!tocados.has(c.id)&&!IM.rows.some(o=>o.sel===c.id))poner(c,0)});
+  if(!tr.codigoFab&&IM.meta.vcod&&IM.okVend!==false&&tr.nombre&&IM.meta.vend&&nc(IM.meta.vend)===nc(tr.nombre))tr.codigoFab=IM.meta.vcod;
+  D.imports.push({id:uid(),at:Date.now(),rep:IM.rep,tipo:k,modo:modo,y:y,m:m,hash:hash,archivo:IM.archivo,n:aplic.length-omit,total:Math.round(aplic.reduce((a,o)=>a+o.imp,0)*100)/100,nuevos:nuevos});
+  save();IM=null;closeModal();render(true);
+  toast('Importado: '+(aplic.length-omit)+' clientes'+(nuevos?' ('+nuevos+' nuevos)':'')+'. Puedes deshacerlo en Copias de seguridad.')}
+function impHist(r){
+  const l=(D.imports||[]).filter(x=>x.rep===r.id).slice().reverse();
+  if(!l.length)return '';
+  return `<div class="card" style="margin-top:14px"><h3>Informes importados</h3><table class="tb"><thead><tr><th>Fecha</th><th>Tipo</th><th>Periodo</th><th class="r">Clientes</th><th class="r">Total</th><th>Archivo</th></tr></thead><tbody>${l.slice(0,15).map(x=>`<tr><td>${fd(new Date(x.at).toISOString().slice(0,10))}</td><td>${CATL[x.tipo]}</td><td>${x.modo==='mes'?MES[x.m-1]+' '+x.y:'Acumulado ene–'+MES[x.m-1]+' '+x.y}</td><td class="r">${x.n}</td><td class="r">${eur2(x.total)}</td><td>${esc(x.archivo||'')}</td></tr>`).join('')}</tbody></table></div>`}
 
 render();
 </script>
