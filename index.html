@@ -74,6 +74,18 @@ button{font-family:inherit}
 .a27{background:var(--am)}
 .bars u.stk{width:42%;display:flex;flex-direction:column;text-decoration:none}.bars u i{width:100%;border-radius:0}.bars u i:first-child{border-radius:4px 4px 0 0}
 .bar2{display:flex;justify-content:space-between;align-items:center;gap:12px;margin:0 0 14px;flex-wrap:wrap}
+.badge{display:none;background:var(--ro);color:#fff;border-radius:20px;font-size:12px;font-weight:700;padding:2px 8px;margin-left:6px}
+.wk{display:grid;grid-template-columns:repeat(7,minmax(0,1fr));gap:10px}
+.wd{background:#fff;border-radius:14px;padding:10px;min-height:150px}.wd.today{outline:2px solid var(--v)}
+.wd h4{font-size:13px;color:var(--g);text-transform:uppercase;letter-spacing:.4px;margin-bottom:8px}
+.pv{background:var(--b);border-radius:10px;padding:8px;margin-bottom:8px;font-size:13px;line-height:1.35}.pv.ok{background:var(--v2)}
+.pv b{display:block;font-size:14px}.pv small{color:var(--g)}.pv .bt{display:flex;gap:4px;flex-wrap:wrap;margin-top:6px}
+.pv .bt button{border:1px solid var(--b2);background:#fff;border-radius:8px;padding:5px 7px;font-size:12px;cursor:pointer;font-family:inherit}
+.chip{display:inline-block;padding:7px 13px;border-radius:20px;border:1px solid var(--b2);background:#fff;font-size:14px;margin:0 6px 6px 0;cursor:pointer}.chip.on{background:var(--v);color:#fff;border-color:var(--v)}
+.vis{border:1px solid var(--b2);border-radius:12px;padding:12px 14px;margin-bottom:10px;font-size:14px;line-height:1.5}
+.vis .vh{display:flex;justify-content:space-between;align-items:center;margin-bottom:4px}.vis .vh b{color:var(--v);font-size:15px}
+.vis dt{color:var(--g);font-size:12px;text-transform:uppercase;letter-spacing:.4px;margin-top:6px}.vis dd{margin:0}
+.sev{display:inline-block;width:10px;height:10px;border-radius:50%;margin-right:6px}.sev.rojo{background:var(--ro)}.sev.amarillo{background:var(--am)}.sev.info{background:#bbb}
 .sec{font-size:20px;color:var(--v);margin:26px 0 12px}
 .tb tr.tot td{font-weight:700;background:#faf7f1;border-top:2px solid var(--b2)}
 .x{color:var(--ro);cursor:pointer;font-weight:700;padding:4px 6px}
@@ -113,7 +125,8 @@ button{font-family:inherit}
   <button data-v="panel" onclick="go('panel')">Panel</button>
   <button data-v="reps" onclick="go('reps')">Representantes</button>
   <button data-v="copias" onclick="go('copias')">Copias de seguridad</button>
-  <button class="off">Planificación</button>
+  <button data-v="plan" onclick="go('plan')">Planificación</button>
+  <button data-v="alertas" onclick="go('alertas')">Alertas <span id="nbadge" class="badge"></span></button>
 </nav>
 <main>
   <div class="top"><div id="crumbs"></div>
@@ -169,9 +182,9 @@ function seed(){
 }
 function migrate(d){
   d.schema=1;d.reps=d.reps||[];d.clientes=d.clientes||[];
-  d.clientes.forEach(c=>{c.fact=c.fact||{};c.exposicion=c.exposicion||[];c.pend=c.pend||[];c.visitas=c.visitas||[];c.pedidos=c.pedidos||[];c.obs=c.obs||'';c.codigo=c.codigo||'';c.comp=c.comp&&typeof c.comp==='object'?c.comp:{};c.catalogo=c.catalogo&&typeof c.catalogo==='object'?c.catalogo:{ok:null,f:''};c.prodPend=c.prodPend||[];c.expObs=c.expObs||'';c.nombreFact=c.nombreFact||'';c.semaforo=c.semaforo||'amarillo';
+  d.clientes.forEach(c=>{c.fact=c.fact||{};c.exposicion=c.exposicion||[];c.pend=c.pend||[];c.visitas=c.visitas||[];c.pedidos=c.pedidos||[];c.obs=c.obs||'';c.visitas=c.visitas.map(v=>{v.id=v.id||uid();if(v.hablamos==null)v.hablamos=v.t||'';['pidio','compromisos','productos','prox','proxF'].forEach(k=>{if(v[k]==null)v[k]=''});v.proxH=!!v.proxH;return v});c.codigo=c.codigo||'';c.comp=c.comp&&typeof c.comp==='object'?c.comp:{};c.catalogo=c.catalogo&&typeof c.catalogo==='object'?c.catalogo:{ok:null,f:''};c.prodPend=c.prodPend||[];c.expObs=c.expObs||'';c.nombreFact=c.nombreFact||'';c.semaforo=c.semaforo||'amarillo';
     if(!c.repHist||!c.repHist.length)c.repHist=[{r:c.repId,d:null}]});
-  d.equiv=Array.isArray(d.equiv)?d.equiv:[];d.imports=Array.isArray(d.imports)?d.imports:[];if(d.changes==null)d.changes=0; if(d.lastBackup===undefined)d.lastBackup=null; return d;
+  d.equiv=Array.isArray(d.equiv)?d.equiv:[];d.imports=Array.isArray(d.imports)?d.imports:[];d.plan=Array.isArray(d.plan)?d.plan:[];if(d.changes==null)d.changes=0; if(d.lastBackup===undefined)d.lastBackup=null; return d;
 }
 function load(){
   let raw=null;try{raw=localStorage.getItem(KEY)}catch(e){}
@@ -267,17 +280,13 @@ function vPanel(){
   <div style="margin-top:16px">${catCards(all)}</div>
   <div class="grid c2" style="margin-top:16px">
     <div class="card"><h3>Facturación mensual ${CAT[VC].toLowerCase()} (miles de €)</h3>${barsHTML(t25,tc,stk)}</div>
-    <div class="card zona"><h3>Zona de esta semana</h3><div class="big">Levante</div>
-      <p>Valencia y Castellón<br>6 clientes por visitar · 2 ya visitados<br>Próxima visita: jueves 9:30, Muebles Ortega (Villarreal)</p></div>
+    ${(()=>{const t=hoy(),w=mondayOf(t),we=addDays(w,6),pl=D.plan.filter(x=>x.f>=w&&x.f<=we),pr=[...new Set(pl.map(x=>{const c=cli(x.cliId);return c&&c.provincia}).filter(Boolean))],nx=pl.filter(x=>!x.hecha&&x.f>=t).sort((a,b)=>(a.f+(a.h||'')).localeCompare(b.f+(b.h||'')))[0],nc=nx&&cli(nx.cliId);
+      return `<div class="card zona"><h3>Zona de esta semana</h3>${pl.length?`<div class="big">${esc(pr.join(' · ')||'Sin provincia')}</div><p>${pl.length} visitas planificadas · ${pl.filter(x=>x.hecha).length} ya hechas<br>${nx&&nc?'Próxima visita: '+DIAS[(parseD(nx.f).getDay()+6)%7].toLowerCase()+' '+fcorta(nx.f)+(nx.h?' '+esc(nx.h):'')+', '+esc(nc.nombre)+' ('+esc(nc.poblacion)+')':'No quedan visitas pendientes esta semana'}</p>`:`<div class="big">Sin planificar</div><p>Todavía no hay visitas esta semana.</p>`}<button class="b2" style="margin-top:10px" onclick="go('plan')">Abrir planificación</button></div>`})()}
   </div>
   <div class="grid c3" style="margin-top:16px">
     <div class="card"><h3>Representantes · ranking ${CAT[VC].toLowerCase()}</h3>${rs.map((x,i)=>`<div class="row lk" onclick="go('rep/${x.r.id}')"><span>${i+1}. ${esc(x.r.nombre)}<br><small style="color:#999">${x.s.ha?eur(x.s.a):'sin datos'}</small></span>${cmpHTML(x.s)}</div>`).join('')||'<span class="mut">Sin datos</span>'}</div>
     <div class="card"><h3>Han dejado de comprar</h3>${dej.map(x=>`<div class="row lk" onclick="go('cli/${x.c.id}')"><span>${esc(x.c.nombre)}<br><small style="color:#999">${esc(x.c.poblacion)}</small></span><span class="dn">hace ${x.n} meses</span></div>`).join('')||'<span class="mut">Ninguno</span>'}</div>
-    <div class="card"><h3>Avisos y tareas</h3>
-      <label class="task"><input type="checkbox"><span>Enviar tarifa nueva a Ortega</span></label>
-      <label class="task"><input type="checkbox"><span>Llamar a Colchones Pérez</span></label>
-      <label class="task"><input type="checkbox" checked><span>Confirmar visita en Gandía</span></label>
-      <label class="task"><input type="checkbox"><span>Reponer expositor en Castellón</span></label></div>
+    <div class="card"><h3>Avisos importantes</h3>${(()=>{const L=alertas().filter(a=>a.sev!=='info').slice(0,6);return (L.length?L.map(a=>`<div class="row lk" onclick="go('cli/${a.c.id}')"><span><span class="sev ${a.sev}"></span><b>${esc(a.c.nombre)}</b><br><small style="color:#999">${ATIPO[a.k]}</small></span></div>`).join(''):'<span class="mut">Sin avisos</span>')+'<div style="margin-top:10px"><button class="b2 sm" onclick="go(\'alertas\')">Ver todas las alertas</button></div>'})()}</div>
   </div>
   ${provTable(all)}`}
 
@@ -417,17 +426,17 @@ function vCli(id){
       <p class="hint">Apuntar un pedido no cambia la facturación mensual: son datos distintos.</p></div>
   </div>
 
-  <h2 class="sec">Datos, visitas y seguimiento</h2>
-  <div class="grid c2">
-    <div class="card"><h3>Datos generales</h3>${dd('Nombre comercial',c.nombre)}${dd('Nombre de facturación',c.nombreFact)}${dd('Código VICKFLEX',c.codigo)}${dd('Población',c.poblacion)}${dd('Provincia',c.provincia)}${dd('Dirección',c.direccion)}${dd('Teléfono',c.telefono)}${dd('Contacto',c.contacto)}${dd('Representante',r&&r.nombre)}${ant.length?dd('Antes con',ant.join(', ')):''}</div>
-    <div class="card"><h3>Compromisos pendientes</h3>${c.pend.length?c.pend.map((t,i)=>`<label class="task"><input type="checkbox" ${t.h?'checked':''} onchange="togglePend('${c.id}',${i})"><span>${esc(t.t)}</span></label>`).join(''):'<span class="mut">Ninguno</span>'}</div>
-  </div>
+  <h2 class="sec">Visitas y seguimiento</h2>
+  <div class="card"><div class="hb" style="margin-bottom:10px"><div><h3 style="margin:0">Historial de visitas</h3><p class="mut" style="margin-top:4px;font-size:13px">Las visitas anteriores nunca se borran: cada visita nueva se añade al historial.</p></div><button class="b1" onclick="visitaForm('${c.id}')">+ Nueva visita</button></div>${visitasHTML(c)}</div>
   <div class="grid c2" style="margin-top:16px">
-    <div class="card"><h3>Historial de visitas</h3>${c.visitas.length?c.visitas.map(v=>`<div class="hist"><b>${fd(v.f)}</b> · ${esc(v.t)}</div>`).join(''):'<span class="mut">Sin visitas registradas todavía</span>'}</div>
-    <div class="card"><h3>Observaciones</h3><p style="font-size:15px;line-height:1.5;color:#555">${c.obs?esc(c.obs):'<span class="mut">Sin observaciones</span>'}</p></div>
+    <div class="card"><h3>Compromisos pendientes</h3>${c.pend.length?c.pend.map((t,i)=>`<label class="task"><input type="checkbox" ${t.h?'checked':''} onchange="togglePend('${c.id}',${i})"><span>${esc(t.t)}${t.f?' <span class="mut">(visita del '+fd(t.f)+')</span>':''}</span></label>`).join(''):'<span class="mut">Ninguno</span>'}</div>
+    <div class="card"><h3>Observaciones y alertas</h3>${alertasCli(c)}<p style="font-size:15px;line-height:1.5;color:#555;margin-top:12px;border-top:1px solid #f0ebe0;padding-top:10px">${c.obs?esc(c.obs):'<span class="mut">Sin observaciones generales</span>'}</p></div>
   </div>
+  <h2 class="sec">Datos del cliente</h2>
+  <div class="grid c2"><div class="card"><h3>Datos generales</h3>${dd('Nombre comercial',c.nombre)}${dd('Nombre de facturación',c.nombreFact)}${dd('Código VICKFLEX',c.codigo)}${dd('Población',c.poblacion)}${dd('Provincia',c.provincia)}${dd('Dirección',c.direccion)}${dd('Teléfono',c.telefono)}${dd('Contacto',c.contacto)}${dd('Representante',r&&r.nombre)}${ant.length?dd('Antes con',ant.join(', ')):''}</div>
+  <div class="card"><h3>Planificar</h3><p style="line-height:1.5;margin-bottom:12px">${(()=>{const pl=D.plan.filter(x=>x.cliId===c.id&&!x.hecha&&x.f>=hoy()).sort((a,b)=>a.f.localeCompare(b.f))[0];return pl?'Próxima visita planificada: <b>'+fd(pl.f)+'</b>'+(pl.h?' a las '+esc(pl.h):''):'No hay ninguna visita planificada.'})()}</p><button class="b2" onclick="planForm(null,{cliId:'${c.id}'})">+ Planificar visita</button></div></div>
   <div class="card" style="margin-top:16px"><h3>Nombres de facturación reconocidos</h3><p class="mut" style="margin-bottom:8px">La app usa estos nombres (y el código VICKFLEX) para saber a qué cliente corresponde cada línea de los Excel de fábrica.</p>${(c.nombreFact?`<div class="row"><span>${esc(c.nombreFact)} <span class="mut">(principal)</span></span></div>`:'')+equivOf(c.id).map((e,i)=>`<div class="row"><span>${esc(e.n)}</span><button class="b2" onclick="delEquiv('${c.id}',${i})">Quitar</button></div>`).join('')||'<span class="mut">Ninguno todavía</span>'}<div style="margin-top:10px"><button class="b2" onclick="addEquiv('${c.id}')">+ Añadir otro nombre de facturación</button></div></div>
-  <p class="hint">El historial de visitas, la planificación y las alertas automáticas llegan en la Fase C.</p>`}
+  `}
 
 function vCopias(){
   const lb=D.lastBackup?new Date(D.lastBackup).toLocaleDateString('es-ES',{day:'numeric',month:'long',year:'numeric'}):'Nunca',u=getUndo();
@@ -449,16 +458,16 @@ function vCopias(){
 function go(h){if(location.hash==='#'+h)render();else location.hash=h}
 function crumbs(v,id){
   const l=(h,t)=>`<a onclick="go('${h}')">${esc(t)}</a>`,s=' <i>›</i> ';
-  if(v==='panel')return '<b>Panel</b>';if(v==='reps')return '<b>Representantes</b>';if(v==='copias')return '<b>Copias de seguridad</b>';
+  if(v==='panel')return '<b>Panel</b>';if(v==='reps')return '<b>Representantes</b>';if(v==='copias')return '<b>Copias de seguridad</b>';if(v==='plan')return '<b>Planificación semanal</b>';if(v==='alertas')return '<b>Alertas</b>';
   if(v==='rep')return l('reps','Representantes')+s+'<b>'+esc(rep(id).nombre)+'</b>';
   const c=cli(id),r=rep(c.repId);return l('reps','Representantes')+s+(r?l('rep/'+r.id,r.nombre)+s:'')+'<b>'+esc(c.nombre)+'</b>'}
 function render(keep){
   const p=(location.hash.slice(1)||'panel').split('/');let v=p[0],id=p[1];
-  if(v==='rep'&&!rep(id))v='reps';if(v==='cli'&&!cli(id))v='reps';if(['panel','reps','rep','cli','copias'].indexOf(v)<0)v='panel';
-  const f={panel:vPanel,reps:vReps,rep:()=>vRep(id),cli:()=>vCli(id),copias:vCopias}[v];
+  if(v==='rep'&&!rep(id))v='reps';if(v==='cli'&&!cli(id))v='reps';if(['panel','reps','rep','cli','copias','plan','alertas'].indexOf(v)<0)v='panel';
+  const f={panel:vPanel,reps:vReps,rep:()=>vRep(id),cli:()=>vCli(id),copias:vCopias,plan:vPlan,alertas:vAlertas}[v];
   const st=$('#view').scrollTop;
   $('#view').innerHTML=(v==='copias'?'':banner())+f();
-  $('#crumbs').innerHTML=crumbs(v,id);
+  $('#crumbs').innerHTML=crumbs(v,id);{const n=alertas().filter(a=>a.sev==='rojo').length,b=$('#nbadge');b.textContent=n;b.style.display=n?'inline-block':'none'}
   document.querySelectorAll('nav button[data-v]').forEach(b=>b.classList.toggle('on',b.dataset.v===((v==='rep'||v==='cli')?'reps':v)));
   $('#view').scrollTop=keep===true?st:0}
 window.addEventListener('hashchange',()=>render());
@@ -481,7 +490,7 @@ function ask(msg,label,fn,typed){
   $('#okc').onclick=()=>{if(typed&&$('#tp').value.trim().toUpperCase()!==typed){$('#tp').classList.add('bad');return}closeModal();fn()}}
 function formModal(title,fields,vals,onSave){
   const provs=[...new Set(D.reps.flatMap(r=>r.provincias).concat(D.clientes.map(c=>c.provincia)).filter(Boolean))];
-  const h=fields.map(f=>`<label class="f ${f.w||''}"><span>${f.l}</span>${f.t==='select'?`<select name="${f.n}">${f.o.map(o=>`<option value="${esc(o[0])}" ${o[0]===vals[f.n]?'selected':''}>${esc(o[1])}</option>`).join('')}</select>`:f.t==='area'?`<textarea name="${f.n}" rows="3">${esc(vals[f.n])}</textarea>`:`<input name="${f.n}" value="${esc(vals[f.n])}" ${f.list?'list="provs"':''} ${f.ph?`placeholder="${esc(f.ph)}"`:''}>`}</label>`).join('');
+  const h=fields.map(f=>`<label class="f ${f.w||''}"><span>${f.l}</span>${f.t==='select'?`<select name="${f.n}">${f.o.map(o=>`<option value="${esc(o[0])}" ${o[0]===vals[f.n]?'selected':''}>${esc(o[1])}</option>`).join('')}</select>`:f.t==='date'?`<input type="date" name="${f.n}" value="${esc(vals[f.n])}">`:f.t==='area'?`<textarea name="${f.n}" rows="3">${esc(vals[f.n])}</textarea>`:`<input name="${f.n}" value="${esc(vals[f.n])}" ${f.list?'list="provs"':''} ${f.ph?`placeholder="${esc(f.ph)}"`:''}>`}</label>`).join('');
   modal(`<h2>${title}</h2><form id="frm"><div class="fg">${h}</div><datalist id="provs">${provs.map(p=>`<option value="${esc(p)}">`).join('')}</datalist><p class="err" id="err"></p><div class="acts"><button type="button" class="b2" onclick="closeModal()">Cancelar</button><button type="submit" class="b1">Guardar</button></div></form>`);
   const fm=$('#frm');
   fm.onsubmit=e=>{e.preventDefault();const o={};fields.forEach(f=>o[f.n]=fm.elements[f.n].value.trim());const r=onSave(o);if(typeof r==='string'){$('#err').textContent=r}else if(r!==true){closeModal()}}}
@@ -578,9 +587,123 @@ function factForm(id,y,k){
   $('#frm').onsubmit=e=>{e.preventDefault();const arr=[];
     for(let i=0;i<12;i++){const raw=$('#frm').elements['m'+i].value,n=num(raw);if(String(raw).trim()!==''&&(n==null||isNaN(n))){$('#err').textContent='El importe de '+MES[i]+' no es válido.';return}arr.push(n==null?null:n)}
     snap('Editar facturación '+(k==='comp'?'de complementos ':'principal ')+y+' de '+c.nombre);if(k==='comp'){c.comp=c.comp||{};c.comp[y]=arr}else c.fact[y]=arr;save();closeModal();render(true);toast('Facturación guardada.')}}
+
+/* ===== Fase C: visitas, planificación semanal y alertas ===== */
+const p2=n=>String(n).padStart(2,'0');
+const hoy=()=>{const d=new Date();return d.getFullYear()+'-'+p2(d.getMonth()+1)+'-'+p2(d.getDate())};
+const isoD=d=>d.getFullYear()+'-'+p2(d.getMonth()+1)+'-'+p2(d.getDate());
+const parseD=f=>new Date(f+'T12:00:00');
+const addDays=(f,n)=>{const d=parseD(f);d.setDate(d.getDate()+n);return isoD(d)};
+const mondayOf=f=>{const d=parseD(f),w=(d.getDay()+6)%7;return addDays(f,-w)};
+const diasEntre=(a,b)=>Math.round((parseD(b)-parseD(a))/864e5);
+const DIAS=['Lunes','Martes','Miércoles','Jueves','Viernes','Sábado','Domingo'];
+const fcorta=f=>{const d=parseD(f);return p2(d.getDate())+'/'+p2(d.getMonth()+1)};
+let PW=null,PR='',PP='',AF={rep:'',t:''};
+
+/* --- Visitas: el historial nunca se borra; solo se añaden y, si hace falta, se corrigen --- */
+function visitaForm(cid,vid,planId,fecha){
+  const c=cli(cid),v=vid?c.visitas.find(x=>x.id===vid):null;
+  formModal(v?'Editar visita':'Nueva visita · '+c.nombre,[
+    {n:'f',l:'Fecha',t:'date'},{n:'hablamos',l:'Qué hablamos con el cliente',t:'area',w:'w'},{n:'pidio',l:'Qué nos pidió',t:'area',w:'w'},
+    {n:'compromisos',l:'Compromisos adquiridos',t:'area',w:'w'},{n:'productos',l:'Productos o exposiciones comentadas',t:'area',w:'w'},
+    {n:'prox',l:'Próxima acción pendiente',w:'w'},{n:'proxF',l:'Fecha prevista de esa acción (opcional)',t:'date'}],
+    {f:v?v.f:(fecha||hoy()),hablamos:v?v.hablamos:'',pidio:v?v.pidio:'',compromisos:v?v.compromisos:'',productos:v?v.productos:'',prox:v?v.prox:'',proxF:v?v.proxF:''},o=>{
+    if(!/^\d{4}-\d{2}-\d{2}$/.test(o.f))return 'Elige la fecha de la visita.';
+    if(!o.hablamos&&!o.pidio&&!o.compromisos&&!o.productos&&!o.prox)return 'Escribe al menos algo de la visita.';
+    if(v){snap('Editar visita '+fd(v.f)+' de '+c.nombre);Object.assign(v,o);
+      const pe=c.pend.find(x=>x.v===v.id);if(pe&&o.compromisos){pe.t=o.compromisos}else if(!pe&&o.compromisos){c.pend.push({t:o.compromisos,h:false,v:v.id,f:o.f})}}
+    else{const n=Object.assign({id:uid(),proxH:false},o);c.visitas.push(n);
+      if(o.compromisos)c.pend.push({t:o.compromisos,h:false,v:n.id,f:o.f});
+      if(planId){const pl=D.plan.find(x=>x.id===planId);if(pl){pl.hecha=true;pl.visitId=n.id}}}
+    save();render(true);toast('Visita guardada.')})}
+function toggleProx(cid,vid){const v=cli(cid).visitas.find(x=>x.id===vid);v.proxH=!v.proxH;save();render(true)}
+const visitasOrd=c=>[...c.visitas].sort((a,b)=>b.f.localeCompare(a.f));
+const lastVisita=c=>visitasOrd(c)[0];
+function visitasHTML(c){
+  const vs=visitasOrd(c);
+  return vs.length?vs.map(v=>`<div class="vis"><div class="vh"><b>${fd(v.f)}</b><button class="b2 sm" onclick="visitaForm('${c.id}','${v.id}')">Editar</button></div><dl style="margin:0">
+    ${v.hablamos?`<dt>Qué hablamos</dt><dd>${esc(v.hablamos)}</dd>`:''}${v.pidio?`<dt>Qué nos pidió</dt><dd>${esc(v.pidio)}</dd>`:''}${v.compromisos?`<dt>Compromisos</dt><dd>${esc(v.compromisos)}</dd>`:''}${v.productos?`<dt>Productos / exposiciones comentadas</dt><dd>${esc(v.productos)}</dd>`:''}
+    ${v.prox?`<dt>Próxima acción</dt><dd><label class="task" style="padding:2px 0"><input type="checkbox" ${v.proxH?'checked':''} onchange="toggleProx('${c.id}','${v.id}')"><span>${esc(v.prox)}${v.proxF?' <span class="mut">('+fd(v.proxF)+')</span>':''}</span></label></dd>`:''}</dl></div>`).join(''):'<span class="mut">Sin visitas registradas todavía</span>'}
+
+/* --- Planificación semanal --- */
+function planForm(id,pre){
+  const pl=id?D.plan.find(x=>x.id===id):null;pre=pre||{};
+  const c0=pl?cli(pl.cliId):(pre.cliId?cli(pre.cliId):null),r0=c0?c0.repId:(PR||(D.reps[0]&&D.reps[0].id)||'');
+  modal(`<h2>${pl?'Editar visita planificada':'Planificar visita'}</h2><form id="frm"><div class="fg">
+   <label class="f"><span>Representante</span><select name="rep" onchange="planRefill()">${D.reps.map(r=>`<option value="${r.id}" ${r.id===r0?'selected':''}>${esc(r.nombre)}</option>`).join('')}</select></label>
+   <label class="f"><span>Provincia</span><select name="prov" onchange="planRefill()"></select></label>
+   <label class="f w"><span>Cliente</span><select name="cli"></select></label>
+   <label class="f"><span>Fecha</span><input type="date" name="f" value="${esc(pl?pl.f:(pre.f||hoy()))}"></label>
+   <label class="f"><span>Hora (opcional)</span><input type="time" name="h" value="${esc(pl?pl.h:'')}"></label>
+   <label class="f w"><span>Nota (qué quiero tratar)</span><textarea name="n" rows="3">${esc(pl?pl.n:'')}</textarea></label></div>
+   <p class="err" id="err"></p><div class="acts"><button type="button" class="b2" onclick="closeModal()">Cancelar</button><button type="submit" class="b1">Guardar</button></div></form>`);
+  const fm=$('#frm');fm.dataset.c=c0?c0.id:'';fm.dataset.p=c0?(c0.provincia||''):'';planRefill(true);
+  fm.onsubmit=e=>{e.preventDefault();const o={cliId:fm.elements.cli.value,f:fm.elements.f.value,h:fm.elements.h.value,n:fm.elements.n.value.trim()};
+    if(!o.cliId)return void($('#err').textContent='Elige un cliente (el representante debe tener clientes).');
+    if(!/^\d{4}-\d{2}-\d{2}$/.test(o.f))return void($('#err').textContent='Elige la fecha.');
+    if(pl)Object.assign(pl,o);else D.plan.push(Object.assign({id:uid(),hecha:false},o));
+    save();closeModal();PW=mondayOf(o.f);render(true);toast('Visita planificada.')}}
+function planRefill(first){
+  const fm=$('#frm'),rid=fm.elements.rep.value,cs=clientsOf(rid);
+  const provs=[...new Set(cs.map(c=>c.provincia||'Sin provincia'))].sort();
+  const sel=first&&fm.dataset.p?fm.dataset.p:fm.elements.prov.value;
+  fm.elements.prov.innerHTML='<option value="">Todas</option>'+provs.map(q=>`<option ${q===sel?'selected':''}>${esc(q)}</option>`).join('');
+  const pv=fm.elements.prov.value,l=cs.filter(c=>!pv||(c.provincia||'Sin provincia')===pv).sort((a,b)=>a.nombre.localeCompare(b.nombre,'es'));
+  const keep=first?fm.dataset.c:fm.elements.cli.value;
+  fm.elements.cli.innerHTML=l.map(c=>`<option value="${c.id}" ${c.id===keep?'selected':''}>${esc(c.nombre)} · ${esc(c.poblacion)}</option>`).join('')}
+function delPlan(id){const pl=D.plan.find(x=>x.id===id),c=cli(pl.cliId);ask(`¿Quitar de la planificación la visita a <b>${esc(c?c.nombre:'')}</b> del ${fd(pl.f)}? (No se borra ninguna visita registrada.)`,'Quitar',()=>{snap('Quitar visita planificada');D.plan=D.plan.filter(x=>x.id!==id);save();render(true)})}
+function regPlan(id){const pl=D.plan.find(x=>x.id===id);visitaForm(pl.cliId,null,id,pl.f)}
+function planSem(d){PW=addDays(PW||mondayOf(hoy()),d*7);render(true)}
+function planHoy(){PW=mondayOf(hoy());render(true)}
+function setPR(v){PR=v;PP='';render(true)}function setPP(v){PP=v;render(true)}
+function vPlan(){
+  PW=PW||mondayOf(hoy());const days=[...Array(7)].map((_,i)=>addDays(PW,i)),t=hoy();
+  const okc=c=>c&&(!PR||c.repId===PR)&&(!PP||(c.provincia||'Sin provincia')===PP);
+  const pls=D.plan.filter(x=>okc(cli(x.cliId)));
+  const cand=D.clientes.filter(c=>!PR||c.repId===PR);const provs=[...new Set(cand.map(c=>c.provincia||'Sin provincia'))].sort();
+  const col=f=>pls.filter(x=>x.f===f).sort((a,b)=>(a.h||'99').localeCompare(b.h||'99')).map(x=>{const c=cli(x.cliId);
+    return `<div class="pv ${x.hecha?'ok':''}"><b onclick="go('cli/${c.id}')" style="cursor:pointer">${x.hecha?'✔ ':''}${esc(c.nombre)}</b><small>${x.h?esc(x.h)+' · ':''}${esc(c.poblacion)}<br>${esc(repNom(c.repId))}</small>${x.n?`<div>${esc(x.n)}</div>`:''}
+    <div class="bt">${x.hecha?'':`<button onclick="regPlan('${x.id}')">Registrar visita</button>`}<button onclick="planForm('${x.id}')">Editar</button><button onclick="delPlan('${x.id}')">Quitar</button></div></div>`}).join('');
+  const inW=pls.filter(x=>x.f>=days[0]&&x.f<=days[6]),plannedIds=new Set(inW.map(x=>x.cliId));
+  const sug=cand.filter(c=>okc(c)&&!plannedIds.has(c.id)).map(c=>{const v=lastVisita(c);return {c:c,d:v?diasEntre(v.f,t):9999}}).filter(x=>x.d>=90).sort((a,b)=>b.d-a.d).slice(0,8);
+  return `<div class="hb"><div><h1>Planificación semanal</h1><p class="sub" style="margin-bottom:0">Semana del ${fd(days[0])} al ${fd(days[6])}</p></div>
+   <div class="acts"><button class="b2" onclick="planSem(-1)">‹ Anterior</button><button class="b2" onclick="planHoy()">Esta semana</button><button class="b2" onclick="planSem(1)">Siguiente ›</button><button class="b1" onclick="planForm()">+ Planificar visita</button></div></div>
+  <div class="bar2"><label>Representante <select class="sel" onchange="setPR(this.value)"><option value="">Todos</option>${D.reps.map(r=>`<option value="${r.id}" ${r.id===PR?'selected':''}>${esc(r.nombre)}</option>`).join('')}</select></label>
+   <label>Provincia <select class="sel" onchange="setPP(this.value)"><option value="">Todas</option>${provs.map(q=>`<option ${q===PP?'selected':''}>${esc(q)}</option>`).join('')}</select></label>
+   <span class="mut">${inW.length} visitas planificadas · ${inW.filter(x=>x.hecha).length} hechas</span></div>
+  <div class="wk">${days.map((f,i)=>`<div class="wd ${f===t?'today':''}"><h4>${DIAS[i]} ${fcorta(f)}</h4>${col(f)||'<span class="mut" style="font-size:12px">—</span>'}</div>`).join('')}</div>
+  <div class="card" style="margin-top:16px"><h3>Clientes que conviene visitar (sin visita desde hace 90 días o más)</h3>${sug.length?sug.map(x=>`<div class="row"><span><b>${esc(x.c.nombre)}</b> <span class="mut">${esc(x.c.poblacion)} · ${esc(repNom(x.c.repId))}</span></span><span>${x.d===9999?'<span class="mut">sin visitas registradas</span>':'hace '+x.d+' días'} <button class="b2 sm" onclick="planForm(null,{cliId:'${x.c.id}',f:'${days[0]>t?days[0]:(t<=days[6]?t:days[0])}'})">Planificar</button></span></div>`).join(''):'<span class="mut">Nada pendiente con los filtros actuales.</span>'}</div>
+  <p class="hint">Las visitas planificadas no se borran al pasar la semana. Cuando hagas la visita, pulsa «Registrar visita»: se guarda en el historial del cliente (que nunca se borra) y la visita planificada queda marcada como hecha.</p>`}
+
+/* --- Alertas (se calculan solas con los datos; no hay que mantenerlas a mano) --- */
+const ATIPO={plan:'Visita planificada sin registrar',prox:'Próxima acción pendiente',comp:'Compromiso pendiente',sinanio:'Compró el año pasado y aún no este año',sinm:'Varios meses sin comprar',caida:'Facturación inferior al año anterior',norep:'Sin repetir compra este año',cat:'Catálogo sin actualizar',expo:'Producto pendiente de exponer',visita:'Sin visita reciente'};
+function alertas(){
+  const m=corte(),t=hoy(),L=[],add=(c,k,sev,txt)=>L.push({c:c,k:k,sev:sev,txt:txt});
+  D.clientes.forEach(c=>{
+    D.plan.filter(x=>x.cliId===c.id&&!x.hecha&&x.f<t).forEach(x=>add(c,'plan','rojo','Estaba planificada el '+fd(x.f)));
+    c.visitas.filter(v=>v.prox&&!v.proxH).forEach(v=>{const late=v.proxF&&v.proxF<t;add(c,'prox',late?'rojo':'amarillo',v.prox+(v.proxF?' ('+(late?'vencida el ':'para el ')+fd(v.proxF)+')':''))});
+    c.pend.filter(x=>!x.h).forEach(x=>add(c,'comp','amarillo',x.t));
+    const prior=has(c,YEAR-1,12,'total')&&acum(c,YEAR-1,12,'total')>0;
+    if(prior&&(!has(c,YEAR,m,'total')||acum(c,YEAR,m,'total')===0))add(c,'sinanio','rojo','Facturó '+eur(acum(c,YEAR-1,12,'total'))+' en '+(YEAR-1)+' y todavía nada en '+YEAR);
+    else if(sinComprar(c,m))add(c,'sinm','rojo','Lleva '+mesesSin(c,m)+' meses sin facturar');
+    const o=cmpL([c],YEAR,m,'total');if(o.ok&&o.d<0&&o.p>0){const pc=o.d/o.p*100;add(c,'caida',pc<=-20?'rojo':'amarillo',sg(o.d)+' ('+pc.toFixed(1).replace('.',',')+' %) frente al mismo periodo de '+(YEAR-1))}
+    if(nCompras(c)===1)add(c,'norep','amarillo','Solo una compra en '+YEAR);
+    if(c.catalogo.ok===false)add(c,'cat','amarillo','Catálogo marcado como NO actualizado');
+    c.prodPend.forEach(x=>add(c,'expo','amarillo',x));
+    const v=lastVisita(c),d=v?diasEntre(v.f,t):null;if(d==null)add(c,'visita','info','Sin visitas registradas');else if(d>=90)add(c,'visita','info','Última visita hace '+d+' días')});
+  const ord={rojo:0,amarillo:1,info:2};return L.sort((a,b)=>ord[a.sev]-ord[b.sev]||a.c.nombre.localeCompare(b.c.nombre,'es'))}
+function vAlertas(){
+  const all=alertas(),L=all.filter(a=>(!AF.rep||a.c.repId===AF.rep)&&(!AF.t||a.k===AF.t)),cnt={};all.filter(a=>!AF.rep||a.c.repId===AF.rep).forEach(a=>cnt[a.k]=(cnt[a.k]||0)+1);
+  return `<h1>Alertas</h1><p class="sub">Se calculan solas con los datos de tus clientes. ${all.filter(a=>a.sev==='rojo').length} urgentes · ${all.filter(a=>a.sev==='amarillo').length} a vigilar · ${all.filter(a=>a.sev==='info').length} informativas.</p>
+  <div class="bar2"><label>Representante <select class="sel" onchange="AF.rep=this.value;render(true)"><option value="">Todos</option>${D.reps.map(r=>`<option value="${r.id}" ${r.id===AF.rep?'selected':''}>${esc(r.nombre)}</option>`).join('')}</select></label></div>
+  <div><span class="chip ${!AF.t?'on':''}" onclick="AF.t='';render(true)">Todas</span>${Object.keys(ATIPO).filter(k=>cnt[k]).map(k=>`<span class="chip ${AF.t===k?'on':''}" onclick="AF.t='${k}';render(true)">${ATIPO[k]} (${cnt[k]})</span>`).join('')}</div>
+  <div class="card" style="margin-top:10px">${L.length?`<table class="tb"><thead><tr><th>Cliente</th><th>Aviso</th><th>Detalle</th></tr></thead><tbody>${L.map(a=>`<tr onclick="go('cli/${a.c.id}')"><td><b>${esc(a.c.nombre)}</b><small>${esc(repNom(a.c.repId))} · ${esc(a.c.poblacion)}</small></td><td><span class="sev ${a.sev}"></span>${ATIPO[a.k]}</td><td>${esc(a.txt)}</td></tr>`).join('')}</tbody></table>`:'<span class="mut">No hay alertas con estos filtros.</span>'}</div>
+  <p class="hint">Rojo = urgente (vencido, mucho tiempo sin comprar, caída fuerte). Amarillo = a vigilar. Gris = informativo (por ejemplo, sin visita en 90 días o más). El semáforo del cliente sigue siendo manual.</p>`}
+function alertasCli(c){const L=alertas().filter(a=>a.c.id===c.id);
+  return L.length?L.map(a=>`<div class="row" style="align-items:flex-start"><span><span class="sev ${a.sev}"></span><b>${ATIPO[a.k]}</b><br><small style="color:var(--g)">${esc(a.txt)}</small></span></div>`).join(''):'<span class="mut">Sin alertas. Todo en orden.</span>'}
 function delCli(id){
   const c=cli(id);
-  ask(`¿Eliminar a <b>${esc(c.nombre)}</b>? Se borrarán su ficha, su facturación y su historial. Después podrás deshacerlo en Copias de seguridad.`,'Eliminar',()=>{snap('Eliminar cliente '+c.nombre);const r=c.repId;D.clientes=D.clientes.filter(x=>x.id!==id);D.equiv=D.equiv.filter(e=>e.c!==id);save();go(rep(r)?'rep/'+r:'reps');toast('Cliente eliminado.')})}
+  ask(`¿Eliminar a <b>${esc(c.nombre)}</b>? Se borrarán su ficha, su facturación y su historial. Después podrás deshacerlo en Copias de seguridad.`,'Eliminar',()=>{snap('Eliminar cliente '+c.nombre);const r=c.repId;D.clientes=D.clientes.filter(x=>x.id!==id);D.equiv=D.equiv.filter(e=>e.c!==id);D.plan=D.plan.filter(x=>x.cliId!==id);save();go(rep(r)?'rep/'+r:'reps');toast('Cliente eliminado.')})}
 function setSem(id,s){cli(id).semaforo=s;save();render(true)}
 function cycSem(id){const c=cli(id),o=['verde','amarillo','rojo'];c.semaforo=o[(o.indexOf(c.semaforo)+1)%3];save();render(true)}
 function togglePend(id,i){const t=cli(id).pend[i];t.h=!t.h;save();render(true)}
