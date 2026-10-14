@@ -67,6 +67,13 @@ button{font-family:inherit}
 .b1{background:var(--v);color:#fff;font-weight:600} .b2{background:#fff;color:var(--v);font-weight:600}
 .b1.danger{background:var(--ro);border-color:var(--ro)} .b2.dng{color:var(--ro);border-color:var(--ro)}
 .b2[disabled]{opacity:.45}
+.sec{font-size:20px;color:var(--v);margin:26px 0 12px}
+.tb tr.tot td{font-weight:700;background:#faf7f1;border-top:2px solid var(--b2)}
+.x{color:var(--ro);cursor:pointer;font-weight:700;padding:4px 6px}
+.tag .x{padding:0 0 0 4px}
+.addrow{display:flex;gap:8px;margin-top:10px}.addrow input{flex:1;padding:11px;border:1px solid var(--b2);border-radius:10px;font-size:16px;font-family:inherit}
+.b2.sm{padding:6px 10px;font-size:13px}
+.ym{display:grid;grid-template-columns:repeat(3,1fr);gap:10px;margin:12px 0}
 .filebtn{display:inline-block}
 .tb{width:100%;border-collapse:collapse;font-size:15px}
 .tb th{text-align:left;font-size:12px;color:var(--g);font-weight:600;text-transform:uppercase;letter-spacing:.5px;padding:8px 10px;border-bottom:2px solid var(--b2)}
@@ -155,7 +162,7 @@ function seed(){
 }
 function migrate(d){
   d.schema=1;d.reps=d.reps||[];d.clientes=d.clientes||[];
-  d.clientes.forEach(c=>{c.fact=c.fact||{};c.exposicion=c.exposicion||[];c.pend=c.pend||[];c.visitas=c.visitas||[];c.pedidos=c.pedidos||[];c.obs=c.obs||'';c.codigo=c.codigo||'';c.nombreFact=c.nombreFact||'';c.semaforo=c.semaforo||'amarillo';
+  d.clientes.forEach(c=>{c.fact=c.fact||{};c.exposicion=c.exposicion||[];c.pend=c.pend||[];c.visitas=c.visitas||[];c.pedidos=c.pedidos||[];c.obs=c.obs||'';c.codigo=c.codigo||'';c.catalogo=c.catalogo&&typeof c.catalogo==='object'?c.catalogo:{ok:null,f:''};c.prodPend=c.prodPend||[];c.expObs=c.expObs||'';c.nombreFact=c.nombreFact||'';c.semaforo=c.semaforo||'amarillo';
     if(!c.repHist||!c.repHist.length)c.repHist=[{r:c.repId,d:null}]});
   d.equiv=Array.isArray(d.equiv)?d.equiv:[];if(d.changes==null)d.changes=0; if(d.lastBackup===undefined)d.lastBackup=null; return d;
 }
@@ -181,11 +188,11 @@ const acum=(c,y,m)=>fy(c,y).slice(0,m).reduce((a,v)=>a+(v||0),0);
 const hasBill=c=>Object.keys(c.fact).some(y=>fy(c,y).some(v=>v>0));
 function mesesSin(c,m){let n=0,y=YEAR,i=m-1;while(n<48){const a=c.fact[y];if(!a&&y<YEAR-3)break;const v=a?a[i]:null;if(v>0)return n;n++;i--;if(i<0){i=11;y--}}return n}
 const sinComprar=(c,m)=>hasBill(c)&&mesesSin(c,m)>=3;
-function stats(cs){const m=corte();let a=0,p=0,up=0,dn=0,nu=0,sc=0;const sem={verde:0,amarillo:0,rojo:0};
+function stats(cs){const m=corte();let a=0,p=0,up=0,dn=0,nu=0,sc=0,nr=0;const sem={verde:0,amarillo:0,rojo:0};
   cs.forEach(c=>{const x=acum(c,YEAR,m),y=acum(c,YEAR-1,m);a+=x;p+=y;
     if(y===0&&x>0)nu++;else if(x>y)up++;else if(x<y)dn++;
-    if(sinComprar(c,m))sc++;sem[c.semaforo||'amarillo']++});
-  return {m:m,a:a,p:p,d:a-p,up:up,dn:dn,nu:nu,sc:sc,sem:sem,n:cs.length}}
+    if(sinComprar(c,m))sc++;if(!repitio(c))nr++;sem[c.semaforo||'amarillo']++});
+  return {m:m,a:a,p:p,d:a-p,up:up,dn:dn,nu:nu,sc:sc,nr:nr,sem:sem,n:cs.length}}
 function pctHTML(a,b){
   if(b===0&&a>0)return '<span class="pill n">Nuevo</span>';
   if(b===0)return '<span class="mut">—</span>';
@@ -195,6 +202,9 @@ const dot=s=>`<span class="dot ${s}"></span>`;
 function barsHTML(a,b){const max=Math.max(1,...a.map(v=>v||0),...b.map(v=>v||0));
   return '<div class="bars">'+a.map((v,i)=>`<div><span><i class="a25" style="height:${(v||0)/max*100}%"></i>${b[i]!=null?`<i class="a26" style="height:${b[i]/max*100}%"></i>`:''}</span>${'EFMAMJJASOND'[i]}</div>`).join('')+'</div>'+
   `<div class="leg"><b class="a25"></b>${YEAR-1}<b class="a26"></b>${YEAR}</div>`}
+function nCompras(c){const np=(c.pedidos||[]).filter(o=>o.f&&o.f.slice(0,4)===String(YEAR)).length,nm=fy(c,YEAR).filter(v=>v>0).length;return Math.max(np,nm)}
+const repitio=c=>nCompras(c)>=2;
+const diasDesde=f=>{const d=new Date(f+'T00:00:00');return isNaN(d)?null:Math.floor((Date.now()-d.getTime())/864e5)};
 function lastPedido(c){return [...(c.pedidos||[])].sort((x,y)=>y.f.localeCompare(x.f))[0]}
 
 /* ---------- Pantallas ---------- */
@@ -265,7 +275,8 @@ function vRep(id){
       <div class="stat"><div class="big up">${s.up}</div><small>▲ Suben</small></div>
       <div class="stat"><div class="big dn">${s.dn}</div><small>▼ Bajan</small></div>
       <div class="stat"><div class="big">${s.nu}</div><small>Nuevos</small></div>
-      <div class="stat"><div class="big dn">${s.sc}</div><small>Sin comprar 3+ meses</small></div></div></div>
+      <div class="stat"><div class="big dn">${s.sc}</div><small>Sin comprar 3+ meses</small></div>
+      <div class="stat"><div class="big" style="color:var(--am)">${s.nr}</div><small>Sin repetir compra en ${YEAR}</small></div></div></div>
     <div class="card"><h3>Semáforo</h3><div class="big3">
       <div class="stat">${dot('verde')}<div class="big">${s.sem.verde}</div></div>
       <div class="stat">${dot('amarillo')}<div class="big">${s.sem.amarillo}</div></div>
@@ -283,31 +294,72 @@ function vCli(id){
   const ant=[...new Set((c.repHist||[]).slice(0,-1).map(h=>h.r))].filter(x=>x!==c.repId).map(x=>rep(x)).filter(Boolean).map(x=>esc(x.nombre));
   const dd=(l,v)=>`<div class="row"><span style="color:var(--g)">${l}</span><span>${v?esc(v):'<span class="mut">—</span>'}</span></div>`;
   const get=y=>MES.map((_,i)=>fy(c,y)[i]);
+  const totP=fy(c,YEAR-1).reduce((t,v)=>t+(v||0),0),dd0=lp?diasDesde(lp.f):null;
+  const mrows=MES.map((n,i)=>{const pv=fy(c,YEAR-1)[i],x=fy(c,YEAR)[i],ok=x!=null;
+    return `<tr><td>${n.charAt(0).toUpperCase()+n.slice(1)}</td><td class="r">${pv!=null?eur(pv):'<span class="mut">—</span>'}</td><td class="r">${ok?eur(x):'<span class="mut">—</span>'}</td><td class="r ${ok&&x-(pv||0)>=0?'up':'dn'}">${ok?sg(x-(pv||0)):'<span class="mut">—</span>'}</td><td class="r">${ok?pctHTML(x,pv||0):'<span class="mut">—</span>'}</td></tr>`}).join('');
+  const yrs=Object.keys(c.fact).map(Number).filter(y=>fy(c,y).some(v=>v!=null)).sort((x,y)=>y-x);
+  const hrows=yrs.map(y=>{const cur=y===YEAR,t=cur?a:fy(c,y).reduce((q,v)=>q+(v||0),0),pt=cur?p:(fy(c,y-1).some(v=>v!=null)?fy(c,y-1).reduce((q,v)=>q+(v||0),0):null);
+    return `<tr><td>${y}${cur?' <small>ene–'+MES[m-1]+'</small>':''}</td><td class="r">${eur(t)}</td><td class="r ${pt!=null&&t-pt>=0?'up':'dn'}">${pt!=null?sg(t-pt):'<span class="mut">—</span>'}</td><td class="r">${pt!=null?pctHTML(t,pt):'<span class="mut">—</span>'}</td></tr>`}).join('');
   return `<div class="hb"><div class="head">${dot(c.semaforo)}<div><h1>${esc(c.nombre)}</h1><p class="sub" style="margin:0">${esc(c.poblacion)}${c.provincia?', '+esc(c.provincia):''} · Representante: ${r?`<a style="color:var(--v);font-weight:600;cursor:pointer" onclick="go('rep/${r.id}')">${esc(r.nombre)}</a>`:'sin asignar'}</p></div></div>
     <div class="acts"><button class="b2" onclick="cliForm('${c.id}')">Editar</button><button class="b2 dng" onclick="delCli('${c.id}')">Eliminar</button></div></div>
   <div class="card" style="margin-bottom:16px"><h3>Estado comercial (se cambia a mano)</h3><div class="semsel">
     ${['verde','amarillo','rojo'].map(s=>`<button class="${c.semaforo===s?'on':''}" onclick="setSem('${c.id}','${s}')">${dot(s)} ${{verde:'Verde · va bien',amarillo:'Amarillo · seguimiento',rojo:'Rojo · atención'}[s]}</button>`).join('')}</div></div>
   <div class="grid k">
-    <div class="card"><h3>Acumulado ${YEAR}</h3><div class="big">${eur(a)}</div></div>
-    <div class="card"><h3>Mismo periodo ${YEAR-1}</h3><div class="big">${eur(p)}</div></div>
-    <div class="card"><h3>Variación</h3><div class="big" style="font-size:24px">${pctHTML(a,p)}</div><div style="margin-top:6px">${p||a?sg(a-p):''}</div></div>
+    <div class="card"><h3>Total ${YEAR-1} (año completo)</h3><div class="big">${eur(totP)}</div></div>
+    <div class="card"><h3>Acumulado ${YEAR} (${per(m)})</h3><div class="big">${eur(a)}</div></div>
+    <div class="card"><h3>Vs mismo periodo ${YEAR-1}</h3><div class="big" style="font-size:24px">${pctHTML(a,p)}</div><div style="margin-top:6px;font-size:14px" class="${a-p>=0?'up':'dn'}">${p||a?sg(a-p)+' <span class="mut">(antes '+eur(p)+')</span>':''}</div></div>
     <div class="card"><h3>Última compra</h3><div class="big" style="font-size:24px">${lp?fd(lp.f):'<span class="mut" style="font-size:18px">Sin fecha en los datos</span>'}</div>${ms>0&&hasBill(c)?`<div class="dn" style="margin-top:6px;font-size:14px">Sin facturar desde hace ${ms} meses</div>`:''}</div>
   </div>
+
+  <h2 class="sec">Facturación</h2>
+  <div class="grid c2">
+    <div class="card"><div class="hb" style="margin-bottom:8px"><h3 style="margin:0">Mes a mes</h3><button class="b2" onclick="factForm('${c.id}')">Editar importes</button></div>
+      <table class="tb"><thead><tr><th>Mes</th><th class="r">${YEAR-1}</th><th class="r">${YEAR}</th><th class="r">Dif. €</th><th class="r">Dif. %</th></tr></thead><tbody>${mrows}
+      <tr class="tot"><td>Acumulado ${per(m)}</td><td class="r">${eur(p)}</td><td class="r">${eur(a)}</td><td class="r ${a-p>=0?'up':'dn'}">${sg(a-p)}</td><td class="r">${pctHTML(a,p)}</td></tr></tbody></table>
+      <p class="hint">Los meses sin dato todavía aparecen con «—». Solo se comparan meses con importe en ambos años.</p></div>
+    <div class="card"><h3>Gráfico mensual</h3>${barsHTML(get(YEAR-1),get(YEAR))}
+      <h3 style="margin-top:20px">Histórico de ejercicios</h3>${hrows?`<table class="tb"><thead><tr><th>Año</th><th class="r">Facturación</th><th class="r">Dif. € vs año anterior</th><th class="r">%</th></tr></thead><tbody>${hrows}</tbody></table><p class="hint">${YEAR}: acumulado ${per(m)}, comparado con el mismo periodo de ${YEAR-1}. Los demás años, ejercicio completo.</p>`:'<span class="mut">Sin facturación registrada</span>'}</div>
+  </div>
+
+  <h2 class="sec">Catálogo, exposición y compras</h2>
+  <div class="grid c2">
+    <div class="card"><h3>Catálogo</h3>
+      <div class="semsel"><button class="${c.catalogo.ok===true?'on':''}" onclick="setCat('${c.id}',true)">✔ Actualizado: SÍ</button><button class="${c.catalogo.ok===false?'on':''}" onclick="setCat('${c.id}',false)">✖ Actualizado: NO</button></div>
+      <label class="f" style="margin-top:12px"><span>Fecha de la última actualización</span><input type="date" value="${esc(c.catalogo.f||'')}" onchange="setCatF('${c.id}',this.value)"></label>
+      <p class="hint" style="margin-top:8px">${c.catalogo.ok==null?'Todavía no indicado.':c.catalogo.ok?'Catálogo al día'+(c.catalogo.f?' desde el '+fd(c.catalogo.f)+'.':'.'):'<b class="dn">Catálogo pendiente de actualizar.</b>'}</p></div>
+    <div class="card"><h3>Compras</h3>
+      <div class="row"><span>Última compra</span><b>${lp?fd(lp.f):'<span class="mut">sin fecha</span>'}</b></div>
+      <div class="row"><span>Importe de la última compra</span><b>${lp?eur(lp.i):'<span class="mut">sin dato</span>'}</b></div>
+      <div class="row"><span>Días desde la última compra</span><b>${lp&&dd0!=null?dd0+' días':'<span class="mut">sin fecha</span>'}</b></div>
+      <div class="row"><span>¿Ha repetido compra en ${YEAR}?</span><b class="${repitio(c)?'up':'dn'}">${repitio(c)?'SÍ':'NO'}</b></div>
+      <div class="row"><span>Meses sin comprar</span><b class="${ms>=3&&hasBill(c)?'dn':''}">${hasBill(c)?ms:'<span class="mut">—</span>'}</b></div>
+      <p class="hint">«Repetido» = al menos 2 compras en ${YEAR}, contando pedidos con fecha o meses con facturación. «Meses sin comprar» se calcula con la facturación mensual. La fecha y el importe de la última compra solo salen de pedidos que tú apuntas: la app nunca los inventa.</p></div>
+  </div>
   <div class="grid c2" style="margin-top:16px">
-    <div class="card"><h3>Facturación mensual (€)</h3>${barsHTML(get(YEAR-1),get(YEAR))}</div>
+    <div class="card"><h3>Colchones VICKFLEX en exposición</h3>
+      <div>${c.exposicion.length?c.exposicion.map((t,i)=>`<span class="tag">${esc(t)} <a class="x" onclick="delModelo('${c.id}',${i})" title="Retirar">✕</a></span>`).join(''):'<span class="mut">Ninguno anotado todavía</span>'}</div>
+      <form class="addrow" onsubmit="return addModelo('${c.id}',this)"><input name="v" list="modelos" placeholder="Añadir modelo (ej. Nube)"><button class="b1" type="submit">Añadir</button></form>
+      <datalist id="modelos">${modelos().map(t=>`<option value="${esc(t)}">`).join('')}</datalist>
+      <h3 style="margin-top:18px">Productos pendientes de incorporar</h3>
+      ${c.prodPend.length?c.prodPend.map((t,i)=>`<div class="row"><span>${esc(t)}</span><span><button class="b2 sm" onclick="prodAExp('${c.id}',${i})">Pasar a exposición</button> <a class="x" onclick="delProd('${c.id}',${i})" title="Quitar">✕</a></span></div>`).join(''):'<span class="mut">Ninguno</span>'}
+      <form class="addrow" onsubmit="return addProd('${c.id}',this)"><input name="v" list="modelos" placeholder="Añadir producto pendiente"><button class="b1" type="submit">Añadir</button></form>
+      <label class="f" style="margin-top:14px"><span>Observaciones sobre la exposición</span><textarea rows="3" onchange="setExpObs('${c.id}',this.value)">${esc(c.expObs)}</textarea></label></div>
+    <div class="card"><h3>Pedidos con fecha</h3>${c.pedidos.length?[...c.pedidos].map((o,i)=>[o,i]).sort((x,y)=>y[0].f.localeCompare(x[0].f)).map(([o,i])=>`<div class="row"><span>${fd(o.f)}</span><span>${eur(o.i)} <a class="x" onclick="delPedido('${c.id}',${i})" title="Quitar">✕</a></span></div>`).join(''):'<span class="mut">Sin pedidos con fecha</span>'}
+      <div style="margin-top:12px"><button class="b2" onclick="pedidoForm('${c.id}')">+ Apuntar pedido</button></div>
+      <p class="hint">Apuntar un pedido no cambia la facturación mensual: son datos distintos.</p></div>
+  </div>
+
+  <h2 class="sec">Datos, visitas y seguimiento</h2>
+  <div class="grid c2">
     <div class="card"><h3>Datos generales</h3>${dd('Nombre comercial',c.nombre)}${dd('Nombre de facturación',c.nombreFact)}${dd('Código VICKFLEX',c.codigo)}${dd('Población',c.poblacion)}${dd('Provincia',c.provincia)}${dd('Dirección',c.direccion)}${dd('Teléfono',c.telefono)}${dd('Contacto',c.contacto)}${dd('Representante',r&&r.nombre)}${ant.length?dd('Antes con',ant.join(', ')):''}</div>
+    <div class="card"><h3>Compromisos pendientes</h3>${c.pend.length?c.pend.map((t,i)=>`<label class="task"><input type="checkbox" ${t.h?'checked':''} onchange="togglePend('${c.id}',${i})"><span>${esc(t.t)}</span></label>`).join(''):'<span class="mut">Ninguno</span>'}</div>
   </div>
   <div class="grid c2" style="margin-top:16px">
-    <div class="card"><h3>En exposición ahora</h3>${c.exposicion.length?c.exposicion.map(t=>`<span class="tag">${esc(t)}</span>`).join(''):'<span class="mut">Sin datos todavía</span>'}
-      <h3 style="margin-top:14px">Compromisos pendientes</h3>${c.pend.length?c.pend.map((t,i)=>`<label class="task"><input type="checkbox" ${t.h?'checked':''} onchange="togglePend('${c.id}',${i})"><span>${esc(t.t)}</span></label>`).join(''):'<span class="mut">Ninguno</span>'}</div>
     <div class="card"><h3>Historial de visitas</h3>${c.visitas.length?c.visitas.map(v=>`<div class="hist"><b>${fd(v.f)}</b> · ${esc(v.t)}</div>`).join(''):'<span class="mut">Sin visitas registradas todavía</span>'}</div>
-  </div>
-  <div class="grid c2" style="margin-top:16px">
-    <div class="card"><h3>Últimos pedidos</h3>${c.pedidos.length?[...c.pedidos].sort((x,y)=>y.f.localeCompare(x.f)).map(o=>`<div class="row">${fd(o.f)}<span>${eur(o.i)}</span></div>`).join(''):'<span class="mut">Sin pedidos con fecha</span>'}</div>
     <div class="card"><h3>Observaciones</h3><p style="font-size:15px;line-height:1.5;color:#555">${c.obs?esc(c.obs):'<span class="mut">Sin observaciones</span>'}</p></div>
   </div>
   <div class="card" style="margin-top:16px"><h3>Nombres de facturación reconocidos</h3><p class="mut" style="margin-bottom:8px">La app usa estos nombres (y el código VICKFLEX) para saber a qué cliente corresponde cada línea de los Excel de fábrica.</p>${(c.nombreFact?`<div class="row"><span>${esc(c.nombreFact)} <span class="mut">(principal)</span></span></div>`:'')+equivOf(c.id).map((e,i)=>`<div class="row"><span>${esc(e.n)}</span><button class="b2" onclick="delEquiv('${c.id}',${i})">Quitar</button></div>`).join('')||'<span class="mut">Ninguno todavía</span>'}<div style="margin-top:10px"><button class="b2" onclick="addEquiv('${c.id}')">+ Añadir otro nombre de facturación</button></div></div>
-  <p class="hint">Ficha provisional: el catálogo, la exposición, las compras, las visitas y las alertas se completan en las fases B y C.</p>`}
+  <p class="hint">El historial de visitas, la planificación y las alertas automáticas llegan en la Fase C.</p>`}
 
 function vCopias(){
   const lb=D.lastBackup?new Date(D.lastBackup).toLocaleDateString('es-ES',{day:'numeric',month:'long',year:'numeric'}):'Nunca',u=getUndo();
@@ -388,7 +440,7 @@ function cliForm(id,repId){
    o=>{
     if(!o.nombre)return 'Escribe el nombre comercial del cliente.';
     const dup=chkDup(o,c?c.id:null);if(dup)return dup;
-    if(!c){const n={id:uid(),codigo:o.codigo,nombreFact:o.nombreFact,nombre:o.nombre,poblacion:o.poblacion,provincia:o.provincia,direccion:o.direccion,telefono:o.telefono,contacto:o.contacto,repId:o.repId,semaforo:o.semaforo,obs:o.obs,fact:{},exposicion:[],pend:[],visitas:[],pedidos:[],repHist:[{r:o.repId,d:Date.now()}]};
+    if(!c){const n={id:uid(),codigo:o.codigo,nombreFact:o.nombreFact,nombre:o.nombre,poblacion:o.poblacion,provincia:o.provincia,direccion:o.direccion,telefono:o.telefono,contacto:o.contacto,repId:o.repId,semaforo:o.semaforo,obs:o.obs,fact:{},catalogo:{ok:null,f:''},prodPend:[],expObs:'',exposicion:[],pend:[],visitas:[],pedidos:[],repHist:[{r:o.repId,d:Date.now()}]};
       D.clientes.push(n);save();go('cli/'+n.id);return}
     const apply=()=>{['nombre','nombreFact','codigo','poblacion','provincia','direccion','telefono','contacto','semaforo','obs'].forEach(k=>c[k]=o[k]);
       if(o.repId!==c.repId){c.repId=o.repId;c.repHist.push({r:o.repId,d:Date.now()})}save();render(true)};
@@ -423,6 +475,40 @@ function addEquiv(cid){
 function delEquiv(cid,i){
   const e=equivOf(cid)[i];
   ask(`¿Quitar la equivalencia <b>${esc(e.n)}</b>? Dejará de reconocerse automáticamente en las importaciones.`,'Quitar',()=>{D.equiv.splice(D.equiv.indexOf(e),1);save();render(true)})}
+
+/* ---- Fase B: catálogo, exposición, facturación manual, pedidos ---- */
+const modelos=()=>[...new Set(D.clientes.flatMap(c=>(c.exposicion||[]).concat(c.prodPend||[])))].sort((a,b)=>a.localeCompare(b,'es'));
+function setCat(id,ok){const c=cli(id);c.catalogo.ok=ok;if(ok&&!c.catalogo.f)c.catalogo.f=new Date().toISOString().slice(0,10);save();render(true)}
+function setCatF(id,v){cli(id).catalogo.f=v;save();render(true)}
+function addModelo(id,f){const v=f.v.value.trim();if(!v)return false;const c=cli(id);
+  if(c.exposicion.some(x=>norm(x)===norm(v))){toast('Ese modelo ya está en la exposición.',1);return false}
+  c.exposicion.push(v);c.prodPend=c.prodPend.filter(x=>norm(x)!==norm(v));save();render(true);return false}
+function delModelo(id,i){const c=cli(id);ask(`¿Retirar <b>${esc(c.exposicion[i])}</b> de la exposición de ${esc(c.nombre)}?`,'Retirar',()=>{snap('Retirar modelo '+c.exposicion[i]);c.exposicion.splice(i,1);save();render(true)})}
+function addProd(id,f){const v=f.v.value.trim();if(!v)return false;const c=cli(id);
+  if(c.prodPend.some(x=>norm(x)===norm(v))||c.exposicion.some(x=>norm(x)===norm(v))){toast('Ya está anotado.',1);return false}
+  c.prodPend.push(v);save();render(true);return false}
+function delProd(id,i){const c=cli(id);ask(`¿Quitar <b>${esc(c.prodPend[i])}</b> de pendientes?`,'Quitar',()=>{snap('Quitar pendiente '+c.prodPend[i]);c.prodPend.splice(i,1);save();render(true)})}
+function prodAExp(id,i){const c=cli(id),t=c.prodPend.splice(i,1)[0];if(!c.exposicion.some(x=>norm(x)===norm(t)))c.exposicion.push(t);save();render(true);toast(t+' pasa a exposición.')}
+function setExpObs(id,v){cli(id).expObs=v.trim();save()}
+function pedidoForm(id){
+  formModal('Apuntar pedido',[{n:'f',l:'Fecha del pedido (aaaa-mm-dd)',ph:new Date().toISOString().slice(0,10)},{n:'i',l:'Importe (€)'}],{f:new Date().toISOString().slice(0,10),i:''},o=>{
+    if(!/^\d{4}-\d{2}-\d{2}$/.test(o.f)||isNaN(new Date(o.f)))return 'Escribe la fecha como aaaa-mm-dd, por ejemplo 2026-10-14.';
+    const n=num(o.i);if(n==null||isNaN(n))return 'Escribe un importe válido.';
+    cli(id).pedidos.push({f:o.f,i:n});save();render(true)})}
+function delPedido(id,i){const c=cli(id),o=c.pedidos[i];ask(`¿Quitar el pedido del <b>${fd(o.f)}</b> (${eur(o.i)})?`,'Quitar',()=>{snap('Quitar pedido');c.pedidos.splice(i,1);save();render(true)})}
+function num(t){t=String(t==null?'':t).replace(/[\s€]/g,'');if(t==='')return null;
+  if(t.indexOf(',')>=0)t=t.replace(/\./g,'').replace(',','.');else if(/^-?\d{1,3}(\.\d{3})+$/.test(t))t=t.replace(/\./g,'');
+  return /^-?\d+(\.\d+)?$/.test(t)?parseFloat(t):NaN}
+function factForm(id,y){
+  const c=cli(id);y=y||YEAR;
+  const ys=[...new Set(Object.keys(c.fact).map(Number).concat([YEAR,YEAR-1,YEAR-2,YEAR-3,YEAR-4,YEAR-5]))].sort((a,b)=>b-a);
+  modal(`<h2>Facturación mensual de ${esc(c.nombre)}</h2><label class="f"><span>Año</span><select onchange="factForm('${id}',+this.value)">${ys.map(a=>`<option ${a===y?'selected':''}>${a}</option>`).join('')}</select></label>
+  <form id="frm"><div class="ym">${MES.map((n,i)=>{const v=fy(c,y)[i];return `<label class="f"><span>${n.toUpperCase()}</span><input name="m${i}" inputmode="decimal" value="${v==null?'':String(v).replace('.',',')}" placeholder="sin dato"></label>`}).join('')}</div>
+  <p class="hint">Deja en blanco un mes sin datos. Escribe 0 si no hubo facturación. Los importes que luego se importen de Excel (Fase D) se mostrarán antes de aplicarlos.</p><p class="err" id="err"></p>
+  <div class="acts"><button type="button" class="b2" onclick="closeModal()">Cancelar</button><button type="submit" class="b1">Guardar</button></div></form>`);
+  $('#frm').onsubmit=e=>{e.preventDefault();const arr=[];
+    for(let i=0;i<12;i++){const raw=$('#frm').elements['m'+i].value,n=num(raw);if(String(raw).trim()!==''&&(n==null||isNaN(n))){$('#err').textContent='El importe de '+MES[i]+' no es válido.';return}arr.push(n==null?null:n)}
+    snap('Editar facturación '+y+' de '+c.nombre);c.fact[y]=arr;save();closeModal();render(true);toast('Facturación guardada.')}}
 function delCli(id){
   const c=cli(id);
   ask(`¿Eliminar a <b>${esc(c.nombre)}</b>? Se borrarán su ficha, su facturación y su historial. Después podrás deshacerlo en Copias de seguridad.`,'Eliminar',()=>{snap('Eliminar cliente '+c.nombre);const r=c.repId;D.clientes=D.clientes.filter(x=>x.id!==id);D.equiv=D.equiv.filter(e=>e.c!==id);save();go(rep(r)?'rep/'+r:'reps');toast('Cliente eliminado.')})}
