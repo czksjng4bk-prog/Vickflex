@@ -67,6 +67,7 @@ button{font-family:inherit}
 .b1{background:var(--v);color:#fff;font-weight:600} .b2{background:#fff;color:var(--v);font-weight:600}
 .b1.danger{background:var(--ro);border-color:var(--ro)} .b2.dng{color:var(--ro);border-color:var(--ro)}
 .b2[disabled]{opacity:.45}
+.qt .qs{display:block;font-size:12px;color:var(--g);font-weight:400;line-height:1.35} .qt td.qn{vertical-align:top;width:34%} .qt .tb td{padding:6px 10px} .qt tr.g1 td{border-top:2px solid var(--b2)}
 .seg{display:inline-flex;background:#fff;border:1px solid var(--b2);border-radius:12px;overflow:hidden}
 .seg button{padding:10px 16px;border:0;background:#fff;font-size:15px;cursor:pointer;color:var(--g);font-family:inherit}
 .seg button.on{background:var(--v);color:#fff;font-weight:600}
@@ -190,7 +191,7 @@ function seed(){
 }
 function migrate(d){
   d.schema=1;d.reps=d.reps||[];d.clientes=d.clientes||[];
-  d.clientes.forEach(c=>{c.fact=c.fact||{};c.exposicion=c.exposicion||[];c.pend=c.pend||[];c.visitas=c.visitas||[];c.pedidos=c.pedidos||[];c.obs=c.obs||'';c.visitas=c.visitas.map(v=>{v.id=v.id||uid();if(v.hablamos==null)v.hablamos=v.t||'';['pidio','compromisos','productos','prox','proxF','persona','expoNueva','expoPend','pedT','pedTxt','pedI','obs','repId','sem'].forEach(k=>{if(v[k]==null)v[k]=''});v.proxH=!!v.proxH;return v});c.codigo=c.codigo||'';c.email=c.email||'';c.acumul=c.acumul&&typeof c.acumul==='object'?c.acumul:{};c.comp=c.comp&&typeof c.comp==='object'?c.comp:{};c.catalogo=c.catalogo&&typeof c.catalogo==='object'?c.catalogo:{ok:null,f:''};c.prodPend=c.prodPend||[];c.expObs=c.expObs||'';c.nombreFact=c.nombreFact||'';c.semaforo=c.semaforo||'amarillo';
+  d.clientes.forEach(c=>{c.fact=c.fact||{};c.exposicion=c.exposicion||[];c.pend=c.pend||[];c.visitas=c.visitas||[];c.pedidos=c.pedidos||[];c.obs=c.obs||'';c.visitas=c.visitas.map(v=>{v.id=v.id||uid();if(v.hablamos==null)v.hablamos=v.t||'';['pidio','compromisos','productos','prox','proxF','persona','expoNueva','expoPend','pedT','pedTxt','pedI','obs','repId','sem'].forEach(k=>{if(v[k]==null)v[k]=''});v.proxH=!!v.proxH;return v});c.codigo=c.codigo||'';c.email=c.email||'';c.cp=c.cp==null?'':String(c.cp);c.acumul=c.acumul&&typeof c.acumul==='object'?c.acumul:{};c.comp=c.comp&&typeof c.comp==='object'?c.comp:{};c.catalogo=c.catalogo&&typeof c.catalogo==='object'?c.catalogo:{ok:null,f:''};c.prodPend=c.prodPend||[];c.expObs=c.expObs||'';c.nombreFact=c.nombreFact||'';c.semaforo=c.semaforo||'amarillo';
     if(!c.repHist||!c.repHist.length)c.repHist=[{r:c.repId,d:null}]});
   d.equiv=Array.isArray(d.equiv)?d.equiv:[];d.imports=Array.isArray(d.imports)?d.imports:[];d.plan=Array.isArray(d.plan)?d.plan:[];d.semanas=Array.isArray(d.semanas)?d.semanas:[];if(d.changes==null)d.changes=0; if(d.lastBackup===undefined)d.lastBackup=null; return d;
 }
@@ -273,6 +274,59 @@ const repitio=c=>nCompras(c)>=2;
 const diasDesde=f=>{const d=new Date(f+'T00:00:00');return isNaN(d)?null:Math.floor((Date.now()-d.getTime())/864e5)};
 function lastPedido(c){return [...(c.pedidos||[])].sort((x,y)=>y.f.localeCompare(x.f))[0]}
 
+
+/* ======================= FACTURACIÓN TRIMESTRAL =======================
+   Se calcula sola sumando los meses ya cargados (no se teclea nada). Un mes sin dato NO es 0 €.
+   Trimestre en curso: solo se comparan los meses disponibles con los mismos meses del año anterior.
+   Los acumulados importados sin desglose mensual no entran aquí (no se pueden repartir por trimestres). */
+let QY=YEAR,QC='todas';
+const QNAME=['1.º trimestre','2.º trimestre','3.º trimestre','4.º trimestre'],QMES=['ene–mar','abr–jun','jul–sep','oct–dic'];
+const monV=(cs,y,i,k)=>{let s=null;cs.forEach(c=>{const v=fy(c,y,k)[i];if(v!=null)s=(s||0)+v});return s};
+const catAct=(cs,y,t)=>cs.some(c=>rawF(c,y,t).some(v=>v!=null));
+function perCalc(cs,y,k,ms){
+  const cats=k==='total'?CATS2:[k],cal=new Date().getMonth(),last=ms[ms.length-1],enCurso=y===YEAR&&last>=cal;
+  let lastD=-1;cats.forEach(t=>{for(let i=11;i>=0;i--){if(monV(cs,y,i,t)!=null){if(i>lastD)lastD=i;break}}});
+  const span=enCurso?ms.filter(i=>i<=lastD):ms;
+  const miss=yy=>span.filter(i=>cats.some(t=>catAct(cs,yy,t)&&monV(cs,yy,i,t)==null));
+  const sum=yy=>{let s=0,h=false;span.forEach(i=>cats.forEach(t=>{const v=monV(cs,yy,i,t);if(v!=null){s+=v;h=true}}));return {s:s,h:h}};
+  const A=sum(y),B=sum(y-1),mc=miss(y),mp=miss(y-1);let ok=true,why='';
+  const mn=l=>l.map(i=>MES[i]).join(', ');
+  if(!span.length){ok=false;why='Sin datos de '+y}
+  else if(!A.h){ok=false;why='Faltan datos de '+y}
+  else if(!B.h){ok=false;why='Faltan datos de '+(y-1)}
+  else{const bad=k==='total'?cats.find(t=>catAct(cs,y,t)!==catAct(cs,y-1,t)):null;
+    if(bad){ok=false;why='Faltan datos de '+CATL[bad]+' en '+(catAct(cs,y,bad)?y-1:y)}
+    else if(mc.length){ok=false;why='Faltan '+mn(mc)+' de '+y}
+    else if(mp.length){ok=false;why='Faltan '+mn(mp)+' de '+(y-1)}}
+  const pend=y===YEAR&&ms[0]>cal&&!A.h;
+  let estado;
+  if(pend)estado='Pendiente';
+  else if(enCurso)estado='En curso'+(span.length?' · '+(span.length>1?MES[span[0]]+'–'+MES[span[span.length-1]]:MES[span[0]]):' · sin datos aún');
+  else if(!A.h)estado='Sin datos';
+  else if(mc.length)estado='⚠ Datos incompletos: faltan '+mn(mc);
+  else estado='Completo';
+  return {s:A.s,p:B.s,d:A.s-B.s,ok:ok,why:why,ha:A.h,hp:B.h,enCurso:enCurso,mc:mc,mp:mp,estado:estado,pend:pend,span:span}}
+function setQY(y){QY=+y;render(true)}
+function setQC(k){QC=k;render(true)}
+function qCard(cs){
+  const ys=[...new Set(cs.flatMap(c=>Object.keys(c.fact||{}).concat(Object.keys(c.comp||{}))).map(Number).concat([YEAR]))].filter(y=>y>2000&&y<=YEAR).sort((a,b)=>b-a);
+  if(ys.indexOf(QY)<0)QY=YEAR;
+  const ks=QC==='todas'?['principal','comp','total']:[QC],multi=ks.length>1;
+  const G=[0,1,2,3].map(q=>({n:QNAME[q],sub:QMES[q],ms:[q*3,q*3+1,q*3+2]})).concat([{n:'Total anual',sub:'ene–dic',ms:[0,1,2,3,4,5,6,7,8,9,10,11],tot:1}]);
+  const body=G.map(g=>{const R=ks.map(k=>perCalc(cs,QY,k,g.ms)),f=R[0],worst=R.find(x=>x.mc.length)||R.find(x=>!x.ok&&x.ha)||f;
+    return R.map((o,j)=>{const k=ks[j],bold=k==='total'||!multi;
+      return `<tr class="${g.tot?'tot ':''}${j===0?'g1':''}">${j===0?`<td class="qn" rowspan="${ks.length}"><b>${g.n}${g.tot?' '+QY:''}</b><span class="qs">${g.sub}</span><span class="qs ${/incompletos/.test(worst.estado)?'dn':''}">${esc(worst.estado)}</span></td>`:''}
+      ${multi?`<td>${CAT[k]}</td>`:''}<td class="r">${o.hp?eur(o.p):mut}</td><td class="r">${o.ha?`${o.mc.length?'<span class="dn" title="Faltan meses">⚠ </span>':''}${bold?'<b>'+eur(o.s)+'</b>':eur(o.s)}`:mut}</td>
+      <td class="r ${o.ok?(o.d>=0?'up':'dn'):''}">${o.ok?sg(o.d):mut}</td><td class="r">${cmpHTML({a:o.s,p:o.p,ok:o.ok,why:o.why})}</td></tr>`}).join('')}).join('');
+  const sel=`<select class="sel" onchange="setQY(this.value)" title="Ejercicio">${ys.map(y=>`<option ${y===QY?'selected':''}>${y}</option>`).join('')}</select>`;
+  const seg=`<div class="seg">${[['todas','Las tres'],['total','Total'],['principal','Principal'],['comp','Complementos']].map(x=>`<button class="${QC===x[0]?'on':''}" onclick="setQC('${x[0]}')">${x[1]}</button>`).join('')}</div>`;
+  const notas=[...new Set(G.slice(0,4).flatMap(g=>ks.map(k=>perCalc(cs,QY,k,g.ms)).filter(o=>!o.ok&&o.ha&&o.why).map(o=>g.n+': '+o.why)))];
+  return `<div class="card qt" style="margin-top:16px"><div class="hb" style="margin-bottom:8px"><h3 style="margin:0">Facturación trimestral · ${QY} frente a ${QY-1}</h3><div class="acts">${seg}${sel}</div></div>
+   <table class="tb"><thead><tr><th>Trimestre</th>${multi?'<th>Tipo</th>':''}<th class="r">${QY-1}</th><th class="r">${QY}</th><th class="r">Dif. €</th><th class="r">Dif. %</th></tr></thead><tbody>${body}</tbody></table>
+   ${notas.length?`<p class="hint dn">Datos incompletos o sin comparar: ${esc(notas.join(' · '))}.</p>`:''}
+   <p class="hint">Principal + complementos = total. Los trimestres se calculan solos sumando los meses cargados. «—» y «Faltan datos» significan que falta información: no es lo mismo que 0 €. En un trimestre en curso se comparan solo los meses disponibles con esos mismos meses del año anterior. Los acumulados importados sin desglose mensual no se reparten por trimestres.</p></div>`}
+function filtrarCli(v){const q=norm(v.trim());document.querySelectorAll('#view tr[data-s]').forEach(tr=>{tr.style.display=q&&tr.dataset.s.indexOf(q)<0?'none':''})}
+
 /* ---------- Pantallas ---------- */
 function banner(){
   const dias=D.lastBackup?(Date.now()-D.lastBackup)/864e5:null;
@@ -300,6 +354,7 @@ function vPanel(){
       const cw=D.semanas.find(x=>t>=x.ini&&t<=x.fin);if(cw){const S=semStats(cw);return `<div class="card zona"><h3>🚐 Coche expositor · esta semana</h3><div class="big">${esc(cw.prov||'Sin provincia')}</div><p>Con ${esc(repNom(cw.repId))} · ${ESTADOS[cw.estado]}<br>${S.n} visitas · ${S.clientes} clientes</p><button class="b2" style="margin-top:10px" onclick="go('semana/${cw.id}')">Abrir semana</button></div>`}
       return `<div class="card zona"><h3>Zona de esta semana</h3>${pl.length?`<div class="big">${esc(pr.join(' · ')||'Sin provincia')}</div><p>${pl.length} visitas planificadas · ${pl.filter(x=>x.hecha).length} ya hechas<br>${nx&&nc?'Próxima visita: '+DIAS[(parseD(nx.f).getDay()+6)%7].toLowerCase()+' '+fcorta(nx.f)+(nx.h?' '+esc(nx.h):'')+', '+esc(nc.nombre)+' ('+esc(nc.poblacion)+')':'No quedan visitas pendientes esta semana'}</p>`:`<div class="big">Sin planificar</div><p>Todavía no hay visitas esta semana.</p>`}<button class="b2" style="margin-top:10px" onclick="go('plan')">Abrir planificación</button></div>`})()}
   </div>
+  ${qCard(all)}
   <div class="grid c3" style="margin-top:16px">
     <div class="card"><h3>Representantes · ranking ${CAT[VC].toLowerCase()}</h3>${rs.map((x,i)=>`<div class="row lk" onclick="go('rep/${x.r.id}')"><span>${i+1}. ${esc(x.r.nombre)}<br><small style="color:#999">${x.s.ha?eur(x.s.a):'sin datos'}</small></span>${cmpHTML(x.s)}</div>`).join('')||'<span class="mut">Sin datos</span>'}</div>
     <div class="card"><h3>Han dejado de comprar</h3>${dej.map(x=>`<div class="row lk" onclick="go('cli/${x.c.id}')"><span>${esc(x.c.nombre)}<br><small style="color:#999">${esc(x.c.poblacion)}</small></span><span class="dn">hace ${x.n} meses</span></div>`).join('')||'<span class="mut">Ninguno</span>'}</div>
@@ -327,10 +382,10 @@ function vReps(){
 function vRep(id){
   const r=rep(id),cs=clientsOf(id),s=stats(cs),m=s.m,vs=(c)=>cmpL([c],YEAR,m,VC);
   const A=(c,k)=>acum(c,YEAR,m,k);
-  const fn={fact:(a,b)=>A(b,'total')-A(a,'total'),principal:(a,b)=>A(b,'principal')-A(a,'principal'),comp:(a,b)=>A(b,'comp')-A(a,'comp'),nombre:(a,b)=>a.nombre.localeCompare(b.nombre,'es'),
+  const fn={fact:(a,b)=>A(b,'total')-A(a,'total'),principal:(a,b)=>A(b,'principal')-A(a,'principal'),comp:(a,b)=>A(b,'comp')-A(a,'comp'),nombre:(a,b)=>a.nombre.localeCompare(b.nombre,'es'),cp:(a,b)=>String(a.cp||'~').localeCompare(String(b.cp||'~'))||a.nombre.localeCompare(b.nombre,'es'),
     caida:(a,b)=>vr(a,m)-vr(b,m),sin:(a,b)=>mesesSin(b,m)-mesesSin(a,m)}[sortBy]||((a,b)=>A(b,'total')-A(a,'total'));
   const rows=[...cs].sort(fn).map((c,i)=>{const lp=lastPedido(c),ms=sinComprar(c,m)?mesesSin(c,m):0,o=vs(c),cell=k=>has(c,YEAR,m,k)?eur(A(c,k)):mut;
-    return `<tr onclick="go('cli/${c.id}')"><td>${i+1}</td><td><b>${esc(c.nombre)}</b><small>${esc(c.poblacion)}${c.provincia?', '+esc(c.provincia):''}</small></td>
+    return `<tr data-s="${esc(norm([c.nombre,c.nombreFact,c.codigo,c.cp,c.poblacion,c.provincia].join(' ')))}" onclick="go('cli/${c.id}')"><td>${i+1}</td><td><b>${esc(c.nombre)}</b><small>${esc((c.cp?c.cp+' ':'')+c.poblacion)}${c.provincia?', '+esc(c.provincia):''}</small></td>
     <td class="r">${cell('principal')}</td><td class="r">${cell('comp')}</td><td class="r"><b>${cell('total')}</b></td><td class="r">${o.hp?eur(o.p):mut}</td><td class="r">${cmpHTML(o)}</td>
     <td>${lp?fd(lp.f):'<span class="mut">sin fecha</span>'}${ms?`<small class="dn">sin facturar ${ms} meses</small>`:''}</td>
     <td onclick="event.stopPropagation();cycSem('${c.id}')" title="Pulsa para cambiar el estado">${dot(c.semaforo)}</td></tr>`}).join('');
@@ -356,8 +411,9 @@ function vRep(id){
       <div class="stat">${dot('amarillo')}<div class="big">${s.sem.amarillo}</div></div>
       <div class="stat">${dot('rojo')}<div class="big">${s.sem.rojo}</div></div></div></div>
   </div>
+  ${cs.length?qCard(cs):''}
   <div class="card" style="margin-top:16px"><div class="hb" style="margin-bottom:8px"><h3 style="margin:0">Clientes de ${esc(r.nombre)}</h3>
-    <select class="sel" onchange="setSort(this.value)"><option value="fact" ${sortBy==='fact'?'selected':''}>Ranking por facturación total</option><option value="principal" ${sortBy==='principal'?'selected':''}>Ranking por facturación principal</option><option value="comp" ${sortBy==='comp'?'selected':''}>Ranking por complementos</option><option value="nombre" ${sortBy==='nombre'?'selected':''}>Nombre A–Z</option><option value="caida" ${sortBy==='caida'?'selected':''}>Mayor caída primero (${CAT[VC].toLowerCase()})</option><option value="sin" ${sortBy==='sin'?'selected':''}>Más meses sin comprar</option></select></div>
+    <input class="sel" style="min-width:260px" placeholder="Filtrar por nombre, población o código postal" oninput="filtrarCli(this.value)"><select class="sel" onchange="setSort(this.value)"><option value="fact" ${sortBy==='fact'?'selected':''}>Ranking por facturación total</option><option value="principal" ${sortBy==='principal'?'selected':''}>Ranking por facturación principal</option><option value="comp" ${sortBy==='comp'?'selected':''}>Ranking por complementos</option><option value="nombre" ${sortBy==='nombre'?'selected':''}>Nombre A–Z</option><option value="cp" ${sortBy==='cp'?'selected':''}>Código postal (por zonas)</option><option value="caida" ${sortBy==='caida'?'selected':''}>Mayor caída primero (${CAT[VC].toLowerCase()})</option><option value="sin" ${sortBy==='sin'?'selected':''}>Más meses sin comprar</option></select></div>
     ${cs.length?`<table class="tb"><thead><tr><th>#</th><th>Cliente</th><th class="r">Principal ${YEAR}</th><th class="r">Compl. ${YEAR}</th><th class="r">Total ${YEAR}</th><th class="r">${CAT[VC]} ${YEAR-1}</th><th class="r">Dif. ${CAT[VC].toLowerCase()}</th><th>Última compra</th><th>Estado</th></tr></thead><tbody>${rows}</tbody></table>
     <p class="hint">Importes acumulados ${per(m)}, comparados con el mismo periodo del año anterior. «Faltan datos» significa que falta información de algún periodo: no es lo mismo que 0 €. Si el informe no trae fechas de pedidos, la última compra aparece como «sin fecha». Pulsa el círculo para cambiar el estado.</p>`
     :'<p class="msg">Este representante todavía no tiene clientes. Pulsa <b>+ Nuevo cliente</b>.</p>'}</div>
@@ -418,6 +474,8 @@ function vCli(id){
     </div>
   </div>
 
+  ${qCard([c])}
+
   <h2 class="sec">Catálogo, exposición y compras</h2>
   <div class="grid c2">
     <div class="card"><h3>Catálogo</h3>
@@ -453,7 +511,7 @@ function vCli(id){
     <div class="card"><h3>Observaciones y alertas</h3>${alertasCli(c)}<p style="font-size:15px;line-height:1.5;color:#555;margin-top:12px;border-top:1px solid #f0ebe0;padding-top:10px">${c.obs?esc(c.obs):'<span class="mut">Sin observaciones generales</span>'}</p></div>
   </div>
   <h2 class="sec">Datos del cliente</h2>
-  <div class="grid c2"><div class="card"><h3>Datos generales</h3>${dd('Nombre comercial',c.nombre)}${dd('Nombre de facturación',c.nombreFact)}${dd('Código VICKFLEX',c.codigo)}${dd('Población',c.poblacion)}${dd('Provincia',c.provincia)}${dd('Dirección',c.direccion)}${dd('Teléfono',c.telefono)}${dd('Contacto',c.contacto)}<div class="row"><span style="color:var(--g)">Correo electrónico</span><span>${c.email?`<a href="mailto:${esc(c.email)}">${esc(c.email)}</a>`:'<span class="mut">—</span>'}</span></div>${dd('Representante',r&&r.nombre)}${ant.length?dd('Antes con',ant.join(', ')):''}</div>
+  <div class="grid c2"><div class="card"><h3>Datos generales</h3>${dd('Nombre comercial',c.nombre)}${dd('Nombre de facturación',c.nombreFact)}${dd('Código VICKFLEX',c.codigo)}${dd('Dirección',c.direccion)}${dd('Código postal',c.cp)}${dd('Población',c.poblacion)}${dd('Provincia',c.provincia)}${dd('Representante',r&&r.nombre)}${dd('Teléfono',c.telefono)}${dd('Contacto',c.contacto)}<div class="row"><span style="color:var(--g)">Correo electrónico</span><span>${c.email?`<a href="mailto:${esc(c.email)}">${esc(c.email)}</a>`:'<span class="mut">—</span>'}</span></div>${ant.length?dd('Antes con',ant.join(', ')):''}</div>
   <div class="card"><h3>Planificar</h3><p style="line-height:1.5;margin-bottom:12px">${(()=>{const pl=D.plan.filter(x=>x.cliId===c.id&&!x.hecha&&x.f>=hoy()).sort((a,b)=>a.f.localeCompare(b.f))[0];return pl?'Próxima visita planificada: <b>'+fd(pl.f)+'</b>'+(pl.h?' a las '+esc(pl.h):''):'No hay ninguna visita planificada.'})()}</p><button class="b2" onclick="planForm(null,{cliId:'${c.id}'})">+ Planificar visita</button></div></div>
   <div class="card" style="margin-top:16px"><h3>Nombres de facturación reconocidos</h3><p class="mut" style="margin-bottom:8px">La app usa estos nombres (y el código VICKFLEX) para saber a qué cliente corresponde cada línea de los Excel de fábrica.</p>${(c.nombreFact?`<div class="row"><span>${esc(c.nombreFact)} <span class="mut">(principal)</span></span></div>`:'')+equivOf(c.id).map((e,i)=>`<div class="row"><span>${esc(e.n)}</span><button class="b2" onclick="delEquiv('${c.id}',${i})">Quitar</button></div>`).join('')||'<span class="mut">Ninguno todavía</span>'}<div style="margin-top:10px"><button class="b2" onclick="addEquiv('${c.id}')">+ Añadir otro nombre de facturación</button></div></div>
   `}
@@ -496,7 +554,7 @@ document.addEventListener('click',e=>{if(!e.target.closest('.sb')){$('#res').sty
 /* ---------- Buscador ---------- */
 function buscar(q){
   const box=$('#res');q=norm(q.trim());if(q.length<2){box.style.display='none';box.innerHTML='';return}
-  const rs=D.clientes.filter(c=>norm([c.nombre,c.nombreFact,c.codigo,c.email,equivOf(c.id).map(e=>e.n).join(' '),c.poblacion,c.provincia,repNom(c.repId)].join(' ')).indexOf(q)>=0).slice(0,10);
+  const rs=D.clientes.filter(c=>norm([c.nombre,c.nombreFact,c.codigo,c.email,equivOf(c.id).map(e=>e.n).join(' '),c.cp,c.poblacion,c.provincia,repNom(c.repId)].join(' ')).indexOf(q)>=0).slice(0,10);
   box.style.display='block';
   box.innerHTML=rs.length?rs.map(c=>`<div class="ri" onclick="abrirRes('${c.id}')">${dot(c.semaforo)}<b>${esc(c.nombre)}</b><small>${esc(c.poblacion)} · ${esc(repNom(c.repId))}</small></div>`).join(''):'<div class="ri mut">Sin resultados</div>'}
 function abrirRes(id){$('#q').value='';$('#res').style.display='none';go('cli/'+id)}
@@ -529,17 +587,19 @@ function delRep(id){
 function cliForm(id,repId){
   const c=id?cli(id):null,r0=c?c.repId:repId,rp=rep(r0);
   formModal(c?'Editar cliente':'Nuevo cliente',[
-   {n:'nombre',l:'Nombre comercial (el que usas tú)',w:'w'},{n:'nombreFact',l:'Nombre de facturación / razón social (el de fábrica)',w:'w'},{n:'codigo',l:'Código de cliente VICKFLEX (si existe)'},{n:'poblacion',l:'Población'},
+   {n:'nombre',l:'Nombre comercial (el que usas tú)',w:'w'},{n:'nombreFact',l:'Nombre de facturación / razón social (el de fábrica)',w:'w'},{n:'codigo',l:'Código de cliente VICKFLEX (si existe)'},
+   {n:'direccion',l:'Dirección',w:'w'},{n:'cp',l:'Código postal',ph:'22400'},{n:'poblacion',l:'Población'},
    {n:'provincia',l:'Provincia',list:1},{n:'repId',l:'Representante asignado',t:'select',o:D.reps.map(r=>[r.id,r.nombre])},
-   {n:'direccion',l:'Dirección',w:'w'},{n:'telefono',l:'Teléfono'},{n:'contacto',l:'Persona de contacto'},{n:'email',l:'Correo electrónico'},
+   {n:'telefono',l:'Teléfono'},{n:'contacto',l:'Persona de contacto'},{n:'email',l:'Correo electrónico'},
    {n:'semaforo',l:'Estado comercial',t:'select',o:[['verde','Verde'],['amarillo','Amarillo'],['rojo','Rojo']]},{n:'obs',l:'Observaciones generales',t:'area',w:'w'}],
-   {nombre:c?c.nombre:'',nombreFact:c?c.nombreFact:'',codigo:c?c.codigo:'',poblacion:c?c.poblacion:'',provincia:c?c.provincia:(rp&&rp.provincias[0])||'',repId:r0,direccion:c?c.direccion:'',telefono:c?c.telefono:'',contacto:c?c.contacto:'',email:c?c.email:'',semaforo:c?c.semaforo:'amarillo',obs:c?c.obs:''},
+   {nombre:c?c.nombre:'',nombreFact:c?c.nombreFact:'',codigo:c?c.codigo:'',poblacion:c?c.poblacion:'',cp:c?c.cp:'',provincia:c?c.provincia:(rp&&rp.provincias[0])||'',repId:r0,direccion:c?c.direccion:'',telefono:c?c.telefono:'',contacto:c?c.contacto:'',email:c?c.email:'',semaforo:c?c.semaforo:'amarillo',obs:c?c.obs:''},
    o=>{
     if(!o.nombre)return 'Escribe el nombre comercial del cliente.';
+    if(o.cp&&!/^\d{5}$/.test(o.cp))return 'El código postal debe tener 5 cifras (ej. 22400).';
     const dup=chkDup(o,c?c.id:null);if(dup)return dup;
-    if(!c){const n={id:uid(),codigo:o.codigo,nombreFact:o.nombreFact,nombre:o.nombre,poblacion:o.poblacion,provincia:o.provincia,direccion:o.direccion,telefono:o.telefono,contacto:o.contacto,email:o.email,acumul:{},repId:o.repId,semaforo:o.semaforo,obs:o.obs,fact:{},comp:{},catalogo:{ok:null,f:''},prodPend:[],expObs:'',exposicion:[],pend:[],visitas:[],pedidos:[],repHist:[{r:o.repId,d:Date.now()}]};
+    if(!c){const n={id:uid(),codigo:o.codigo,nombreFact:o.nombreFact,nombre:o.nombre,poblacion:o.poblacion,cp:o.cp,provincia:o.provincia,direccion:o.direccion,telefono:o.telefono,contacto:o.contacto,email:o.email,acumul:{},repId:o.repId,semaforo:o.semaforo,obs:o.obs,fact:{},comp:{},catalogo:{ok:null,f:''},prodPend:[],expObs:'',exposicion:[],pend:[],visitas:[],pedidos:[],repHist:[{r:o.repId,d:Date.now()}]};
       D.clientes.push(n);save();go('cli/'+n.id);return}
-    const apply=()=>{['nombre','nombreFact','codigo','poblacion','provincia','direccion','telefono','contacto','email','semaforo','obs'].forEach(k=>c[k]=o[k]);
+    const apply=()=>{['nombre','nombreFact','codigo','poblacion','cp','provincia','direccion','telefono','contacto','email','semaforo','obs'].forEach(k=>c[k]=o[k]);
       if(o.repId!==c.repId){c.repId=o.repId;c.repHist.push({r:o.repId,d:Date.now()})}save();render(true)};
     if(o.repId!==c.repId){ask(`Vas a pasar <b>${esc(c.nombre)}</b> de <b>${esc(repNom(c.repId))}</b> a <b>${esc(repNom(o.repId))}</b>. Se conserva todo su historial.`,'Cambiar de representante',apply);return true}
     apply()})}
@@ -802,23 +862,24 @@ function setSemEstado(id,v){semOf(id).estado=v;save();render(true)}
 function delSem(id){const x=semOf(id),n=semStats(x).n;
   ask(`¿Eliminar la semana <b>${esc(semLabel(x))}</b> del coche expositor? ${n?`Las <b>${n} visitas</b> registradas NO se borran: se quedan en las fichas de sus clientes.`:'No tiene visitas.'}`,'Eliminar semana',()=>{snap('Eliminar semana del coche expositor');D.clientes.forEach(c=>c.visitas.forEach(v=>{if(v.sem===id)v.sem=''}));D.semanas=D.semanas.filter(y=>y.id!==id);save();go('coche');toast('Semana eliminada.')})}
 function pickCliente(semId,f){PK={sem:semId,f:f};
-  modal(`<h2>Añadir visita · ${DIAS[(parseD(f).getDay()+6)%7]} ${fcorta(f)}</h2><input id="pk" placeholder="Buscar cliente por nombre, población o código…" oninput="pkFill()" autocomplete="off"><div id="pkl"></div><div class="acts"><button class="b2" onclick="closeModal()">Cancelar</button><button class="b2" onclick="nuevoClienteForm()">+ Cliente nuevo</button></div>`);pkFill();setTimeout(()=>{const i=$('#pk');if(i)i.focus()},50)}
+  modal(`<h2>Añadir visita · ${DIAS[(parseD(f).getDay()+6)%7]} ${fcorta(f)}</h2><input id="pk" placeholder="Buscar cliente por nombre, población, código o código postal…" oninput="pkFill()" autocomplete="off"><div id="pkl"></div><div class="acts"><button class="b2" onclick="closeModal()">Cancelar</button><button class="b2" onclick="nuevoClienteForm()">+ Cliente nuevo</button></div>`);pkFill();setTimeout(()=>{const i=$('#pk');if(i)i.focus()},50)}
 function pkFill(){
   const x=semOf(PK.sem),q=norm($('#pk').value.trim()),pv=norm(x.prov);
-  const match=c=>!q||norm([c.nombre,c.nombreFact,c.codigo,c.poblacion,c.provincia].join(' ')).indexOf(q)>=0;
+  const match=c=>!q||norm([c.nombre,c.nombreFact,c.codigo,c.cp,c.poblacion,c.provincia].join(' ')).indexOf(q)>=0;
   const A=D.clientes.filter(c=>c.repId===x.repId&&(!pv||norm(c.provincia)===pv||norm(c.poblacion)===pv)&&match(c)).sort((a,b)=>a.nombre.localeCompare(b.nombre,'es')),ids=new Set(A.map(c=>c.id));
   const B=q.length>=2?D.clientes.filter(c=>!ids.has(c.id)&&match(c)).slice(0,15):[];
   const item=c=>`<div class="row lk" onclick="elegirCli('${c.id}')"><span>${dot(c.semaforo)} <b>${esc(c.nombre)}</b> <span class="mut">${esc(c.poblacion)}</span></span><span class="mut">${c.visitas.some(v=>v.f===PK.f)?'ya visitado este día · ':''}${esc(repNom(c.repId))}</span></div>`;
   $('#pkl').innerHTML=`<h3 style="margin:12px 0 4px">Clientes de ${esc(repNom(x.repId))}${x.prov?' en '+esc(x.prov):''}</h3>${A.length?A.map(item).join(''):'<span class="mut">Ninguno'+(q?' con esa búsqueda':'')+'</span>'}${B.length?`<h3 style="margin:14px 0 4px">Otros clientes</h3>${B.map(item).join('')}`:(q.length<2?'<p class="hint">Escribe 2 letras o más para buscar también entre los clientes de otros representantes y zonas.</p>':'')}`}
 function elegirCli(id){closeModal();visitaForm(id,null,null,PK.f,{sem:PK.sem,repId:semOf(PK.sem).repId})}
 function nuevoClienteForm(){const x=semOf(PK.sem),f=PK.f,sem=PK.sem;
-  formModal('Cliente nuevo (se asocia al representante elegido)',[{n:'nombre',l:'Nombre comercial',w:'w'},{n:'poblacion',l:'Población'},{n:'provincia',l:'Provincia',list:1},
+  formModal('Cliente nuevo (se asocia al representante elegido)',[{n:'nombre',l:'Nombre comercial',w:'w'},{n:'cp',l:'Código postal'},{n:'poblacion',l:'Población'},{n:'provincia',l:'Provincia',list:1},
     {n:'repId',l:'Representante asignado',t:'select',o:D.reps.map(r=>[r.id,r.nombre])},{n:'telefono',l:'Teléfono'},{n:'contacto',l:'Persona de contacto'}],
-    {nombre:'',poblacion:'',provincia:x.prov||'',repId:x.repId,telefono:'',contacto:''},o=>{
+    {nombre:'',cp:'',poblacion:'',provincia:x.prov||'',repId:x.repId,telefono:'',contacto:''},o=>{
     if(!o.nombre)return 'Escribe el nombre comercial.';
+    if(o.cp&&!/^\d{5}$/.test(o.cp))return 'El código postal debe tener 5 cifras (ej. 22400).';
     const dup=D.clientes.find(c=>nc(c.nombre)===nc(o.nombre)&&nc(c.poblacion)===nc(o.poblacion));
     if(dup)return 'Ya existe «'+dup.nombre+'»'+(dup.poblacion?' en '+dup.poblacion:'')+'. Búscalo en la lista para no duplicarlo.';
-    const n={id:uid(),codigo:'',nombreFact:'',nombre:o.nombre,poblacion:o.poblacion,provincia:o.provincia,direccion:'',telefono:o.telefono,contacto:o.contacto,email:'',acumul:{},repId:o.repId,semaforo:'amarillo',obs:'',fact:{},comp:{},catalogo:{ok:null,f:''},prodPend:[],expObs:'',exposicion:[],pend:[],visitas:[],pedidos:[],repHist:[{r:o.repId,d:Date.now()}]};
+    const n={id:uid(),codigo:'',nombreFact:'',nombre:o.nombre,poblacion:o.poblacion,cp:o.cp,provincia:o.provincia,direccion:'',telefono:o.telefono,contacto:o.contacto,email:'',acumul:{},repId:o.repId,semaforo:'amarillo',obs:'',fact:{},comp:{},catalogo:{ok:null,f:''},prodPend:[],expObs:'',exposicion:[],pend:[],visitas:[],pedidos:[],repHist:[{r:o.repId,d:Date.now()}]};
     D.clientes.push(n);save();toast('Cliente dado de alta: '+n.nombre+'. Ahora registra la visita.');
     visitaForm(n.id,null,null,f,{sem:sem,repId:o.repId});return true})}
 function vSemana(id){
@@ -1154,7 +1215,7 @@ function impAplicar(){
   aplic.forEach(o=>{let c;
     if(o.sel==='new'){
       if(chkDup({codigo:o.cod,nombreFact:o.nombre},null)){omit++;return}
-      c={id:uid(),codigo:o.cod,nombreFact:o.nombre,nombre:o.nombre,poblacion:o.pob,provincia:o.prov,direccion:'',telefono:'',contacto:'',email:o.email,repId:IM.rep,semaforo:'amarillo',obs:'',fact:{},comp:{},acumul:{},catalogo:{ok:null,f:''},prodPend:[],expObs:'',exposicion:[],pend:[],visitas:[],pedidos:[],repHist:[{r:IM.rep,d:Date.now()}]};
+      c={id:uid(),codigo:o.cod,nombreFact:o.nombre,nombre:o.nombre,poblacion:o.pob,cp:o.cp||'',provincia:o.prov,direccion:'',telefono:'',contacto:'',email:o.email,repId:IM.rep,semaforo:'amarillo',obs:'',fact:{},comp:{},acumul:{},catalogo:{ok:null,f:''},prodPend:[],expObs:'',exposicion:[],pend:[],visitas:[],pedidos:[],repHist:[{r:IM.rep,d:Date.now()}]};
       D.clientes.push(c);nuevos++}
     else{c=cli(o.sel);if(!c){omit++;return}
       if(!c.codigo&&o.cod&&!chkDup({codigo:o.cod,nombreFact:''},c.id))c.codigo=o.cod;
@@ -1162,6 +1223,7 @@ function impAplicar(){
       else if(o.nombre&&nc(o.nombre)!==nc(c.nombreFact)&&nc(o.nombre)!==nc(c.nombre)&&!chkDup({codigo:'',nombreFact:o.nombre},c.id))D.equiv.push({n:o.nombre,c:c.id});
       if(!c.email&&o.email)c.email=o.email;
       if(!c.poblacion&&o.pob)c.poblacion=o.pob;
+      if(!c.cp&&o.cp)c.cp=o.cp;
       if(!c.provincia&&o.prov)c.provincia=o.prov}
     poner(c,Math.round(o.imp*100)/100)});
   if(IM.zero)clientsOf(IM.rep).forEach(c=>{if(!tocados.has(c.id)&&!IM.rows.some(o=>o.sel===c.id))poner(c,0)});
