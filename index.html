@@ -118,6 +118,9 @@ button{font-family:inherit}
 #modal .mb{position:fixed;inset:0;background:rgba(40,30,10,.45);display:flex;align-items:center;justify-content:center;z-index:50;padding:20px}
 .mc{background:#fff;border-radius:20px;padding:24px;width:min(640px,100%);max-height:90vh;overflow:auto}
 .fg{display:grid;grid-template-columns:1fr 1fr;gap:14px;margin:14px 0}
+.fsec{grid-column:1/-1;margin:6px 0 0;padding:8px 12px;background:#eef4ef;color:var(--v);border-radius:10px;font-size:13px;letter-spacing:.6px;text-transform:uppercase}
+.rcard{display:grid;grid-template-columns:1.6fr 1fr;gap:16px;margin:0 0 16px} .rcard .hot{background:#faf7f1;border:1px solid var(--b2)} .rcard a{color:var(--v);font-weight:600;text-decoration:none}
+@media(max-width:820px){.rcard{grid-template-columns:1fr}}
 .f{display:flex;flex-direction:column;gap:5px;font-size:13px;color:var(--g)} .f.w{grid-column:1/3}
 .f input,.f select,.f textarea,.mc>input,textarea#pega{padding:12px;border:1px solid var(--b2);border-radius:10px;font-size:16px;font-family:inherit;color:var(--t);width:100%}
 .acts{display:flex;gap:10px;justify-content:flex-end;margin-top:14px} .acts.l{justify-content:flex-start}
@@ -191,7 +194,8 @@ function seed(){
 }
 function migrate(d){
   d.schema=1;d.reps=d.reps||[];d.clientes=d.clientes||[];
-  d.clientes.forEach(c=>{c.fact=c.fact||{};c.exposicion=c.exposicion||[];c.pend=c.pend||[];c.visitas=c.visitas||[];c.pedidos=c.pedidos||[];c.obs=c.obs||'';c.visitas=c.visitas.map(v=>{v.id=v.id||uid();if(v.hablamos==null)v.hablamos=v.t||'';['pidio','compromisos','productos','prox','proxF','persona','expoNueva','expoPend','pedT','pedTxt','pedI','obs','repId','sem'].forEach(k=>{if(v[k]==null)v[k]=''});v.proxH=!!v.proxH;return v});c.codigo=c.codigo||'';c.email=c.email||'';c.cp=c.cp==null?'':String(c.cp);c.acumul=c.acumul&&typeof c.acumul==='object'?c.acumul:{};c.comp=c.comp&&typeof c.comp==='object'?c.comp:{};c.catalogo=c.catalogo&&typeof c.catalogo==='object'?c.catalogo:{ok:null,f:''};c.prodPend=c.prodPend||[];c.expObs=c.expObs||'';c.nombreFact=c.nombreFact||'';c.semaforo=c.semaforo||'amarillo';
+  d.reps.forEach(r=>{['email','codigoFab','tel','ciudad','hotelN','hotelT'].forEach(k=>{if(r[k]==null)r[k]=''});if(!Array.isArray(r.provincias))r.provincias=[]});
+  d.clientes.forEach(c=>{c.fact=c.fact||{};c.exposicion=c.exposicion||[];c.pend=c.pend||[];c.visitas=c.visitas||[];c.pedidos=c.pedidos||[];c.obs=c.obs||'';c.visitas=c.visitas.map(v=>{v.id=v.id||uid();if(v.hablamos==null)v.hablamos=v.t||'';['pidio','compromisos','productos','prox','proxF','persona','expoNueva','expoPend','pedT','pedTxt','pedI','obs','repId','sem'].forEach(k=>{if(v[k]==null)v[k]=''});v.proxH=!!v.proxH;return v});c.codigo=c.codigo||'';c.email=c.email||'';c.cp=c.cp==null?'':String(c.cp);c.zona=c.zona==null?'':String(c.zona);c.acumul=c.acumul&&typeof c.acumul==='object'?c.acumul:{};c.comp=c.comp&&typeof c.comp==='object'?c.comp:{};c.catalogo=c.catalogo&&typeof c.catalogo==='object'?c.catalogo:{ok:null,f:''};c.prodPend=c.prodPend||[];c.expObs=c.expObs||'';c.nombreFact=c.nombreFact||'';c.semaforo=c.semaforo||'amarillo';
     if(!c.repHist||!c.repHist.length)c.repHist=[{r:c.repId,d:null}]});
   d.equiv=Array.isArray(d.equiv)?d.equiv:[];d.imports=Array.isArray(d.imports)?d.imports:[];d.plan=Array.isArray(d.plan)?d.plan:[];d.semanas=Array.isArray(d.semanas)?d.semanas:[];if(d.changes==null)d.changes=0; if(d.lastBackup===undefined)d.lastBackup=null; return d;
 }
@@ -258,11 +262,11 @@ function setVC(k){VC=k;render(true)}
 function setFY(y){FY=y;render(true)}
 function catCards(cs){const m=corte();return '<div class="grid c3">'+['principal','comp','total'].map(k=>{const o=cmpL(cs,YEAR,m,k);
   return `<div class="card"><h3>${k==='total'?'Facturación total':k==='comp'?'Complementos':'Facturación principal'} · ${YEAR} (${per(m)})</h3><div class="big">${o.ha?eur(o.a):'<span class="mut" style="font-size:20px">Sin datos</span>'}</div><div style="margin-top:8px">${cmpHTML(o)}</div>${o.ok?`<div class="${o.d>=0?'up':'dn'}" style="margin-top:6px;font-size:14px">${sg(o.d)} <span class="mut">(antes ${eur(o.p)})</span></div>`:`<div class="mut" style="margin-top:6px;font-size:13px">${esc(o.why)}</div>`}</div>`}).join('')+'</div>'}
-function provTable(cs){const m=corte(),g={};cs.forEach(c=>{const q=c.provincia||'Sin provincia';(g[q]=g[q]||[]).push(c)});
+function provTable(cs,z){const m=corte(),g={};cs.forEach(c=>{const q=z?(c.zona||'Sin zona'):(c.provincia||'Sin provincia');(g[q]=g[q]||[]).push(c)});
   const sm=(l,k)=>l.reduce((t,c)=>t+acum(c,YEAR,m,k),0);
   const rows=Object.keys(g).map(q=>({q:q,l:g[q],v:sm(g[q],VC)})).sort((a,b)=>b.v-a.v).map(x=>{const l=x.l,o=cmpL(l,YEAR,m,VC),hp=l.some(c=>has(c,YEAR,m,'principal')),hc=l.some(c=>has(c,YEAR,m,'comp'));
     return `<tr><td><b>${esc(x.q)}</b></td><td class="r">${l.length}</td><td class="r">${hp?eur(sm(l,'principal')):mut}</td><td class="r">${hc?eur(sm(l,'comp')):mut}</td><td class="r"><b>${(hp||hc)?eur(sm(l,'total')):mut}</b></td><td class="r">${cmpHTML(o)}</td></tr>`}).join('');
-  return `<div class="card" style="margin-top:16px"><h3>Facturación por provincia · ${YEAR} (${per(m)})</h3><table class="tb"><thead><tr><th>Provincia</th><th class="r">Clientes</th><th class="r">Principal</th><th class="r">Complementos</th><th class="r">Total</th><th class="r">Dif. ${CAT[VC].toLowerCase()} vs ${YEAR-1}</th></tr></thead><tbody>${rows}</tbody></table></div>`}
+  return `<div class="card" style="margin-top:16px"><h3>Facturación por ${z?'zona':'provincia'} · ${YEAR} (${per(m)})</h3><table class="tb"><thead><tr><th>${z?'Zona':'Provincia'}</th><th class="r">Clientes</th><th class="r">Principal</th><th class="r">Complementos</th><th class="r">Total</th><th class="r">Dif. ${CAT[VC].toLowerCase()} vs ${YEAR-1}</th></tr></thead><tbody>${rows}</tbody></table></div>`}
 const per=m=>MES[0]+'–'+MES[m-1];
 const dot=s=>`<span class="dot ${s}"></span>`;
 function barsHTML(a,b,st){const max=Math.max(1,...a.map(v=>v||0),...b.map(v=>v||0));
@@ -382,7 +386,8 @@ function vPanel(){
     <div class="card"><h3>Han dejado de comprar</h3>${dej.map(x=>`<div class="row lk" onclick="go('cli/${x.c.id}')"><span>${esc(x.c.nombre)}<br><small style="color:#999">${esc(x.c.poblacion)}</small></span><span class="dn">hace ${x.n} meses</span></div>`).join('')||'<span class="mut">Ninguno</span>'}</div>
     <div class="card"><h3>Avisos importantes</h3>${(()=>{const L=alertas().filter(a=>a.sev!=='info').slice(0,6);return (L.length?L.map(a=>`<div class="row lk" onclick="go('cli/${a.c.id}')"><span><span class="sev ${a.sev}"></span><b>${esc(a.c.nombre)}</b><br><small style="color:#999">${ATIPO[a.k]}</small></span></div>`).join(''):'<span class="mut">Sin avisos</span>')+'<div style="margin-top:10px"><button class="b2 sm" onclick="go(\'alertas\')">Ver todas las alertas</button></div>'})()}</div>
   </div>
-  ${provTable(all)}`}
+  ${provTable(all)}
+  ${all.some(c=>c.zona)?provTable(all,true):''}`}
 
 function vReps(){
   const m=corte(),rs=D.reps.map(r=>({r:r,s:stats(clientsOf(r.id)),cs:clientsOf(r.id)}));
@@ -407,12 +412,13 @@ function vRep(id){
   const fn={fact:(a,b)=>A(b,'total')-A(a,'total'),principal:(a,b)=>A(b,'principal')-A(a,'principal'),comp:(a,b)=>A(b,'comp')-A(a,'comp'),nombre:(a,b)=>a.nombre.localeCompare(b.nombre,'es'),cp:(a,b)=>String(a.cp||'~').localeCompare(String(b.cp||'~'))||a.nombre.localeCompare(b.nombre,'es'),
     caida:(a,b)=>vr(a,m)-vr(b,m),sin:(a,b)=>mesesSin(b,m)-mesesSin(a,m)}[sortBy]||((a,b)=>A(b,'total')-A(a,'total'));
   const rows=[...cs].sort(fn).map((c,i)=>{const lp=lastPedido(c),ms=sinComprar(c,m)?mesesSin(c,m):0,o=vs(c),cell=k=>has(c,YEAR,m,k)?eur(A(c,k)):mut;
-    return `<tr data-s="${esc(norm([c.nombre,c.nombreFact,c.codigo,c.cp,c.poblacion,c.provincia].join(' ')))}" onclick="go('cli/${c.id}')"><td>${i+1}</td><td><b>${esc(c.nombre)}</b><small>${esc((c.cp?c.cp+' ':'')+c.poblacion)}${c.provincia?', '+esc(c.provincia):''}</small></td>
+    return `<tr data-s="${esc(norm([c.nombre,c.nombreFact,c.codigo,c.cp,c.poblacion,c.provincia,c.zona].join(' ')))}" onclick="go('cli/${c.id}')"><td>${i+1}</td><td><b>${esc(c.nombre)}</b><small>${esc((c.cp?c.cp+' ':'')+c.poblacion)}${c.provincia?(c.poblacion?', ':'')+esc(c.provincia):''}${c.zona?' · <b>'+esc(c.zona)+'</b>':''}</small></td>
     <td class="r">${cell('principal')}</td><td class="r">${cell('comp')}</td><td class="r"><b>${cell('total')}</b></td><td class="r">${o.hp?eur(o.p):mut}</td><td class="r">${cmpHTML(o)}</td>
     <td>${lp?fd(lp.f):'<span class="mut">sin fecha</span>'}${ms?`<small class="dn">sin facturar ${ms} meses</small>`:''}</td>
     <td onclick="event.stopPropagation();cycSem('${c.id}')" title="Pulsa para cambiar el estado">${dot(c.semaforo)}</td></tr>`}).join('');
-  return `<div class="hb"><div><h1>${esc(r.nombre)}</h1><p class="sub" style="margin-bottom:0">${esc(r.provincias.join(' · ')||'Sin provincia')}${r.codigoFab?' · Cód. fábrica '+esc(r.codigoFab):''}</p></div>
-    <div class="acts"><button class="b1" onclick="cliForm(null,'${r.id}')">+ Nuevo cliente</button><button class="b2" onclick="repForm('${r.id}')">Editar</button><button class="b2 dng" onclick="delRep('${r.id}')">Eliminar</button><button class="b1" onclick="impOpen('${r.id}','principal')">Importar principal</button><button class="b1" onclick="impOpen('${r.id}','comp')">Importar complementos</button></div></div>
+  return `<div class="hb"><div><h1>${esc(r.nombre)}</h1><p class="sub" style="margin-bottom:0">${esc(r.provincias.join(' · ')||'Sin provincia')}${r.ciudad?' · '+esc(r.ciudad):''}</p></div>
+    <div class="acts"><button class="b1" onclick="cliForm(null,'${r.id}')">+ Nuevo cliente</button><button class="b2" onclick="repForm('${r.id}')">Editar</button><button class="b2 dng" onclick="delRep('${r.id}')">Eliminar</button><button class="b2" onclick="nomOpen('${r.id}')">Importar solo nombres</button><button class="b1" onclick="impOpen('${r.id}','principal')">Importar principal</button><button class="b1" onclick="impOpen('${r.id}','comp')">Importar complementos</button></div></div>
+  ${repFicha(r)}
   <div class="bar2">${catSel()}<span class="mut">Las cifras de abajo muestran: <b>${CAT[VC]}</b></span></div>
   <div class="grid k">
     <div class="card"><h3>Clientes</h3><div class="big">${s.n}</div></div>
@@ -435,12 +441,13 @@ function vRep(id){
   </div>
   ${cs.length?repChart(cs)+mCard(cs)+qCard(cs):''}
   <div class="card" style="margin-top:16px"><div class="hb" style="margin-bottom:8px"><h3 style="margin:0">Clientes de ${esc(r.nombre)}</h3>
-    <input class="sel" style="min-width:260px" placeholder="Filtrar por nombre, población o código postal" oninput="filtrarCli(this.value)"><select class="sel" onchange="setSort(this.value)"><option value="fact" ${sortBy==='fact'?'selected':''}>Ranking por facturación total</option><option value="principal" ${sortBy==='principal'?'selected':''}>Ranking por facturación principal</option><option value="comp" ${sortBy==='comp'?'selected':''}>Ranking por complementos</option><option value="nombre" ${sortBy==='nombre'?'selected':''}>Nombre A–Z</option><option value="cp" ${sortBy==='cp'?'selected':''}>Código postal (por zonas)</option><option value="caida" ${sortBy==='caida'?'selected':''}>Mayor caída primero (${CAT[VC].toLowerCase()})</option><option value="sin" ${sortBy==='sin'?'selected':''}>Más meses sin comprar</option></select></div>
+    <input class="sel" style="min-width:260px" placeholder="Filtrar por nombre, población, zona o código postal" oninput="filtrarCli(this.value)"><select class="sel" onchange="setSort(this.value)"><option value="fact" ${sortBy==='fact'?'selected':''}>Ranking por facturación total</option><option value="principal" ${sortBy==='principal'?'selected':''}>Ranking por facturación principal</option><option value="comp" ${sortBy==='comp'?'selected':''}>Ranking por complementos</option><option value="nombre" ${sortBy==='nombre'?'selected':''}>Nombre A–Z</option><option value="cp" ${sortBy==='cp'?'selected':''}>Código postal (por zonas)</option><option value="caida" ${sortBy==='caida'?'selected':''}>Mayor caída primero (${CAT[VC].toLowerCase()})</option><option value="sin" ${sortBy==='sin'?'selected':''}>Más meses sin comprar</option></select></div>
     ${cs.length?`<table class="tb"><thead><tr><th>#</th><th>Cliente</th><th class="r">Principal ${YEAR}</th><th class="r">Compl. ${YEAR}</th><th class="r">Total ${YEAR}</th><th class="r">${CAT[VC]} ${YEAR-1}</th><th class="r">Dif. ${CAT[VC].toLowerCase()}</th><th>Última compra</th><th>Estado</th></tr></thead><tbody>${rows}</tbody></table>
     <p class="hint">Importes acumulados ${per(m)}, comparados con el mismo periodo del año anterior. «Faltan datos» significa que falta información de algún periodo: no es lo mismo que 0 €. Si el informe no trae fechas de pedidos, la última compra aparece como «sin fecha». Pulsa el círculo para cambiar el estado.</p>`
     :'<p class="msg">Este representante todavía no tiene clientes. Pulsa <b>+ Nuevo cliente</b>.</p>'}</div>
   ${repCoche(r)}
   ${cs.length?provTable(cs):''}
+  ${cs.some(c=>c.zona)?provTable(cs,true):''}
   ${impHist(r)}`}
 function vr(c,m){const a=acum(c,YEAR,m),b=acum(c,YEAR-1,m);return b?(a-b)/b:(a>0?1e9:0)}
 
@@ -534,7 +541,7 @@ function vCli(id){
     <div class="card"><h3>Observaciones y alertas</h3>${alertasCli(c)}<p style="font-size:15px;line-height:1.5;color:#555;margin-top:12px;border-top:1px solid #f0ebe0;padding-top:10px">${c.obs?esc(c.obs):'<span class="mut">Sin observaciones generales</span>'}</p></div>
   </div>
   <h2 class="sec">Datos del cliente</h2>
-  <div class="grid c2"><div class="card"><h3>Datos generales</h3>${dd('Nombre comercial',c.nombre)}${dd('Nombre de facturación',c.nombreFact)}${dd('Código VICKFLEX',c.codigo)}${dd('Dirección',c.direccion)}${dd('Código postal',c.cp)}${dd('Población',c.poblacion)}${dd('Provincia',c.provincia)}${dd('Representante',r&&r.nombre)}${dd('Teléfono',c.telefono)}${dd('Contacto',c.contacto)}<div class="row"><span style="color:var(--g)">Correo electrónico</span><span>${c.email?`<a href="mailto:${esc(c.email)}">${esc(c.email)}</a>`:'<span class="mut">—</span>'}</span></div>${ant.length?dd('Antes con',ant.join(', ')):''}</div>
+  <div class="grid c2"><div class="card"><h3>Datos generales</h3>${dd('Nombre comercial',c.nombre)}${dd('Nombre de facturación',c.nombreFact)}${dd('Código VICKFLEX',c.codigo)}${dd('Dirección',c.direccion)}${dd('Código postal',c.cp)}${dd('Población',c.poblacion)}${dd('Provincia',c.provincia)}${dd('Zona',c.zona)}${dd('Representante',r&&r.nombre)}${dd('Teléfono',c.telefono)}${dd('Contacto',c.contacto)}<div class="row"><span style="color:var(--g)">Correo electrónico</span><span>${c.email?`<a href="mailto:${esc(c.email)}">${esc(c.email)}</a>`:'<span class="mut">—</span>'}</span></div>${ant.length?dd('Antes con',ant.join(', ')):''}</div>
   <div class="card"><h3>Planificar</h3><p style="line-height:1.5;margin-bottom:12px">${(()=>{const pl=D.plan.filter(x=>x.cliId===c.id&&!x.hecha&&x.f>=hoy()).sort((a,b)=>a.f.localeCompare(b.f))[0];return pl?'Próxima visita planificada: <b>'+fd(pl.f)+'</b>'+(pl.h?' a las '+esc(pl.h):''):'No hay ninguna visita planificada.'})()}</p><button class="b2" onclick="planForm(null,{cliId:'${c.id}'})">+ Planificar visita</button></div></div>
   <div class="card" style="margin-top:16px"><h3>Nombres de facturación reconocidos</h3><p class="mut" style="margin-bottom:8px">La app usa estos nombres (y el código VICKFLEX) para saber a qué cliente corresponde cada línea de los Excel de fábrica.</p>${(c.nombreFact?`<div class="row"><span>${esc(c.nombreFact)} <span class="mut">(principal)</span></span></div>`:'')+equivOf(c.id).map((e,i)=>`<div class="row"><span>${esc(e.n)}</span><button class="b2" onclick="delEquiv('${c.id}',${i})">Quitar</button></div>`).join('')||'<span class="mut">Ninguno todavía</span>'}<div style="margin-top:10px"><button class="b2" onclick="addEquiv('${c.id}')">+ Añadir otro nombre de facturación</button></div></div>
   `}
@@ -577,7 +584,7 @@ document.addEventListener('click',e=>{if(!e.target.closest('.sb')){$('#res').sty
 /* ---------- Buscador ---------- */
 function buscar(q){
   const box=$('#res');q=norm(q.trim());if(q.length<2){box.style.display='none';box.innerHTML='';return}
-  const rs=D.clientes.filter(c=>norm([c.nombre,c.nombreFact,c.codigo,c.email,equivOf(c.id).map(e=>e.n).join(' '),c.cp,c.poblacion,c.provincia,repNom(c.repId)].join(' ')).indexOf(q)>=0).slice(0,10);
+  const rs=D.clientes.filter(c=>norm([c.nombre,c.nombreFact,c.codigo,c.email,equivOf(c.id).map(e=>e.n).join(' '),c.cp,c.poblacion,c.provincia,c.zona,repNom(c.repId)].join(' ')).indexOf(q)>=0).slice(0,10);
   box.style.display='block';
   box.innerHTML=rs.length?rs.map(c=>`<div class="ri" onclick="abrirRes('${c.id}')">${dot(c.semaforo)}<b>${esc(c.nombre)}</b><small>${esc(c.poblacion)} · ${esc(repNom(c.repId))}</small></div>`).join(''):'<div class="ri mut">Sin resultados</div>'}
 function abrirRes(id){$('#q').value='';$('#res').style.display='none';go('cli/'+id)}
@@ -590,19 +597,33 @@ function ask(msg,label,fn,typed){
   modal(`<h2>Confirmar</h2><p class="msg">${msg}</p>${typed?`<input id="tp" placeholder="Escribe ${typed} para confirmar">`:''}<div class="acts"><button class="b2" onclick="closeModal()">Cancelar</button><button class="b1 danger" id="okc">${label}</button></div>`);
   $('#okc').onclick=()=>{if(typed&&$('#tp').value.trim().toUpperCase()!==typed){$('#tp').classList.add('bad');return}closeModal();fn()}}
 function formModal(title,fields,vals,onSave,opts){opts=opts||{};
-  const provs=[...new Set(D.reps.flatMap(r=>r.provincias).concat(D.clientes.map(c=>c.provincia)).filter(Boolean))];
-  const h=fields.map(f=>`<label class="f ${f.w||''}"><span>${f.l}</span>${f.t==='select'?`<select name="${f.n}">${f.o.map(o=>`<option value="${esc(o[0])}" ${o[0]===vals[f.n]?'selected':''}>${esc(o[1])}</option>`).join('')}</select>`:f.t==='date'?`<input type="date" name="${f.n}" value="${esc(vals[f.n])}">`:f.t==='area'?`<textarea name="${f.n}" rows="3">${esc(vals[f.n])}</textarea>`:`<input name="${f.n}" value="${esc(vals[f.n])}" ${f.list?'list="provs"':''} ${f.ph?`placeholder="${esc(f.ph)}"`:''}>`}</label>`).join('');
-  modal(`<h2>${title}</h2>${opts.intro?`<p class="hint" style="margin:0 0 6px">${opts.intro}</p>`:''}<form id="frm"><div class="fg">${h}</div><datalist id="provs">${provs.map(p=>`<option value="${esc(p)}">`).join('')}</datalist><p class="err" id="err"></p><div class="acts"><button type="button" class="b2" onclick="closeModal()">Cancelar</button>${(opts.extra||[]).map(x=>`<button type="submit" class="b2" data-k="${x.k}">${x.l}</button>`).join('')}<button type="submit" class="b1">Guardar</button></div></form>`);
+  const provs=[...new Set(D.reps.flatMap(r=>r.provincias).concat(D.clientes.map(c=>c.provincia)).filter(Boolean))],zonas=[...new Set(D.clientes.map(c=>c.zona).filter(Boolean))];
+  const h=fields.map(f=>f.t==='sec'?`<h3 class="fsec">${f.l}</h3>`:`<label class="f ${f.w||''}"><span>${f.l}</span>${f.t==='select'?`<select name="${f.n}">${f.o.map(o=>`<option value="${esc(o[0])}" ${o[0]===vals[f.n]?'selected':''}>${esc(o[1])}</option>`).join('')}</select>`:f.t==='date'?`<input type="date" name="${f.n}" value="${esc(vals[f.n])}">`:f.t==='area'?`<textarea name="${f.n}" rows="3">${esc(vals[f.n])}</textarea>`:`<input name="${f.n}" value="${esc(vals[f.n])}" ${f.list?(f.list===2?'list="zonas"':'list="provs"'):''} ${f.ph?`placeholder="${esc(f.ph)}"`:''}>`}</label>`).join('');
+  modal(`<h2>${title}</h2>${opts.intro?`<p class="hint" style="margin:0 0 6px">${opts.intro}</p>`:''}<form id="frm"><div class="fg">${h}</div><datalist id="provs">${provs.map(p=>`<option value="${esc(p)}">`).join('')}</datalist><datalist id="zonas">${zonas.map(p=>`<option value="${esc(p)}">`).join('')}</datalist><p class="err" id="err"></p><div class="acts"><button type="button" class="b2" onclick="closeModal()">Cancelar</button>${(opts.extra||[]).map(x=>`<button type="submit" class="b2" data-k="${x.k}">${x.l}</button>`).join('')}<button type="submit" class="b1">Guardar</button></div></form>`);
   const fm=$('#frm');
-  fm.onsubmit=e=>{e.preventDefault();const o={};fields.forEach(f=>o[f.n]=fm.elements[f.n].value.trim());const r=onSave(o,e.submitter&&e.submitter.dataset?e.submitter.dataset.k:'');if(typeof r==='string'){$('#err').textContent=r}else if(r!==true){closeModal()}}}
+  fm.onsubmit=e=>{e.preventDefault();const o={};fields.forEach(f=>{if(f.t!=='sec')o[f.n]=fm.elements[f.n].value.trim()});const r=onSave(o,e.submitter&&e.submitter.dataset?e.submitter.dataset.k:'');if(typeof r==='string'){$('#err').textContent=r}else if(r!==true){closeModal()}}}
 
 function repForm(id){
   const r=id?rep(id):null;
-  formModal(r?'Editar representante':'Nuevo representante',[{n:'nombre',l:'Nombre y apellidos',w:'w'},{n:'codigoFab',l:'Código de vendedor en fábrica (ej. V12)'},{n:'prov',l:'Provincias que lleva (separadas por comas)',ph:'Castellón, Teruel',w:'w'}],
-   {nombre:r?r.nombre:'',codigoFab:r?(r.codigoFab||''):'',prov:r?r.provincias.join(', '):''},o=>{
+  formModal(r?'Editar representante':'Nuevo representante',[
+   {t:'sec',l:'Datos del representante'},
+   {n:'nombre',l:'Nombre y apellidos',w:'w'},{n:'codigoFab',l:'Código de vendedor VICKFLEX (ej. V12)'},{n:'tel',l:'Teléfono de contacto'},
+   {n:'email',l:'Correo electrónico'},{n:'ciudad',l:'Ciudad de residencia'},
+   {n:'prov',l:'Provincias que lleva (separadas por comas)',ph:'Castellón, Teruel',w:'w'},
+   {t:'sec',l:'Hotel habitual (opcional)'},
+   {n:'hotelN',l:'Nombre del hotel'},{n:'hotelT',l:'Teléfono del hotel'}],
+   {nombre:r?r.nombre:'',codigoFab:r?(r.codigoFab||''):'',tel:r?(r.tel||''):'',email:r?(r.email||''):'',ciudad:r?(r.ciudad||''):'',prov:r?r.provincias.join(', '):'',hotelN:r?(r.hotelN||''):'',hotelT:r?(r.hotelT||''):''},o=>{
     if(!o.nombre)return 'Escribe el nombre del representante.';
     const pv=o.prov.split(',').map(x=>x.trim()).filter(Boolean);
-    if(r){r.nombre=o.nombre;r.codigoFab=o.codigoFab;r.provincias=pv;save();render(true)}else{const n={id:uid(),nombre:o.nombre,codigoFab:o.codigoFab,provincias:pv};D.reps.push(n);save();go('rep/'+n.id)}})}
+    const campos={nombre:o.nombre,codigoFab:o.codigoFab,tel:o.tel,email:o.email,ciudad:o.ciudad,hotelN:o.hotelN,hotelT:o.hotelT,provincias:pv};
+    if(r){Object.assign(r,campos);save();render(true)}else{const n=Object.assign({id:uid()},campos);D.reps.push(n);save();go('rep/'+n.id)}})}
+const telHref=t=>'tel:'+String(t||'').replace(/[^\d+]/g,'');
+const lnkTel=t=>t?`<a href="${esc(telHref(t))}">${esc(t)}</a>`:'<span class="mut">—</span>';
+const lnkMail=t=>t?`<a href="mailto:${esc(t)}">${esc(t)}</a>`:'<span class="mut">—</span>';
+function repFicha(r){
+  const dd=(l,v)=>`<div class="row"><span style="color:var(--g)">${l}</span><span>${v}</span></div>`;
+  return `<div class="rcard"><div class="card"><h3>Datos del representante</h3>${dd('Nombre y apellidos',esc(r.nombre))}${dd('Código de vendedor VICKFLEX',r.codigoFab?esc(r.codigoFab):'<span class="mut">—</span>')}${dd('Teléfono de contacto',lnkTel(r.tel))}${dd('Correo electrónico',lnkMail(r.email))}${dd('Ciudad de residencia',r.ciudad?esc(r.ciudad):'<span class="mut">—</span>')}${dd('Provincias que lleva',r.provincias.length?esc(r.provincias.join(' · ')):'<span class="mut">—</span>')}</div>
+  <div class="card hot"><h3>🏨 Hotel habitual</h3>${r.hotelN||r.hotelT?`<div class="big" style="font-size:22px">${r.hotelN?esc(r.hotelN):'<span class="mut">Sin nombre</span>'}</div><div style="margin-top:10px;font-size:18px">${r.hotelT?'📞 '+lnkTel(r.hotelT):'<span class="mut">Sin teléfono</span>'}</div>`:'<p class="mut">Sin datos. Pulsa Editar para añadir el hotel donde te alojas cuando viajas con este representante.</p>'}</div></div>`}
 function delRep(id){
   const r=rep(id),n=clientsOf(id).length;
   if(n)return modal(`<h2>No se puede eliminar</h2><p class="msg"><b>${esc(r.nombre)}</b> tiene ${n} clientes. Para no perder su historial, primero cambia cada cliente a otro representante (Editar cliente → Representante).</p><div class="acts"><button class="b1" onclick="closeModal()">Entendido</button></div>`);
@@ -612,17 +633,17 @@ function cliForm(id,repId){
   formModal(c?'Editar cliente':'Nuevo cliente',[
    {n:'nombre',l:'Nombre comercial (el que usas tú)',w:'w'},{n:'nombreFact',l:'Nombre de facturación / razón social (el de fábrica)',w:'w'},{n:'codigo',l:'Código de cliente VICKFLEX (si existe)'},
    {n:'direccion',l:'Dirección',w:'w'},{n:'cp',l:'Código postal',ph:'22400'},{n:'poblacion',l:'Población'},
-   {n:'provincia',l:'Provincia',list:1},{n:'repId',l:'Representante asignado',t:'select',o:D.reps.map(r=>[r.id,r.nombre])},
+   {n:'provincia',l:'Provincia',list:1},{n:'zona',l:'Zona (ej. Madrid provincia, Madrid centro, Toledo)',list:2,w:'w'},{n:'repId',l:'Representante asignado',t:'select',o:D.reps.map(r=>[r.id,r.nombre])},
    {n:'telefono',l:'Teléfono'},{n:'contacto',l:'Persona de contacto'},{n:'email',l:'Correo electrónico'},
    {n:'semaforo',l:'Estado comercial',t:'select',o:[['verde','Verde'],['amarillo','Amarillo'],['rojo','Rojo']]},{n:'obs',l:'Observaciones generales',t:'area',w:'w'}],
-   {nombre:c?c.nombre:'',nombreFact:c?c.nombreFact:'',codigo:c?c.codigo:'',poblacion:c?c.poblacion:'',cp:c?c.cp:'',provincia:c?c.provincia:(rp&&rp.provincias[0])||'',repId:r0,direccion:c?c.direccion:'',telefono:c?c.telefono:'',contacto:c?c.contacto:'',email:c?c.email:'',semaforo:c?c.semaforo:'amarillo',obs:c?c.obs:''},
+   {nombre:c?c.nombre:'',nombreFact:c?c.nombreFact:'',codigo:c?c.codigo:'',poblacion:c?c.poblacion:'',cp:c?c.cp:'',zona:c?c.zona:'',provincia:c?c.provincia:(rp&&rp.provincias[0])||'',repId:r0,direccion:c?c.direccion:'',telefono:c?c.telefono:'',contacto:c?c.contacto:'',email:c?c.email:'',semaforo:c?c.semaforo:'amarillo',obs:c?c.obs:''},
    o=>{
     if(!o.nombre)return 'Escribe el nombre comercial del cliente.';
     if(o.cp&&!/^\d{5}$/.test(o.cp))return 'El código postal debe tener 5 cifras (ej. 22400).';
     const dup=chkDup(o,c?c.id:null);if(dup)return dup;
-    if(!c){const n={id:uid(),codigo:o.codigo,nombreFact:o.nombreFact,nombre:o.nombre,poblacion:o.poblacion,cp:o.cp,provincia:o.provincia,direccion:o.direccion,telefono:o.telefono,contacto:o.contacto,email:o.email,acumul:{},repId:o.repId,semaforo:o.semaforo,obs:o.obs,fact:{},comp:{},catalogo:{ok:null,f:''},prodPend:[],expObs:'',exposicion:[],pend:[],visitas:[],pedidos:[],repHist:[{r:o.repId,d:Date.now()}]};
+    if(!c){const n={id:uid(),codigo:o.codigo,nombreFact:o.nombreFact,nombre:o.nombre,poblacion:o.poblacion,cp:o.cp,zona:o.zona,provincia:o.provincia,direccion:o.direccion,telefono:o.telefono,contacto:o.contacto,email:o.email,acumul:{},repId:o.repId,semaforo:o.semaforo,obs:o.obs,fact:{},comp:{},catalogo:{ok:null,f:''},prodPend:[],expObs:'',exposicion:[],pend:[],visitas:[],pedidos:[],repHist:[{r:o.repId,d:Date.now()}]};
       D.clientes.push(n);save();go('cli/'+n.id);return}
-    const apply=()=>{['nombre','nombreFact','codigo','poblacion','cp','provincia','direccion','telefono','contacto','email','semaforo','obs'].forEach(k=>c[k]=o[k]);
+    const apply=()=>{['nombre','nombreFact','codigo','poblacion','cp','provincia','zona','direccion','telefono','contacto','email','semaforo','obs'].forEach(k=>c[k]=o[k]);
       if(o.repId!==c.repId){c.repId=o.repId;c.repHist.push({r:o.repId,d:Date.now()})}save();render(true)};
     if(o.repId!==c.repId){ask(`Vas a pasar <b>${esc(c.nombre)}</b> de <b>${esc(repNom(c.repId))}</b> a <b>${esc(repNom(o.repId))}</b>. Se conserva todo su historial.`,'Cambiar de representante',apply);return true}
     apply()})}
@@ -888,7 +909,7 @@ function pickCliente(semId,f){PK={sem:semId,f:f};
   modal(`<h2>Añadir visita · ${DIAS[(parseD(f).getDay()+6)%7]} ${fcorta(f)}</h2><input id="pk" placeholder="Buscar cliente por nombre, población, código o código postal…" oninput="pkFill()" autocomplete="off"><div id="pkl"></div><div class="acts"><button class="b2" onclick="closeModal()">Cancelar</button><button class="b2" onclick="nuevoClienteForm()">+ Cliente nuevo</button></div>`);pkFill();setTimeout(()=>{const i=$('#pk');if(i)i.focus()},50)}
 function pkFill(){
   const x=semOf(PK.sem),q=norm($('#pk').value.trim()),pv=norm(x.prov);
-  const match=c=>!q||norm([c.nombre,c.nombreFact,c.codigo,c.cp,c.poblacion,c.provincia].join(' ')).indexOf(q)>=0;
+  const match=c=>!q||norm([c.nombre,c.nombreFact,c.codigo,c.cp,c.poblacion,c.provincia,c.zona].join(' ')).indexOf(q)>=0;
   const A=D.clientes.filter(c=>c.repId===x.repId&&(!pv||norm(c.provincia)===pv||norm(c.poblacion)===pv)&&match(c)).sort((a,b)=>a.nombre.localeCompare(b.nombre,'es')),ids=new Set(A.map(c=>c.id));
   const B=q.length>=2?D.clientes.filter(c=>!ids.has(c.id)&&match(c)).slice(0,15):[];
   const item=c=>`<div class="row lk" onclick="elegirCli('${c.id}')"><span>${dot(c.semaforo)} <b>${esc(c.nombre)}</b> <span class="mut">${esc(c.poblacion)}</span></span><span class="mut">${c.visitas.some(v=>v.f===PK.f)?'ya visitado este día · ':''}${esc(repNom(c.repId))}</span></div>`;
@@ -1044,11 +1065,15 @@ function serialDate(n){if(typeof n!=='number'||n<30000||n>80000)return null;cons
 function parseLineaImpresa(s){
   s=tx(s);const tk=s.split(' ');
   if(tk.length<3)return null;
-  if(!/^[A-Za-z]{0,2}\d{3,8}$/.test(tk[0]))return null;
+  let cod;
+  if(/^[A-Za-z]{0,2}\d{4,8}$/.test(tk[0]))cod=tk[0];
+  else if(/^\d{1,3}$/.test(tk[0]))cod='';   // solo número de orden (sin código de cliente)
+  else return null;
   const last=tk[tk.length-1];
   const imp=AMT.test(last)?num(last):null;
-  const mid=tk.slice(1,imp==null?tk.length:tk.length-1).join(' ');
-  return splitMid(tk[0],mid,imp)}
+  const mid=tk.slice(1,imp==null?tk.length:tk.length-1).join(' ').replace(/\s*[—–-]+\s*$/,'');
+  if(!mid)return null;
+  return splitMid(cod,mid,imp)}
 function splitMid(cod,mid,imp){
   let nombre=mid,email='',rest='';
   const em=/[\w.+-]+@[\w-]+(\.[\w-]+)+/.exec(mid);
@@ -1111,7 +1136,7 @@ function detPeriodo(ini,fin){
 /* ---- ventana ---- */
 function modalW(h){$('#modal').innerHTML='<div class="mb"><div class="mc" style="width:min(1180px,100%)">'+h+'</div></div>'}
 function impOpen(repId,tipo){
-  IM={rep:repId,tipo:tipo,fase:1,rows:[],meta:null,per:null,y:YEAR,m:1,modo:'mes',ign:0,archivo:'',zero:false,okVend:false,okCtrl:false,msg:''};
+  IM={provDef:(rep(repId).provincias.length===1?rep(repId).provincias[0]:''),rep:repId,tipo:tipo,fase:1,rows:[],meta:null,per:null,y:YEAR,m:1,modo:'mes',ign:0,archivo:'',zero:false,okVend:false,okCtrl:false,msg:''};
   impFase1()}
 function impFase1(){
   const r=rep(IM.rep);
@@ -1135,6 +1160,7 @@ function impCargar(rows){
   if(!a.rows.length){IM.msg='No he encontrado filas de clientes en ese informe. Revisa que incluya código, razón social e importe.';return impFase1()}
   IM.meta=a.meta;IM.ign=a.ign;IM.per=detPeriodo(a.meta.ini,a.meta.fin);
   if(IM.per.modo==='mes'||IM.per.modo==='acum'){IM.modo=IM.per.modo;IM.y=IM.per.y;IM.m=IM.per.m}
+  else if(IM.per.modo===null){IM.modo='';IM.m=Math.max(1,new Date().getMonth())}
   const seen={};
   IM.rows=a.rows.map((o,i)=>{const mt=matchCliente(o.cod,o.nombre);
     return Object.assign(o,{i:i,sel:mt?mt.cli.id:'',por:mt?mt.por:'',nota:''})});
@@ -1149,44 +1175,47 @@ function impRevisar(){
       usados[o.sel]=o.i;
       if(c&&!o.nota&&o.por==='código'&&c.nombreFact&&nc(c.nombreFact)!==nc(o.nombre)&&!equivOf(c.id).some(e=>nc(e.n)===nc(o.nombre)))o.nota='Mismo código, nombre distinto al guardado («'+c.nombreFact+'»). Se guardará como equivalencia.';}
     if(o.sel==='new'){const d=chkDup({codigo:o.cod,nombreFact:o.nombre},null);if(d){o.nota=d;o.warn=1}}
-    if(o.imp==null&&o.sel!=='skip')o.nota=(o.nota?o.nota+' ':'')+'Sin importe en el informe: escríbelo o se omitirá.'});
+    if(o.imp==null&&o.sel!=='skip')o.nota=(o.nota?o.nota+' ':'')+'Sin importe en el informe: se guardará el cliente sin facturación.'});
   // en filas con aviso y cliente de otro rep / duplicado, no se importa hasta que el usuario lo confirme eligiendo de nuevo
   const dupCli={};IM.rows.forEach(o=>{if(o.sel&&o.sel.length>3&&o.sel!=='skip'&&o.sel!=='new'){(dupCli[o.sel]=dupCli[o.sel]||[]).push(o)}});
   Object.values(dupCli).forEach(l=>{if(l.length>1)l.slice(1).forEach(o=>{o.sel='';o.por=''})});
-  IM.rows.forEach(o=>{const c=o.sel&&o.sel!=='new'&&o.sel!=='skip'?cli(o.sel):null;if(c&&c.repId!==IM.rep&&!o.ok){o.sel='';o.por='';o.warn=1}})}
+  IM.rows.forEach(o=>{const c=o.sel&&o.sel!=='new'&&o.sel!=='skip'?cli(o.sel):null;if(c&&c.repId!==IM.rep&&!o.ok){o.sel='';o.por='';o.warn=1}});
+  IM.rows.forEach(impSim)}
+function impSim(o){o.sim=0;if(!o.sel){const x=D.clientes.find(c=>nc(c.nombre)===nc(o.nombre));if(x){o.sim=1;o.nota=(o.nota?o.nota+' ':'')+'Ya existe un cliente «'+x.nombre+'» con ese nombre: si es el mismo, asígnalo con el desplegable.'}}}
+function impTodosNuevos(){IM.rows.forEach(o=>{if(!o.sel&&!o.sim){o.sel='new';o.por='';o.ok=1}});keepScroll(()=>{impAvisos();impRender()})}
 function impSet(i,v){const o=IM.rows[i];o.sel=v;o.por=v&&v!=='new'&&v!=='skip'?'manual':'';o.ok=1;
   if(v==='new'||(v&&v!=='skip')){/* limpia avisos si decide el usuario */}
   keepScroll(()=>{impAvisos();impRender()})}
 function impImp(i,v){const o=IM.rows[i];if(v.trim()===''){o.imp=null}else{const n=num(v);if(isNaN(n)){toast('Importe no válido.',1);return impRender()}o.imp=n}keepScroll(()=>{impAvisos();impRender()})}
 function impAvisos(){IM.rows.forEach(o=>{if(o.sel&&o.sel!=='skip'&&o.sel!=='new'){const c=cli(o.sel);o.nota=c&&c.repId!==IM.rep?'Cliente de '+repNom(c.repId)+': lo has elegido tú.':'';o.warn=0}
   else if(o.sel==='new'){const d=chkDup({codigo:o.cod,nombreFact:o.nombre},null);o.nota=d;o.warn=d?1:0}else o.nota='';
-  if(o.imp==null&&o.sel!=='skip')o.nota=(o.nota?o.nota+' ':'')+'Sin importe: se omitirá.'})}
+  if(o.imp==null&&o.sel!=='skip')o.nota=(o.nota?o.nota+' ':'')+'Sin importe: se guardará el cliente sin facturación.';impSim(o)})}
 function keepScroll(fn){const mc=document.querySelector('.mc'),t=mc?mc.scrollTop:0;fn();const m2=document.querySelector('.mc');if(m2)m2.scrollTop=t}
 function impPer(k,v){if(k==='modo')IM.modo=v;else IM[k]=+v;keepScroll(impRender)}
 function impSetTodos(){/* no usado */}
 
 function impHash(){
-  const ls=IM.rows.filter(o=>o.imp!=null).map(o=>nz(o.cod)+':'+Math.round(o.imp*100)).sort().join('|');
+  const ls=IM.rows.filter(o=>o.imp!=null).map(o=>(nz(o.cod)||nc(o.nombre))+':'+Math.round(o.imp*100)).sort().join('|');
   const s=IM.rep+'|'+IM.tipo+'|'+IM.modo+'|'+IM.y+'|'+IM.m+'|'+ls;let h=5381;for(let i=0;i<s.length;i++)h=((h<<5)+h+s.charCodeAt(i))|0;return String(h)}
 function impPrevio(o){
   if(!o.sel||o.sel==='new'||o.sel==='skip'||o.imp==null)return null;const c=cli(o.sel);if(!c)return null;
   const k=IM.tipo;
   if(IM.modo==='mes'){const a=rawF(c,IM.y,k);return a[IM.m-1]!=null?a[IM.m-1]:null}
   const r=accRec(c,IM.y,k);return r[IM.m]!=null?r[IM.m]:null}
-function impImpRows(){return IM.rows.filter(o=>o.sel&&o.sel!=='skip'&&o.imp!=null&&!(o.sel==='new'&&chkDup({codigo:o.cod,nombreFact:o.nombre},null)))}
+function impImpRows(){return IM.rows.filter(o=>o.sel&&o.sel!=='skip'&&!(o.sel==='new'&&chkDup({codigo:o.cod,nombreFact:o.nombre},null)))}
 function impRender(){
   const r=rep(IM.rep),M=IM.meta,P=IM.per;
   const conImp=IM.rows.filter(o=>o.imp!=null),suma=Math.round(conImp.reduce((a,o)=>a+o.imp,0)*100)/100;
   const ctrl=M.ctrl!=null?M.ctrl:M.ctrlG;
   const cuadra=ctrl!=null&&Math.abs(ctrl-suma)<0.015;
-  const aplic=impImpRows(),sumaAp=Math.round(aplic.reduce((a,o)=>a+o.imp,0)*100)/100;
+  const aplic=impImpRows(),sumaAp=Math.round(aplic.reduce((a,o)=>a+(o.imp||0),0)*100)/100;
   const sinDec=IM.rows.filter(o=>!o.sel).length,sinImp=IM.rows.filter(o=>o.imp==null&&o.sel!=='skip').length;
   const vOk=(M.vcod&&r.codigoFab&&nc(M.vcod)===nc(r.codigoFab))||(M.vend&&mismoNombre(M.vend,r.nombre));
   const vTxt=(M.vend||M.vcod)?`${esc(M.vend)}${M.vcod?' ('+esc(M.vcod)+')':''}`:'';
   const h=IM.hashV=impHash(),yaMismo=(D.imports||[]).find(x=>x.hash===h);
   const mismoPer=(D.imports||[]).find(x=>x.rep===IM.rep&&x.tipo===IM.tipo&&x.modo===IM.modo&&x.y===IM.y&&x.m===IM.m&&x.hash!==h);
   const perBad=P&&P.modo==='bad';
-  const bloq=perBad||!aplic.length||(vTxt&&!vOk&&!IM.okVend)||(ctrl!=null&&!cuadra&&!IM.okCtrl);
+  const bloq=perBad||(!IM.modo&&aplic.some(o=>o.imp!=null))||!aplic.length||(vTxt&&!vOk&&!IM.okVend)||(ctrl!=null&&!cuadra&&!IM.okCtrl);
   const optsCli=c0=>`<option value="">— Decidir —</option><option value="new" ${c0==='new'?'selected':''}>➕ Crear cliente nuevo</option><option value="skip" ${c0==='skip'?'selected':''}>⛔ No importar</option>`+
      [...D.clientes].sort((a,b)=>a.nombre.localeCompare(b.nombre,'es')).map(c=>`<option value="${c.id}" ${c0===c.id?'selected':''}>${esc(c.nombre)}${c.poblacion?' · '+esc(c.poblacion):''}${c.repId!==IM.rep?' ['+esc(repNom(c.repId))+']':''}</option>`).join('');
   const filas=IM.rows.map(o=>{const pv=impPrevio(o),c=o.sel&&o.sel!=='new'&&o.sel!=='skip'?cli(o.sel):null;
@@ -1202,10 +1231,10 @@ function impRender(){
    <div class="card"><h3>Periodo</h3>
     ${perBad?`<p class="dn"><b>${esc(P.msg)}</b></p><p class="hint">Pide a fábrica el informe de un mes completo o del acumulado desde el 1 de enero.</p>`:`
     ${P&&P.modo===null?`<p class="hint">${esc(P.msg)}</p>`:`<p class="hint" style="margin-top:0">Fechas del informe: ${fd(M.ini)} – ${fd(M.fin)}</p>`}
-    <div class="fg"><label class="f"><span>Tipo de informe</span><select onchange="impPer('modo',this.value)"><option value="mes" ${IM.modo==='mes'?'selected':''}>Un mes completo</option><option value="acum" ${IM.modo==='acum'?'selected':''}>Acumulado desde el 1 de enero</option></select></label>
+    <div class="fg"><label class="f"><span>Tipo de informe</span><select onchange="impPer('modo',this.value)">${IM.modo?'':'<option value="" selected>— Elige —</option>'}<option value="mes" ${IM.modo==='mes'?'selected':''}>Un mes completo</option><option value="acum" ${IM.modo==='acum'?'selected':''}>Acumulado desde el 1 de enero</option></select></label>
     <label class="f"><span>Año</span><select onchange="impPer('y',this.value)">${[YEAR+1,YEAR,YEAR-1,YEAR-2,YEAR-3].map(a=>`<option ${a===IM.y?'selected':''}>${a}</option>`).join('')}</select></label>
     <label class="f"><span>${IM.modo==='mes'?'Mes':'Hasta el mes'}</span><select onchange="impPer('m',this.value)">${MESN.map((n,i)=>`<option value="${i+1}" ${IM.m===i+1?'selected':''}>${n}</option>`).join('')}</select></label></div>
-    <p class="hint">${IM.modo==='mes'?`Se guardará como facturación de <b>${MESN[IM.m-1].toLowerCase()} ${IM.y}</b>, sustituyendo lo que hubiera en ese mes.`:`Se guardará como <b>acumulado ene–${MES[IM.m-1]} ${IM.y}</b>. No se reparte por meses ni se suma a los meses ya cargados.`}</p>`}
+    <p class="hint">${!IM.modo?'<b class="dn">Elige el tipo de periodo (mes completo o acumulado desde el 1 de enero) para poder importar.</b>':IM.modo==='mes'?`Se guardará como facturación de <b>${MESN[IM.m-1].toLowerCase()} ${IM.y}</b>, sustituyendo lo que hubiera en ese mes.`:`Se guardará como <b>acumulado ene–${MES[IM.m-1]} ${IM.y}</b>. No se reparte por meses ni se suma a los meses ya cargados.`}</p>`}
    </div>
    <div class="card"><h3>Comprobaciones</h3>
     <div class="row"><span>Filas leídas</span><b>${IM.rows.length}</b></div>
@@ -1217,14 +1246,16 @@ function impRender(){
     ${mismoPer?`<p class="dn">Ya hay otro informe distinto de este mismo periodo: se sustituirán sus valores.</p>`:''}
     ${IM.ign?`<p class="hint">${IM.ign} línea(s) del texto no se han reconocido como cliente y se han ignorado.</p>`:''}
    </div></div>
-  <div class="card" style="margin-top:12px"><div style="overflow:auto"><table class="tb"><thead><tr><th>Código</th><th>Cliente según el informe</th><th class="r">Importe</th><th>Estado</th><th>Asignar a</th></tr></thead><tbody>${filas}</tbody></table></div>
+  <div class="card" style="margin-top:12px">${IM.rows.some(o=>!o.sel&&!o.sim)?`<div class="acts l" style="margin:0 0 10px"><button class="b1" onclick="impTodosNuevos()">Crear como clientes nuevos las ${IM.rows.filter(o=>!o.sel&&!o.sim).length} filas sin asociar</button></div>`:''}
+   <label class="f" style="max-width:360px;margin:0 0 10px"><span>Provincia para clientes sin provincia (opcional)</span><input value="${esc(IM.provDef||'')}" onchange="IM.provDef=this.value.trim()" placeholder="Madrid"></label>
+  <div style="overflow:auto"><table class="tb"><thead><tr><th>Código</th><th>Cliente según el informe</th><th class="r">Importe</th><th>Estado</th><th>Asignar a</th></tr></thead><tbody>${filas}</tbody></table></div>
    <p class="hint">Las filas «Sin asociar» no se importan hasta que elijas un cliente, crees uno nuevo o las marques como «No importar». Nunca se crea ni asigna nada sin que tú lo decidas.</p></div>
   ${ausentes.length?`<p class="hint">${ausentes.length} cliente(s) de ${esc(r.nombre)} no aparecen en el informe.</p><label style="display:flex;gap:8px;align-items:center;margin-bottom:6px"><input type="checkbox" ${IM.zero?'checked':''} onchange="IM.zero=this.checked;impRender()"> Poner <b>0 €</b> en ese ${IM.modo==='mes'?'mes':'acumulado'} a esos clientes (solo si el informe lista a todos los que compraron)</label>`:''}
   <div class="row"><span>Se importarán</span><b>${aplic.length} clientes · ${eur2(sumaAp)}</b></div>
-  ${sinDec||sinImp?`<p class="dn">${sinDec?sinDec+' fila(s) sin asociar. ':''}${sinImp?sinImp+' fila(s) sin importe. ':''}No se importarán.</p>`:''}
+  ${sinDec?`<p class="dn">${sinDec} fila(s) sin asociar: no se importarán.</p>`:''}${sinImp?`<p class="hint">${sinImp} fila(s) sin importe: se darán de alta sin facturación.</p>`:''}
   <div class="acts"><button class="b2" onclick="IM.fase=1;impFase1()">← Volver</button><button class="b2" onclick="IM=null;closeModal()">Cancelar</button><button class="b1" ${bloq?'disabled style="opacity:.45"':''} onclick="impConfirmar()">Importar</button></div>`)}
 function impConfirmar(){
-  const aplic=impImpRows(),nuevos=aplic.filter(o=>o.sel==='new').length,pisa=aplic.filter(o=>{const p=impPrevio(o);return p!=null&&Math.abs(p-o.imp)>0.004}).length;
+  const aplic=impImpRows(),nuevos=aplic.filter(o=>o.sel==='new').length,pisa=aplic.filter(o=>{const p=impPrevio(o);return p!=null&&o.imp!=null&&Math.abs(p-o.imp)>0.004}).length;
   const k=CATL[IM.tipo],per=IM.modo==='mes'?MESN[IM.m-1].toLowerCase()+' '+IM.y:'acumulado ene–'+MES[IM.m-1]+' '+IM.y;
   ask(`Vas a importar facturación <b>${k}</b> de <b>${esc(repNom(IM.rep))}</b> (${per}): <b>${aplic.length}</b> clientes${nuevos?`, <b>${nuevos}</b> nuevos`:''}${pisa?`, <b>${pisa}</b> valores sustituidos`:''}. Antes se guarda una copia interna para poder deshacerlo.`,'Importar',impAplicar)}
 function impAplicar(){
@@ -1238,7 +1269,7 @@ function impAplicar(){
   aplic.forEach(o=>{let c;
     if(o.sel==='new'){
       if(chkDup({codigo:o.cod,nombreFact:o.nombre},null)){omit++;return}
-      c={id:uid(),codigo:o.cod,nombreFact:o.nombre,nombre:o.nombre,poblacion:o.pob,cp:o.cp||'',provincia:o.prov,direccion:'',telefono:'',contacto:'',email:o.email,repId:IM.rep,semaforo:'amarillo',obs:'',fact:{},comp:{},acumul:{},catalogo:{ok:null,f:''},prodPend:[],expObs:'',exposicion:[],pend:[],visitas:[],pedidos:[],repHist:[{r:IM.rep,d:Date.now()}]};
+      c={id:uid(),codigo:o.cod,nombreFact:o.nombre,nombre:o.nombre,poblacion:o.pob,cp:o.cp||'',provincia:o.prov||IM.provDef||'',direccion:'',telefono:'',contacto:'',email:o.email,repId:IM.rep,semaforo:'amarillo',obs:'',fact:{},comp:{},acumul:{},catalogo:{ok:null,f:''},prodPend:[],expObs:'',exposicion:[],pend:[],visitas:[],pedidos:[],repHist:[{r:IM.rep,d:Date.now()}]};
       D.clientes.push(c);nuevos++}
     else{c=cli(o.sel);if(!c){omit++;return}
       if(!c.codigo&&o.cod&&!chkDup({codigo:o.cod,nombreFact:''},c.id))c.codigo=o.cod;
@@ -1247,17 +1278,75 @@ function impAplicar(){
       if(!c.email&&o.email)c.email=o.email;
       if(!c.poblacion&&o.pob)c.poblacion=o.pob;
       if(!c.cp&&o.cp)c.cp=o.cp;
-      if(!c.provincia&&o.prov)c.provincia=o.prov}
-    poner(c,Math.round(o.imp*100)/100)});
+      if(!c.provincia&&(o.prov||IM.provDef))c.provincia=o.prov||IM.provDef}
+    if(o.imp!=null)poner(c,Math.round(o.imp*100)/100)});
   if(IM.zero)clientsOf(IM.rep).forEach(c=>{if(!tocados.has(c.id)&&!IM.rows.some(o=>o.sel===c.id))poner(c,0)});
   if(!tr.codigoFab&&IM.meta.vcod&&IM.okVend!==false&&tr.nombre&&IM.meta.vend&&nc(IM.meta.vend)===nc(tr.nombre))tr.codigoFab=IM.meta.vcod;
-  D.imports.push({id:uid(),at:Date.now(),rep:IM.rep,tipo:k,modo:modo,y:y,m:m,hash:hash,archivo:IM.archivo,n:aplic.length-omit,total:Math.round(aplic.reduce((a,o)=>a+o.imp,0)*100)/100,nuevos:nuevos});
+  D.imports.push({id:uid(),at:Date.now(),rep:IM.rep,tipo:k,modo:modo,y:y,m:m,hash:hash,archivo:IM.archivo,n:aplic.length-omit,total:Math.round(aplic.reduce((a,o)=>a+(o.imp||0),0)*100)/100,nuevos:nuevos});
   save();IM=null;closeModal();render(true);
   toast('Importado: '+(aplic.length-omit)+' clientes'+(nuevos?' ('+nuevos+' nuevos)':'')+'. Puedes deshacerlo en Copias de seguridad.')}
 function impHist(r){
   const l=(D.imports||[]).filter(x=>x.rep===r.id).slice().reverse();
   if(!l.length)return '';
-  return `<div class="card" style="margin-top:14px"><h3>Informes importados</h3><table class="tb"><thead><tr><th>Fecha</th><th>Tipo</th><th>Periodo</th><th class="r">Clientes</th><th class="r">Total</th><th>Archivo</th></tr></thead><tbody>${l.slice(0,15).map(x=>`<tr><td>${fd(new Date(x.at).toISOString().slice(0,10))}</td><td>${CATL[x.tipo]}</td><td>${x.modo==='mes'?MES[x.m-1]+' '+x.y:'Acumulado ene–'+MES[x.m-1]+' '+x.y}</td><td class="r">${x.n}</td><td class="r">${eur2(x.total)}</td><td>${esc(x.archivo||'')}</td></tr>`).join('')}</tbody></table></div>`}
+  return `<div class="card" style="margin-top:14px"><h3>Informes importados</h3><table class="tb"><thead><tr><th>Fecha</th><th>Tipo</th><th>Periodo</th><th class="r">Clientes</th><th class="r">Total</th><th>Archivo</th></tr></thead><tbody>${l.slice(0,15).map(x=>`<tr><td>${fd(new Date(x.at).toISOString().slice(0,10))}</td><td>${x.modo==='nombres'?'Solo nombres':CATL[x.tipo]}</td><td>${x.modo==='nombres'?'—':x.modo==='mes'?MES[x.m-1]+' '+x.y:'Acumulado ene–'+MES[x.m-1]+' '+x.y}</td><td class="r">${x.n}</td><td class="r">${x.modo==='nombres'?'—':eur2(x.total)}</td><td>${esc(x.archivo||'')}</td></tr>`).join('')}</tbody></table></div>`}
+
+/* ======================= IMPORTAR SOLO NOMBRES DE CLIENTES =======================
+   Pega una lista (uno por línea). Se ignoran números de orden e importes. Solo crea los clientes
+   (nombre comercial + nombre de facturación). Facturación y código VICKFLEX se ponen después a mano o con el importador. */
+let NM=null;
+function nomLimpia(l){
+  l=tx(l);if(!l)return '';
+  if(/^(vendedor|total|hoja|ficha|control|n[º°o]\b|cliente\b|facturaci)/i.test(l))return '';
+  l=l.replace(/^\d{1,3}\s*[.)\-–:]?\s+(?=\D)/,'');
+  l=l.replace(/\s+-?(\d{1,3}(\.\d{3})+|\d+),\d{1,2}\s*€?\s*$/,'').replace(/\s*€\s*$/,'').replace(/\s*[—–]+\s*$/,'');
+  return l.trim()}
+function nomOpen(repId){const r=rep(repId);NM={rep:repId,rows:[],zonas:r.provincias.join(', '),prov:'',txt:''};nomF1()}
+function nomF1(){
+  modalW(`<h2>Importar solo nombres · ${esc(rep(NM.rep).nombre)}</h2>
+  <p class="hint" style="margin:0 0 10px">Pega la lista de clientes, <b>uno por línea</b>. Se ignoran los números de orden y los importes. Solo se crean los clientes: la facturación y el código VICKFLEX los pondrás tú después. Nada se guarda hasta que veas la vista previa y confirmes.</p>
+  <textarea id="nmt" rows="12" style="width:100%;padding:12px;border:1px solid var(--b2);border-radius:10px;font-size:15px;font-family:inherit" placeholder="IRENE GONZÁLEZ JAUME&#10;Muebles Felcar S.L.&#10;…">${esc(NM.txt)}</textarea>
+  <p class="err" id="err">${esc(NM.msg||'')}</p><div class="acts"><button class="b2" onclick="NM=null;closeModal()">Cancelar</button><button class="b1" onclick="nomLeer()">Ver vista previa</button></div>`)}
+function nomLeer(){
+  NM.txt=$('#nmt').value;const ls=NM.txt.split(/\r?\n/).map(nomLimpia).filter(Boolean);NM.msg='';
+  if(!ls.length){NM.msg='No he encontrado ningún nombre.';return nomF1()}
+  NM.rows=ls.map(n=>({n:n,sel:'new',z:''}));nomCheck();nomRender()}
+function nomCheck(){
+  const vistos={};
+  NM.rows.forEach(o=>{o.nota='';o.bad=0;const k=nc(o.n);
+    const ex=D.clientes.find(c=>nc(c.nombre)===k||nc(c.nombreFact)===k)||(D.equiv.find(e=>nc(e.n)===k)&&cli(D.equiv.find(e=>nc(e.n)===k).c));
+    if(!k){o.sel='skip';o.nota='Nombre vacío';o.bad=1}
+    else if(ex){o.sel='skip';o.bad=1;o.nota='Ya existe «'+ex.nombre+'» ('+repNom(ex.repId)+'): no se duplica.'}
+    else if(vistos[k]){o.sel='skip';o.bad=1;o.nota='Repetido en la lista.'}
+    else if(o.sel==='skip'&&o.auto){o.sel='new'}
+    if(k)vistos[k]=1})}
+function nomEdit(i,v){NM.rows[i].n=v.trim();NM.rows[i].sel='new';keepScroll(()=>{nomCheck();nomRender()})}
+function nomSel(i,v){NM.rows[i].sel=v;keepScroll(nomRender)}
+function nomZona(i,v){NM.rows[i].z=v;keepScroll(nomRender)}
+function nomTodos(v){NM.rows.forEach(o=>{if(!o.bad)o.z=v});keepScroll(nomRender)}
+const nomZs=()=>NM.zonas.split(',').map(x=>x.trim()).filter(Boolean);
+function nomRender(){
+  const zs=nomZs(),nNew=NM.rows.filter(o=>o.sel==='new'&&!o.bad).length;
+  const zopt=v=>`<option value="">— sin zona —</option>`+zs.map(z=>`<option ${z===v?'selected':''}>${esc(z)}</option>`).join('');
+  const filas=NM.rows.map((o,i)=>`<tr${o.bad?' style="background:#fff6ea"':''}><td>${i+1}</td>
+   <td><input style="width:100%;min-width:260px;padding:8px;border:1px solid var(--b2);border-radius:8px;font-size:15px" value="${esc(o.n)}" onchange="nomEdit(${i},this.value)">${o.nota?`<small class="dn">${esc(o.nota)}</small>`:''}</td>
+   <td><select style="padding:8px;border:1px solid var(--b2);border-radius:8px;font-size:14px" ${o.bad?'disabled':''} onchange="nomZona(${i},this.value)">${zopt(o.z)}</select></td>
+   <td><select style="padding:8px;border:1px solid var(--b2);border-radius:8px;font-size:14px" ${o.bad?'disabled':''} onchange="nomSel(${i},this.value)"><option value="new" ${o.sel==='new'&&!o.bad?'selected':''}>Crear cliente</option><option value="skip" ${o.sel==='skip'||o.bad?'selected':''}>No crear</option></select></td></tr>`).join('');
+  modalW(`<h2>Vista previa · solo nombres · ${esc(rep(NM.rep).nombre)}</h2>
+  <p class="hint" style="margin:0 0 10px"><b>Todavía no se ha guardado nada.</b> Se crearán <b>${nNew}</b> clientes de ${NM.rows.length} líneas, solo con su nombre.</p>
+  <div class="grid c2"><label class="f"><span>Zonas de este representante (separadas por comas)</span><input value="${esc(NM.zonas)}" onchange="NM.zonas=this.value;keepScroll(nomRender)" placeholder="Madrid provincia, Toledo"></label>
+   <label class="f"><span>Poner la misma zona a todos</span><select onchange="nomTodos(this.value)">${zopt('')}</select></label></div>
+  <div class="card" style="margin-top:10px"><div style="overflow:auto;max-height:52vh"><table class="tb"><thead><tr><th>#</th><th>Nombre del cliente</th><th>Zona</th><th>Qué hacer</th></tr></thead><tbody>${filas}</tbody></table></div></div>
+  <p class="hint">La zona es opcional (después puedes cambiarla en la ficha de cada cliente). Si la zona empieza por una provincia del representante, esa provincia se rellena sola.</p>
+  <div class="acts"><button class="b2" onclick="nomF1()">← Volver</button><button class="b2" onclick="NM=null;closeModal()">Cancelar</button><button class="b1" ${nNew?'':'disabled style="opacity:.45"'} onclick="nomConfirmar()">Crear ${nNew} clientes</button></div>`)}
+function nomConfirmar(){const n=NM.rows.filter(o=>o.sel==='new'&&!o.bad).length;
+  ask(`Vas a crear <b>${n}</b> clientes nuevos para <b>${esc(repNom(NM.rep))}</b>, solo con el nombre. Antes se guarda una copia interna para poder deshacerlo.`,'Crear clientes',nomAplicar)}
+function nomAplicar(){
+  const r=rep(NM.rep);snap('Importar nombres de clientes de '+r.nombre);let n=0;
+  NM.rows.forEach(o=>{if(o.sel!=='new'||o.bad)return;if(D.clientes.some(c=>nc(c.nombre)===nc(o.n)||nc(c.nombreFact)===nc(o.n)))return;
+    const prov=o.z?(r.provincias.find(p=>norm(o.z).indexOf(norm(p))===0)||''):'';
+    D.clientes.push({id:uid(),codigo:'',nombreFact:o.n,nombre:o.n,poblacion:'',cp:'',provincia:prov,zona:o.z||'',direccion:'',telefono:'',contacto:'',email:'',repId:NM.rep,semaforo:'amarillo',obs:'',fact:{},comp:{},acumul:{},catalogo:{ok:null,f:''},prodPend:[],expObs:'',exposicion:[],pend:[],visitas:[],pedidos:[],repHist:[{r:NM.rep,d:Date.now()}]});n++});
+  D.imports.push({id:uid(),at:Date.now(),rep:NM.rep,tipo:'principal',modo:'nombres',y:YEAR,m:0,hash:'n'+Date.now(),archivo:'solo nombres',n:n,total:0,nuevos:n});
+  save();const id=NM.rep;NM=null;closeModal();go('rep/'+id);render(true);toast('Creados '+n+' clientes. Puedes deshacerlo en Copias de seguridad.')}
 
 render();
 </script>
