@@ -305,7 +305,7 @@ function perCalc(cs,y,k,ms){
 function setQY(y){QY=+y;render(true)}
 function setQC(k){QC=k;render(true)}
 function qYears(cs){const ys=[...new Set(cs.flatMap(c=>Object.keys(c.fact||{}).concat(Object.keys(c.comp||{}))).map(Number).concat([YEAR]))].filter(y=>y>2000&&y<=YEAR).sort((a,b)=>b-a);if(ys.indexOf(QY)<0)QY=YEAR;return ys}
-function qCard(cs){
+function qCard(cs,mail){
   const ys=qYears(cs);
   const ks=QC==='todas'?['principal','comp','total']:[QC],multi=ks.length>1;
   const G=[0,1,2,3].map(q=>({n:QNAME[q],sub:QMES[q],ms:[q*3,q*3+1,q*3+2]})).concat([{n:'Total anual',sub:'ene–dic',ms:[0,1,2,3,4,5,6,7,8,9,10,11],tot:1}]);
@@ -317,13 +317,13 @@ function qCard(cs){
   const sel=`<select class="sel" onchange="setQY(this.value)" title="Ejercicio">${ys.map(y=>`<option ${y===QY?'selected':''}>${y}</option>`).join('')}</select>`;
   const seg=`<div class="seg">${[['todas','Las tres'],['total','Total'],['principal','Principal'],['comp','Complementos']].map(x=>`<button class="${QC===x[0]?'on':''}" onclick="setQC('${x[0]}')">${x[1]}</button>`).join('')}</div>`;
   const notas=[...new Set(G.slice(0,4).flatMap(g=>ks.map(k=>perCalc(cs,QY,k,g.ms)).filter(o=>!o.ok&&o.ha&&o.why).map(o=>g.n+': '+o.why)))];
-  return `<div class="card qt" style="margin-top:16px"><div class="hb" style="margin-bottom:8px"><h3 style="margin:0">Facturación trimestral · ${QY} frente a ${QY-1}</h3><div class="acts">${seg}${sel}</div></div>
+  return `<div class="card qt" style="margin-top:16px"><div class="hb" style="margin-bottom:8px"><h3 style="margin:0">Facturación trimestral · ${QY} frente a ${QY-1}</h3><div class="acts">${mail?`<button class="b2" onclick="${mail}">✉ Enviar por correo</button>`:''}${seg}${sel}</div></div>
    <table class="tb"><thead><tr><th>Trimestre</th>${multi?'<th>Tipo</th>':''}<th class="r">${QY-1}</th><th class="r">${QY}</th><th class="r">Dif. €</th><th class="r">Dif. %</th></tr></thead><tbody>${body}</tbody></table>
    ${notas.length?`<p class="hint dn">Datos incompletos o sin comparar: ${esc(notas.join(' · '))}.</p>`:''}
    <p class="hint">Principal + complementos = total. Los trimestres se calculan solos sumando los meses cargados. «—» y «Faltan datos» significan que falta información: no es lo mismo que 0 €. En un trimestre en curso se comparan solo los meses disponibles con esos mismos meses del año anterior. Los acumulados importados sin desglose mensual no se reparten por trimestres.</p></div>`}
 
 /* Tabla mensual (12 meses) + gráfico del representante. Misma regla: mes sin dato = «—», nunca 0 €. */
-function mCard(cs){
+function mCard(cs,mail){
   const ys=qYears(cs),y=QY,cal=new Date().getMonth();let sinC=[];
   const rows=MES.map((n,i)=>{const P=monV(cs,y,i,'principal'),C=monV(cs,y,i,'comp'),T=monV(cs,y,i,'total'),pv=monV(cs,y-1,i,'total'),o=perCalc(cs,y,'total',[i]),en=y===YEAR&&i===cal;
     if(T!=null&&!o.ok)sinC.push(n);
@@ -334,7 +334,7 @@ function mCard(cs){
   const tot=`<tr class="tot g1"><td>${lab}${oT.mc.length?'<span class="qs dn">⚠ datos incompletos</span>':''}</td><td class="r">${oP.ha?eur(oP.s):mut}</td><td class="r">${oC.ha?eur(oC.s):mut}</td><td class="r">${oT.ha?eur(oT.s):mut}</td><td class="r">${oT.hp?eur(oT.p):mut}</td>
     <td class="r ${oT.ok?(oT.d>=0?'up':'dn'):''}">${oT.ok?sg(oT.d):mut}</td><td class="r">${cmpHTML({a:oT.s,p:oT.p,ok:oT.ok,why:oT.why})}</td></tr>`;
   const sel=`<select class="sel" onchange="setQY(this.value)" title="Ejercicio">${ys.map(a=>`<option ${a===y?'selected':''}>${a}</option>`).join('')}</select>`;
-  return `<div class="card qt" style="margin-top:16px"><div class="hb" style="margin-bottom:8px"><h3 style="margin:0">Facturación mensual · ${y} frente a ${y-1}</h3><div class="acts">${sel}</div></div>
+  return `<div class="card qt" style="margin-top:16px"><div class="hb" style="margin-bottom:8px"><h3 style="margin:0">Facturación mensual · ${y} frente a ${y-1}</h3><div class="acts">${mail?`<button class="b2" onclick="${mail}">✉ Enviar por correo</button>`:''}${sel}</div></div>
    <table class="tb"><thead><tr><th>Mes</th><th class="r">Principal ${y}</th><th class="r">Complementos ${y}</th><th class="r">Total ${y}</th><th class="r">Total ${y-1}</th><th class="r">Dif. €</th><th class="r">Dif. %</th></tr></thead><tbody>${rows}${tot}</tbody></table>
    ${sinC.length?`<p class="hint dn">Meses sin comparar por falta de datos: ${esc(sinC.join(', '))}.</p>`:''}
    <p class="hint">Total = principal + complementos. «—» = sin dato (no es 0 €). Solo se comparan meses con dato en ambos años; el acumulado compara los mismos meses de los dos años.</p></div>`}
@@ -343,6 +343,148 @@ function repChart(cs){
   const stk=VC==='total'&&cs.some(c=>has(c,YEAR,12,'comp'))?{p:th(t(YEAR,'principal')),c:th(t(YEAR,'comp'))}:null;
   return `<div class="card" style="margin-top:16px"><h3>Facturación mensual ${CAT[VC].toLowerCase()} (miles de €)</h3>${barsHTML(th(t(YEAR-1,VC)),th(t(YEAR,VC)).map((v,i)=>i<m?v:null),stk)}</div>`}
 function filtrarCli(v){const q=norm(v.trim());document.querySelectorAll('#view tr[data-s]').forEach(tr=>{tr.style.display=q&&tr.dataset.s.indexOf(q)<0?'none':''})}
+
+/* ===================== INFORMES PDF Y ENVÍO POR CORREO =====================
+   El PDF se crea aquí mismo, en el iPad: sin internet, sin servidores, sin subir nada a GitHub y sin enlaces públicos.
+   Cada informe solo usa los clientes de ESE representante (o ese único cliente).
+   Las cifras salen de las mismas funciones que las tablas de pantalla (perCalc, monV, acum, has): no se recalcula nada aparte.
+   Las ventas del coche expositor NO entran en estos informes. Nada se envía solo: el envío lo confirmas tú en Mail. */
+const PDFHW=[[278,278,355,556,556,889,667,191,333,333,389,584,278,333,278,278,556,556,556,556,556,556,556,556,556,556,278,278,584,584,584,556,1015,667,667,722,722,667,611,778,722,278,500,667,556,833,722,778,667,778,722,667,611,722,667,944,667,667,611,278,278,278,469,556,333,556,556,500,556,556,278,556,556,222,222,500,222,833,556,556,556,556,333,500,278,556,500,722,500,500,500,334,260,334,584,761,556,556,222,556,333,1000,556,556,333,1000,667,333,1000,556,611,556,556,222,222,333,333,350,556,1000,333,1000,500,333,944,556,500,667,278,333,556,556,556,556,260,556,333,737,370,556,584,333,737,333,400,584,333,333,333,556,537,278,333,333,365,556,834,834,834,611,667,667,667,667,667,667,1000,722,667,667,667,667,278,278,278,278,722,722,778,778,778,778,778,584,778,722,722,722,722,667,667,611,556,556,556,556,556,556,889,500,556,556,556,556,278,278,278,278,556,556,556,556,556,556,556,584,611,556,556,556,556,500,556,500],[278,333,474,556,556,889,722,238,333,333,389,584,278,333,278,278,556,556,556,556,556,556,556,556,556,556,333,333,584,584,584,611,975,722,722,722,722,667,611,778,722,278,556,722,611,833,722,778,667,778,722,667,611,722,667,944,667,667,611,333,278,333,584,556,333,556,611,556,611,556,333,611,611,278,278,556,278,889,611,611,611,611,389,556,333,611,556,778,556,556,500,389,280,389,584,761,556,556,278,556,500,1000,556,556,333,1000,667,333,1000,556,611,556,556,278,278,500,500,350,556,1000,333,1000,556,333,944,556,500,667,278,333,556,556,556,556,280,556,333,737,370,556,584,333,737,333,400,584,333,333,333,611,556,278,333,333,365,556,834,834,834,611,722,722,722,722,722,722,1000,722,667,667,667,667,278,278,278,278,722,722,778,778,778,778,778,584,778,722,722,722,722,667,667,611,556,556,556,556,556,556,889,556,556,556,556,556,278,278,278,278,611,611,611,611,611,611,611,584,611,611,611,611,611,556,611,556]];
+const MESL=['enero','febrero','marzo','abril','mayo','junio','julio','agosto','septiembre','octubre','noviembre','diciembre'];
+const W1252={'€':128,'‚':130,'„':132,'…':133,'‰':137,'‘':145,'’':146,'“':147,'”':148,'•':149,'–':150,'—':151,'™':153,'−':45};
+function pdfCode(ch){if(W1252[ch])return W1252[ch];const c=ch.charCodeAt(0);if((c>=32&&c<=126)||(c>=160&&c<=255))return c;return 63}
+function pdfW(t,b,sz){let w=0;for(const ch of String(t))w+=PDFHW[b?1:0][pdfCode(ch)-32]||556;return w*sz/1000}
+function pdfStr(t){let o='';for(const ch of String(t)){const c=String.fromCharCode(pdfCode(ch));o+=(c==='('||c===')'||c==='\\')?'\\'+c:c}return '('+o+')'}
+function pdfFit(t,b,sz,w){t=String(t);if(pdfW(t,b,sz)<=w)return t;while(t.length>1&&pdfW(t+'…',b,sz)>w)t=t.slice(0,-1);return t+'…'}
+const PDFH=841.89,PDFW=595.28,n2=v=>(Math.round(v*100)/100).toFixed(2);
+const hexC=h=>{const x=parseInt(h.slice(1),16);return [(x>>16&255)/255,(x>>8&255)/255,(x&255)/255].map(n2).join(' ')};
+function PDFDoc(){this.pages=[];this.img=null;this.page()}
+PDFDoc.prototype.page=function(){this.c=[];this.pages.push(this.c)};
+PDFDoc.prototype.rect=function(x,y,w,h,col){this.c.push(hexC(col)+' rg '+n2(x)+' '+n2(PDFH-y-h)+' '+n2(w)+' '+n2(h)+' re f')};
+PDFDoc.prototype.line=function(x1,y1,x2,y2,col,lw){this.c.push(hexC(col)+' RG '+n2(lw||.6)+' w '+n2(x1)+' '+n2(PDFH-y1)+' m '+n2(x2)+' '+n2(PDFH-y2)+' l S')};
+PDFDoc.prototype.text=function(x,y,t,o){o=o||{};const sz=o.sz||10,b=!!o.b,w=pdfW(t,b,sz);if(o.al==='r')x-=w;else if(o.al==='c')x-=w/2;
+  this.c.push('BT '+hexC(o.col||'#2b2b2b')+' rg /'+(b?'F2':'F1')+' '+sz+' Tf '+n2(x)+' '+n2(PDFH-y)+' Td '+pdfStr(t)+' Tj ET')};
+PDFDoc.prototype.image=function(x,y,w,h){if(this.img)this.c.push('q '+n2(w)+' 0 0 '+n2(h)+' '+n2(x)+' '+n2(PDFH-y-h)+' cm /Im1 Do Q')};
+PDFDoc.prototype.blob=function(){
+  const enc=s=>{const u=new Uint8Array(s.length);for(let i=0;i<s.length;i++)u[i]=s.charCodeAt(i)&255;return u};
+  const parts=[],offs=[];let len=0;const push=u=>{parts.push(u);len+=u.length};
+  const np=this.pages.length,I=this.img;let id=1;const cat=id++,pgs=id++,f1=id++,f2=id++,im=I?id++:0,pids=[],cids=[];
+  for(let i=0;i<np;i++){pids.push(id++);cids.push(id++)}
+  const O={};O[cat]=['<< /Type /Catalog /Pages '+pgs+' 0 R >>'];
+  O[pgs]=['<< /Type /Pages /Kids ['+pids.map(p=>p+' 0 R').join(' ')+'] /Count '+np+' >>'];
+  O[f1]=['<< /Type /Font /Subtype /Type1 /BaseFont /Helvetica /Encoding /WinAnsiEncoding >>'];
+  O[f2]=['<< /Type /Font /Subtype /Type1 /BaseFont /Helvetica-Bold /Encoding /WinAnsiEncoding >>'];
+  if(I)O[im]=['<< /Type /XObject /Subtype /Image /Width '+I.w+' /Height '+I.h+' /ColorSpace /DeviceRGB /BitsPerComponent 8 /Filter /DCTDecode /Length '+I.b.length+' >>\nstream\n',I.b,'\nendstream'];
+  this.pages.forEach((pc,i)=>{const s=pc.join('\n');
+    O[pids[i]]=['<< /Type /Page /Parent '+pgs+' 0 R /MediaBox [0 0 '+PDFW+' '+PDFH+'] /Resources << /Font << /F1 '+f1+' 0 R /F2 '+f2+' 0 R >>'+(I?' /XObject << /Im1 '+im+' 0 R >>':'')+' >> /Contents '+cids[i]+' 0 R >>'];
+    O[cids[i]]=['<< /Length '+s.length+' >>\nstream\n'+s+'\nendstream']});
+  push(enc('%PDF-1.4\n%\xE2\xE3\xCF\xD3\n'));
+  for(let k=1;k<id;k++){offs[k]=len;push(enc(k+' 0 obj\n'));O[k].forEach(p=>push(typeof p==='string'?enc(p):p));push(enc('\nendobj\n'))}
+  let x='xref\n0 '+id+'\n0000000000 65535 f \n';for(let k=1;k<id;k++)x+=String(offs[k]).padStart(10,'0')+' 00000 n \n';
+  push(enc(x+'trailer\n<< /Size '+id+' /Root '+cat+' 0 R >>\nstartxref\n'+len+'\n%%EOF\n'));
+  return new Blob(parts,{type:'application/pdf'})};
+function logoJPG(){try{const im=document.querySelector('img.logo');if(!im||!im.complete||!im.naturalWidth)return null;
+  const s=Math.min(1,700/im.naturalWidth),w=Math.round(im.naturalWidth*s),h=Math.round(im.naturalHeight*s),cv=document.createElement('canvas');cv.width=w;cv.height=h;
+  const x=cv.getContext('2d');x.fillStyle='#fff';x.fillRect(0,0,w,h);x.drawImage(im,0,0,w,h);
+  const d=atob(cv.toDataURL('image/jpeg',.92).split(',')[1]),u=new Uint8Array(d.length);for(let i=0;i<d.length;i++)u[i]=d.charCodeAt(i);return {w:w,h:h,b:u}}catch(e){return null}}
+
+/* --- Maquetación del informe (A4, fondo blanco, detalles en beige y verde) --- */
+const PDFV='#2f6b4f',PDFB='#f4efe6',PDFB2='#e9e0d0',PDFG='#7a7468',PDFL='#eef4ef';
+function infPDF(R){const d=new PDFDoc();d.img=logoJPG();const M=42,W=PDFW-2*M;let y=0;
+  const head=()=>{if(d.img){const h=44,w=Math.min(190,d.img.w*h/d.img.h);d.image(M,30,w,w*d.img.h/d.img.w)}else d.text(M,58,'VICKFLEX Descanso',{sz:16,b:1,col:PDFV});
+    d.text(PDFW-M,50,'VICKFLEX Descanso',{sz:13,b:1,col:PDFV,al:'r'});d.text(PDFW-M,64,'Informe de facturación',{sz:9,col:PDFG,al:'r'});
+    d.rect(M,86,W,2.2,PDFB2);d.rect(M,86,64,2.2,PDFV);y=108};
+  const need=h=>{if(y+h>788){d.page();head()}};
+  head();
+  d.text(M,y+14,R.titulo,{sz:19,b:1,col:PDFV});y+=30;
+  R.info.forEach(([k,v])=>{d.text(M,y+10,k,{sz:9.5,col:PDFG});d.text(M+92,y+10,pdfFit(v,1,10,W-92),{sz:10,b:1});y+=15});y+=10;
+  if(R.kpi){const n=R.kpi.length,g=10,bw=(W-g*(n-1))/n;R.kpi.forEach((k,i)=>{const x=M+i*(bw+g),hl=k.hl;d.rect(x,y,bw,56,hl?PDFL:PDFB);if(hl)d.rect(x,y,3,56,PDFV);
+      d.text(x+12,y+17,pdfFit(k.l.toUpperCase(),1,7.5,bw-20),{sz:7.5,b:1,col:PDFG});d.text(x+12,y+38,pdfFit(k.v,1,15,bw-20),{sz:15,b:1,col:hl?PDFV:'#2b2b2b'});
+      if(k.s)d.text(x+12,y+50,pdfFit(k.s,0,7.5,bw-20),{sz:7.5,col:PDFG})});y+=72}
+  R.tablas.forEach(T=>{need(70);d.text(M,y+11,T.titulo,{sz:11,b:1,col:PDFV});y+=20;
+    const tw=T.cols.reduce((a,c)=>a+c.w,0),sc=W/tw,cols=T.cols.map(c=>Object.assign({},c,{w:c.w*sc}));
+    const thead=()=>{d.rect(M,y,W,20,PDFB);let x=M;cols.forEach(c=>{const tx=c.al==='r'?x+c.w-6:x+6;d.text(tx,y+13.5,pdfFit(c.t,1,8,c.w-10),{sz:8,b:1,col:PDFV,al:c.al});x+=c.w});y+=20};
+    thead();
+    const row=(r,tot)=>{const h=tot?22:19;if(y+h>788){d.page();head();thead()}if(tot)d.rect(M,y,W,h,PDFL);let x=M;
+      cols.forEach((c,i)=>{const v=r[i]==null?'—':String(r[i]),tx=c.al==='r'?x+c.w-6:x+6,mute=v==='—'||v==='Faltan datos';
+        d.text(tx,y+(tot?14.5:13),pdfFit(v,tot||c.b,9,c.w-10),{sz:9,b:tot||c.b,al:c.al,col:mute?PDFG:(tot?PDFV:'#2b2b2b')});x+=c.w});
+      if(!tot)d.line(M,y+h,M+W,y+h,'#ece5d8',.5);y+=h};
+    T.rows.forEach(r=>row(r));if(T.tot)row(T.tot,1);y+=16});
+  if(R.notas&&R.notas.length){R.notas.forEach(t=>{const L=[];let cur='';t.split(' ').forEach(w=>{if(cur&&pdfW(cur+' '+w,0,8.5)>W){L.push(cur);cur=w}else cur=cur?cur+' '+w:w});L.push(cur);
+      L.forEach(l=>{need(12);d.text(M,y+9,l,{sz:8.5,col:PDFG});y+=12});y+=3})}
+  const N=d.pages.length;d.pages.forEach((pc,i)=>{d.c=pc;d.line(M,806,PDFW-M,806,PDFB2,.6);d.text(M,820,'Documento confidencial · Información comercial de VICKFLEX Descanso · Emitido el '+fd(hoy()),{sz:7.5,col:PDFG});d.text(PDFW-M,820,'Página '+(i+1)+' de '+N,{sz:7.5,col:PDFG,al:'r'})});
+  return {blob:d.blob(),pages:N}}
+
+/* --- Datos de cada informe (mismas funciones que la pantalla) --- */
+const pdfE=v=>v==null?'—':eur(v),pdfS=v=>(v>0?'+':'')+eur(v);
+function pdfPct(o){if(!o.ok)return 'Faltan datos';if(o.p===0&&o.s>0)return 'Nuevo';if(o.p===0)return '—';const v=(o.s-o.p)/o.p*100;return (v>=0?'+':'-')+Math.abs(v).toFixed(1).replace('.',',')+' %'}
+let INF=null;
+const infCS=()=>INF.cli?[cli(INF.cli)].filter(Boolean):clientsOf(INF.rep);
+const infIsMes=()=>INF.t==='mes'||(INF.t==='cli'&&INF.pk==='mes');
+const infMs=()=>infIsMes()?[INF.m]:[INF.q*3,INF.q*3+1,INF.q*3+2];
+function infPer(){const I=INF,y=I.y;if(infIsMes())return cap(MESL[I.m])+' '+y;
+  if(I.t==='tri'||I.pk==='tri')return QNAME[I.q]+' '+y+' ('+MESL[I.q*3]+'–'+MESL[I.q*3+2]+')';
+  const m=y===YEAR?corte():12;return 'Año '+y+(m<12?' (enero–'+MESL[m-1]+')':'')}
+const INFT={mes:'Facturación mensual',tri:'Facturación trimestral',cli:'Facturación de clientes'};
+function infWho(){const r=rep(INF.rep),c=INF.cli?cli(INF.cli):null;return c?c.nombre+(r?' ('+r.nombre+')':''):(r?r.nombre:'')}
+function infSubj(){return INF.subjEdited?INF.subj:'Informe '+INFT[INF.t].toLowerCase()+' · '+infWho()+' · '+infPer()}
+function infBody(){const r=rep(INF.rep);return 'Hola'+(r&&!INF.cli?' '+r.nombre.split(' ')[0]:'')+',\n\nTe adjunto el informe de '+INFT[INF.t].toLowerCase()+' de '+infWho()+' correspondiente a '+infPer()+'.\n\nUn saludo.'}
+function infBuild(){const I=INF,cs=infCS(),r=rep(I.rep),c=I.cli?cli(I.cli):null,y=I.y,ms=infMs(),per=infPer(),notas=[];
+  const info=[['Representante',r?r.nombre:'Sin representante']];if(c)info.push(['Cliente',c.nombre+(c.codigo?' · Código '+c.codigo:'')+(c.poblacion?' · '+c.poblacion:'')]);info.push(['Período',per]);
+  const cmpRow=(k,lab)=>{const o=perCalc(cs,y,k,ms);if(!o.ok&&o.why&&(o.ha||o.hp))notas.push(lab+': '+o.why+'.');return {o:o,row:[lab,o.ha?eur(o.s):null,o.hp?eur(o.p):null,o.ok?pdfS(o.d):null,pdfPct(o)]}};
+  if(I.t==='mes'||I.t==='tri'){const pl=I.t==='mes'?cap(MESL[I.m]):QNAME[I.q];
+    const ks=['principal','comp'].filter(k=>{const o=perCalc(cs,y,k,ms);return o.ha||o.hp}),R=ks.map(k=>cmpRow(k,CAT[k])),T=cmpRow('total','Total');
+    const rows=R.map(x=>x.row),o=T.o;
+    const tablas=[{titulo:'Comparativa con '+(I.t==='mes'?'el mismo mes':'el mismo trimestre')+' de '+(y-1),cols:[{t:'Tipo',w:150,b:1},{t:pl+' '+y,w:100,al:'r'},{t:pl+' '+(y-1),w:100,al:'r'},{t:'Diferencia €',w:100,al:'r'},{t:'Diferencia %',w:90,al:'r'}],rows:rows,tot:T.row}];
+    if(I.t==='tri'){const mr=ms.map(i=>{const P=monV(cs,y,i,'principal'),C=monV(cs,y,i,'comp'),Tt=monV(cs,y,i,'total'),pv=monV(cs,y-1,i,'total'),oo=perCalc(cs,y,'total',[i]);
+        return [cap(MESL[i]),pdfE(P),pdfE(C),pdfE(Tt),pdfE(pv),Tt!=null&&oo.ok?pdfS(oo.d):null,Tt!=null?pdfPct(oo):null]});
+      const oP=perCalc(cs,y,'principal',ms),oC=perCalc(cs,y,'comp',ms);
+      tablas.push({titulo:'Desglose mensual del '+QNAME[I.q]+' '+y,cols:[{t:'Mes',w:90,b:1},{t:'Principal '+y,w:85,al:'r'},{t:'Complem. '+y,w:85,al:'r'},{t:'Total '+y,w:85,al:'r'},{t:'Total '+(y-1),w:85,al:'r'},{t:'Dif. €',w:75,al:'r'},{t:'Dif. %',w:70,al:'r'}],rows:mr,
+        tot:['Total '+QNAME[I.q],oP.ha?eur(oP.s):null,oC.ha?eur(oC.s):null,o.ha?eur(o.s):null,o.hp?eur(o.p):null,o.ok?pdfS(o.d):null,pdfPct(o)]})}
+    if(o.enCurso&&o.span.length)notas.push('Período en curso: solo se comparan los meses con datos ('+o.span.map(i=>MESL[i]).join(', ')+') con esos mismos meses de '+(y-1)+'.');
+    notas.push('Total = facturación principal + complementos. «—» significa que no hay dato (no es 0 €). Las ventas del coche expositor no se incluyen.');
+    return {titulo:INFT[I.t]+' · '+per,info:info,kpi:[{l:'Total '+pl+' '+y,v:o.ha?eur(o.s):'Sin datos',hl:1},{l:'Mismo período '+(y-1),v:o.hp?eur(o.p):'Sin datos'},{l:'Diferencia',v:o.ok?pdfS(o.d):'—',s:pdfPct(o)}],tablas:tablas,notas:notas}}
+  /* Facturación de clientes del representante: mes, trimestre o año. Ordenados de mayor a menor. */
+  let L;if(I.pk==='anio'){const m=y===YEAR?corte():12;L=cs.map(c=>{const g=k=>has(c,y,m,k)?acum(c,y,m,k):null;return {c:c,P:g('principal'),C:g('comp'),T:g('total')}})}
+  else L=cs.map(c=>{const g=k=>{let s=null;ms.forEach(i=>{const v=fy(c,y,k)[i];if(v!=null)s=(s||0)+v});return s};return {c:c,P:g('principal'),C:g('comp'),T:g('total')}});
+  L.sort((a,b)=>(b.T==null?-1:b.T)-(a.T==null?-1:a.T)||a.c.nombre.localeCompare(b.c.nombre,'es'));
+  const sum=k=>{const v=L.filter(x=>x[k]!=null);return v.length?v.reduce((t,x)=>t+x[k],0):null},ST=sum('T');
+  notas.push('Clientes asignados actualmente a '+(r?r.nombre:'este representante')+', ordenados de mayor a menor facturación total. Total = principal + complementos. «—» significa que no hay dato (no es 0 €). Las ventas del coche expositor no se incluyen.');
+  if(I.pk==='anio'&&y===YEAR)notas.push('Año en curso: importes acumulados de enero a '+MESL[corte()-1]+' (incluye acumulados importados de informes «ventas entre fechas»).');
+  return {titulo:'Facturación de clientes · '+per,info:info.concat([['Clientes',String(cs.length)]]),
+    kpi:[{l:'Facturación total del período',v:ST==null?'Sin datos':eur(ST),hl:1},{l:'Clientes con facturación',v:String(L.filter(x=>x.T>0).length)+' de '+cs.length},{l:'Principal / complementos',v:pdfE(sum('P'))+' / '+pdfE(sum('C'))}],
+    tablas:[{titulo:'Facturación por cliente',cols:[{t:'#',w:28,al:'r'},{t:'Cliente',w:190,b:1},{t:'Código',w:62},{t:'Principal',w:80,al:'r'},{t:'Complem.',w:80,al:'r'},{t:'Total',w:85,al:'r'}],
+      rows:L.map((x,i)=>[String(i+1),x.c.nombre,x.c.codigo||'—',pdfE(x.P),pdfE(x.C),x.T==null?null:eur(x.T)]),tot:['','Total ('+cs.length+' clientes)','',pdfE(sum('P')),pdfE(sum('C')),pdfE(ST)]}],notas:notas}}
+
+/* --- Ventana «Enviar por correo» --- */
+function infMail(t,rid,cid){const c=cid?cli(cid):null;rid=c?c.repId:rid;const r=rep(rid);if(!r&&!c)return;
+  INF={t:t,rep:rid,cli:cid||'',y:QY,m:0,q:0,pk:'mes',to:(r&&r.email)||'',subj:'',subjEdited:false,file:null};
+  const lm=lastM(infCS(),QY,'total')||(QY===YEAR?Math.max(1,new Date().getMonth()):12);INF.m=lm-1;INF.q=Math.floor((lm-1)/3);infModal()}
+function infSet(k,v){INF[k]=k==='pk'?v:+v;INF.file=null;infModal()}
+function infModal(){const I=INF,r=rep(I.rep),c=I.cli?cli(I.cli):null,cs=infCS();
+  const ys=[...new Set(cs.flatMap(x=>Object.keys(x.fact||{}).concat(Object.keys(x.comp||{}),Object.keys((x.acumul&&x.acumul.principal)||{}),Object.keys((x.acumul&&x.acumul.comp)||{}))).map(Number).concat([YEAR,YEAR-1,I.y]))].filter(y=>y>2000&&y<=YEAR+1).sort((a,b)=>b-a);
+  const sel=(k,o,l)=>`<label class="f"><span>${l}</span><select onchange="infSet('${k}',this.value)">${o.map(x=>`<option value="${x[0]}" ${String(x[0])===String(I[k])?'selected':''}>${esc(x[1])}</option>`).join('')}</select></label>`;
+  const sY=sel('y',ys.map(y=>[y,y]),'Año'),sM=sel('m',MESL.map((n,i)=>[i,cap(n)]),'Mes'),sQ=sel('q',QNAME.map((n,i)=>[i,n+' ('+QMES[i]+')']),'Trimestre');
+  let s;if(I.t==='mes')s=sY+sM;else if(I.t==='tri')s=sY+sQ;else s=sel('pk',[['mes','Mes'],['tri','Trimestre'],['anio','Año completo']],'Período')+sY+(I.pk==='mes'?sM:I.pk==='tri'?sQ:'');
+  modal(`<h2>✉ Enviar por correo · ${INFT[I.t]}</h2><p class="sub" style="margin-bottom:4px">${c?'Solo el cliente <b>'+esc(c.nombre)+'</b> · ':''}Representante: <b>${esc(r?r.nombre:'sin asignar')}</b></p>
+  <div class="fg">${s}<label class="f w"><span>Para (puedes cambiarlo)</span><input id="ito" type="email" autocomplete="off" value="${esc(I.to)}" placeholder="correo@ejemplo.com" oninput="INF.to=this.value.trim()"></label>
+  <label class="f w"><span>Asunto</span><input id="isu" value="${esc(infSubj())}" oninput="INF.subj=this.value;INF.subjEdited=true"></label></div>
+  ${r&&!r.email?'<p class="hint" style="margin-top:0">Este representante no tiene correo en su ficha. Escríbelo aquí o añádelo en «Editar» del representante.</p>':''}
+  <div id="infout">${I.file?infReady():''}</div>
+  <div class="acts"><button class="b2" onclick="closeModal()">Cerrar</button>${I.file?'':'<button class="b1" onclick="infPrep()">Preparar informe PDF</button>'}</div>`)}
+const slug=t=>norm(t).replace(/[^a-z0-9]+/g,'-').replace(/^-+|-+$/g,'');
+function infPrep(){try{const o=infPDF(infBuild()),name='VICKFLEX_'+slug(INFT[INF.t]).replace(/-/g,'_')+'_'+slug(infWho())+'_'+slug(infPer())+'.pdf';
+  INF.file=new File([o.blob],name,{type:'application/pdf'});INF.pages=o.pages;infModal()}catch(e){toast('No se ha podido preparar el PDF.',1)}}
+function infReady(){const I=INF;let sh=false;try{sh=!!(navigator.canShare&&navigator.canShare({files:[I.file]}))}catch(e){}
+  return `<div class="card" style="background:var(--v2);margin:4px 0 10px;padding:14px"><b>✔ Informe PDF preparado</b> · ${esc(I.file.name)} · ${I.pages} ${I.pages===1?'página':'páginas'}<br><span class="mut">Todavía no se ha enviado nada.</span>
+   <div class="acts l" style="flex-wrap:wrap;margin-top:12px;justify-content:flex-start">${sh?'<button class="b1" onclick="infShare()">📤 Compartir PDF · elegir Mail</button>':''}<button class="b2" onclick="infMailto()">✉ Abrir Mail con destinatario y asunto</button><button class="b2" onclick="infDown()">⬇ Descargar PDF</button></div>
+   <div class="acts l" style="flex-wrap:wrap;margin-top:8px;justify-content:flex-start"><button class="b2 sm" onclick="infCopy(INF.to,'Destinatario')">Copiar destinatario</button><button class="b2 sm" onclick="infCopy(infSubj(),'Asunto')">Copiar asunto</button></div>
+   <p class="hint" style="margin-bottom:0">${sh?'<b>Compartir</b>: elige Mail y el PDF irá adjunto. Revisa el destinatario (si no aparece, pégalo con «Copiar destinatario») y el asunto. ':''}<b>Abrir Mail</b>: rellena destinatario y asunto, pero el PDF hay que adjuntarlo con el clip (descárgalo antes; queda en Archivos › Descargas). Nada se envía hasta que tú pulses Enviar en Mail.</p></div>`}
+function infShare(){const I=INF;if(!I||!I.file)return;
+  navigator.share({files:[I.file],title:infSubj(),text:infBody()}).then(()=>toast('Compartido. Si lo has abierto en Mail, el envío lo confirmas tú allí.')).catch(e=>{if(e&&e.name==='AbortError')toast('Cancelado. No se ha enviado nada.');else toast('No se ha podido abrir Compartir. Usa «Descargar PDF».',1)})}
+function infMailto(){const I=INF;location.href='mailto:'+encodeURIComponent(I.to||'')+'?subject='+encodeURIComponent(infSubj())+'&body='+encodeURIComponent(infBody()+'\n\n(Adjunta el PDF: '+I.file.name+')');toast('Se ha abierto Mail. Adjunta el PDF, revisa y pulsa Enviar allí.')}
+function infDown(){const I=INF,a=document.createElement('a'),u=URL.createObjectURL(I.file);a.href=u;a.download=I.file.name;document.body.appendChild(a);a.click();a.remove();setTimeout(()=>URL.revokeObjectURL(u),60000);toast('PDF descargado. Lo tienes en Archivos › Descargas.')}
+function infCopy(t,l){if(!t)return toast('No hay '+l.toLowerCase()+' que copiar.',1);try{navigator.clipboard.writeText(t).then(()=>toast(l+' copiado.'),()=>toast('No se ha podido copiar.',1))}catch(e){toast('No se ha podido copiar.',1)}}
 
 /* ---------- Pantallas ---------- */
 function banner(){
@@ -432,8 +574,8 @@ function vRep(id){
       <div class="stat">${dot('amarillo')}<div class="big">${s.sem.amarillo}</div></div>
       <div class="stat">${dot('rojo')}<div class="big">${s.sem.rojo}</div></div></div></div>
   </div>
-  ${cs.length?repChart(cs)+mCard(cs)+qCard(cs):''}
-  <div class="card" style="margin-top:16px"><div class="hb" style="margin-bottom:8px"><h3 style="margin:0">Clientes de ${esc(r.nombre)}</h3>
+  ${cs.length?repChart(cs)+mCard(cs,`infMail('mes','${r.id}')`)+qCard(cs,`infMail('tri','${r.id}')`):''}
+  <div class="card" style="margin-top:16px"><div class="hb" style="margin-bottom:8px"><h3 style="margin:0">Clientes de ${esc(r.nombre)}</h3><button class="b2" onclick="infMail('cli','${r.id}')">✉ Enviar por correo</button>
     <input class="sel" style="min-width:260px" placeholder="Filtrar por nombre, población, zona o código postal" oninput="filtrarCli(this.value)"><select class="sel" onchange="setSort(this.value)"><option value="fact" ${sortBy==='fact'?'selected':''}>Ranking por facturación total</option><option value="principal" ${sortBy==='principal'?'selected':''}>Ranking por facturación principal</option><option value="comp" ${sortBy==='comp'?'selected':''}>Ranking por complementos</option><option value="nombre" ${sortBy==='nombre'?'selected':''}>Nombre A–Z</option><option value="cp" ${sortBy==='cp'?'selected':''}>Código postal (por zonas)</option><option value="caida" ${sortBy==='caida'?'selected':''}>Mayor caída primero (${CAT[VC].toLowerCase()})</option><option value="sin" ${sortBy==='sin'?'selected':''}>Más meses sin comprar</option></select></div>
     ${cs.length?`<table class="tb"><thead><tr><th>#</th><th>Cliente</th><th class="r">Principal ${YEAR}</th><th class="r">Compl. ${YEAR}</th><th class="r">Total ${YEAR}</th><th class="r">${CAT[VC]} ${YEAR-1}</th><th class="r">Dif. ${CAT[VC].toLowerCase()}</th><th>Última compra</th><th>Estado</th></tr></thead><tbody>${rows}</tbody></table>
     <p class="hint">Importes acumulados ${per(m)}, comparados con el mismo periodo del año anterior. «Faltan datos» significa que falta información de algún periodo: no es lo mismo que 0 €. Si el informe no trae fechas de pedidos, la última compra aparece como «sin fecha». Pulsa el círculo para cambiar el estado.</p>`
@@ -496,8 +638,8 @@ function vCli(id){
     </div>
   </div>
 
-  ${mCard([c])}
-  ${qCard([c])}
+  ${mCard([c],`infMail('mes','','${c.id}')`)}
+  ${qCard([c],`infMail('tri','','${c.id}')`)}
 
   <h2 class="sec">Catálogo, exposición y compras</h2>
   <div class="grid c2">
