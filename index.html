@@ -93,7 +93,16 @@ button{font-family:inherit}
 .wd{background:#fff;border-radius:14px;padding:10px;min-height:150px}.wd.today{outline:2px solid var(--v)}
 .wd h4{font-size:13px;color:var(--g);text-transform:uppercase;letter-spacing:.4px;margin-bottom:8px}
 .pv{background:var(--b);border-radius:10px;padding:8px;margin-bottom:8px;font-size:13px;line-height:1.35}.pv.ok{background:var(--v2)}
-.pv b{display:block;font-size:14px}.pv .pill{white-space:normal;display:inline-block}.pv small{color:var(--g)}.pv .bt{display:flex;gap:4px;flex-wrap:wrap;margin-top:6px}
+.pv b{display:block;font-size:14px}.pv .pill{white-space:normal;display:inline-block}
+.vc{display:block;background:#fff;border:1px solid var(--b2);border-left:5px solid #cfc8bb;border-radius:9px;padding:6px 9px;margin-bottom:5px;cursor:pointer;line-height:1.25}
+.vc:active{background:#faf7f1}
+.vc b{display:block;font-size:14px;color:var(--t)}
+.vc small{display:block;font-size:12px;color:var(--g);margin:1px 0 4px}
+.vc .rs{display:inline-block;font-size:11px;font-weight:700;letter-spacing:.4px;text-transform:uppercase;padding:2px 8px;border-radius:12px}
+.vc.r-conseguido{border-left-color:#5fae7b}.rs.r-conseguido{background:#dff1e5;color:#2f7a4a}
+.vc.r-previsto{border-left-color:#e9a04f}.rs.r-previsto{background:#fde9d2;color:#a8590e}
+.vc.r-ninguno{border-left-color:#bdb7ad}.rs.r-ninguno{background:#ecebe8;color:#6f6a62}
+.rs.r-sin{background:transparent;color:#a39d92;border:1px dashed #cfc8bb}.pv small{color:var(--g)}.pv .bt{display:flex;gap:4px;flex-wrap:wrap;margin-top:6px}
 .pv .bt button{border:1px solid var(--b2);background:#fff;border-radius:8px;padding:5px 7px;font-size:12px;cursor:pointer;font-family:inherit}
 .pv .bt button{padding:7px 9px;font-size:13px}.pv .bt button.dng{color:var(--ro);border-color:#e7b3ab}
 .chip{display:inline-block;padding:7px 13px;border-radius:20px;border:1px solid var(--b2);background:#fff;font-size:14px;margin:0 6px 6px 0;cursor:pointer}.chip.on{background:var(--v);color:#fff;border-color:var(--v)}
@@ -519,7 +528,7 @@ function vCli(id){
   </div>
 
   <h2 class="sec">Visitas y seguimiento</h2>
-  <div class="card"><div class="hb" style="margin-bottom:10px"><div><h3 style="margin:0">Historial de visitas</h3><p class="mut" style="margin-top:4px;font-size:13px">Cada visita nueva se añade al historial. Solo se borra una visita si tú la eliminas y lo confirmas.</p></div><button class="b1" onclick="visitaForm('${c.id}')">+ Nueva visita</button></div>${visitasHTML(c)}</div>
+  <div class="card" id="visitas"><div class="hb" style="margin-bottom:10px"><div><h3 style="margin:0">Historial de visitas</h3><p class="mut" style="margin-top:4px;font-size:13px">Cada visita nueva se añade al historial. Solo se borra una visita si tú la eliminas y lo confirmas.</p></div><button class="b1" onclick="visitaForm('${c.id}')">+ Nueva visita</button></div>${visitasHTML(c)}</div>
   <div class="grid c2" style="margin-top:16px">
     <div class="card"><h3>Compromisos pendientes</h3>${c.pend.length?c.pend.map((t,i)=>`<label class="task"><input type="checkbox" ${t.h?'checked':''} onchange="togglePend('${c.id}',${i})"><span>${esc(t.t)}${t.f?' <span class="mut">(visita del '+fd(t.f)+')</span>':''}</span></label>`).join(''):'<span class="mut">Ninguno</span>'}</div>
     <div class="card"><h3>Observaciones y alertas</h3>${alertasCli(c)}<p style="font-size:15px;line-height:1.5;color:#555;margin-top:12px;border-top:1px solid #f0ebe0;padding-top:10px">${c.obs?esc(c.obs):'<span class="mut">Sin observaciones generales</span>'}</p></div>
@@ -726,7 +735,7 @@ function visitaForm(cid,vid,planId,fecha,ctx){
     {n:'hablamos',l:'Qué hemos hablado',t:'area',w:'w'},{n:'pidio',l:'Qué nos ha solicitado',t:'area',w:'w'},
     {n:'productos',l:'Colchones o productos comentados',t:'area',w:'w'},
     {n:'expoNueva',l:'Modelos que ha expuesto ahora (separados por comas)'},{n:'expoPend',l:'Posibles incorporaciones a la exposición (comas)'},
-    {n:'pedT',l:'Pedido',t:'select',o:[['','Ninguno'],['conseguido','Conseguido'],['previsto','Previsto']]},{n:'pedI',l:'Importe del pedido (€, opcional)'},
+    {n:'pedT',l:'Resultado de la visita',t:'select',o:[['','Sin indicar'],['conseguido','Pedido conseguido'],['previsto','Previsto'],['ninguno','Ninguno']]},{n:'pedI',l:'Importe del pedido (€, opcional)'},
     {n:'pedTxt',l:'Qué pedido (modelos, unidades…)',w:'w'},
     {n:'compromisos',l:'Compromisos adquiridos',t:'area',w:'w'},{n:'prox',l:'Próxima acción pendiente',w:'w'},{n:'proxF',l:'Fecha prevista de esa acción (opcional)',t:'date'},
     {n:'obs',l:'Observaciones',t:'area',w:'w'}];
@@ -737,7 +746,7 @@ function visitaForm(cid,vid,planId,fecha,ctx){
     if(!o.hablamos&&!o.pidio&&!o.compromisos&&!o.productos&&!o.prox&&!o.persona&&!o.pedTxt&&!o.obs&&!o.expoNueva&&!o.expoPend)return 'Escribe al menos algo de la visita.';
     const wk=o.sem?semOf(o.sem):null;if(wk&&(o.f<wk.ini||o.f>wk.fin))return 'La fecha debe estar dentro de la semana elegida ('+fd(wk.ini)+' a '+fd(wk.fin)+').';
     let pi='';if(o.pedI!==''){pi=num(o.pedI);if(pi==null||isNaN(pi))return 'El importe del pedido no es válido.'}
-    if(o.pedT===''&&(o.pedI!==''||o.pedTxt))return 'Indica si el pedido es conseguido o previsto.';
+    if((o.pedT===''||o.pedT==='ninguno')&&(o.pedI!==''||o.pedTxt))return 'Has escrito un pedido: en «Resultado de la visita» elige «Pedido conseguido» o «Previsto».';
     o.pedI=pi;let vv=v;
     if(v){snap('Editar visita '+fd(v.f)+' de '+c.nombre);Object.assign(v,o);
       const pe=c.pend.find(x=>x.v===v.id);if(pe&&o.compromisos){pe.t=o.compromisos}else if(!pe&&o.compromisos){c.pend.push({t:o.compromisos,h:false,v:v.id,f:o.f})}}
@@ -754,22 +763,26 @@ function visitaForm(cid,vid,planId,fecha,ctx){
 function toggleProx(cid,vid){const v=cli(cid).visitas.find(x=>x.id===vid);v.proxH=!v.proxH;save();render(true)}
 const visitasOrd=c=>[...c.visitas].sort((a,b)=>b.f.localeCompare(a.f));
 const lastVisita=c=>visitasOrd(c)[0];
-const pedChip=v=>v.pedT?`<span class="pill ${v.pedT==='conseguido'?'u':'n'}">Pedido ${v.pedT}${v.pedI!==''&&v.pedI!=null?' · '+eur(v.pedI):''}</span>`:'';
+const RES={conseguido:'Pedido conseguido',previsto:'Previsto',ninguno:'Ninguno'};
+const resK=v=>RES[v.pedT]?v.pedT:'sin';
+const resChip=v=>`<span class="rs r-${resK(v)}">${RES[v.pedT]||'Sin indicar'}</span>`;
+const pedChip=v=>v.pedT==='ninguno'?resChip(v):v.pedT?`<span class="pill ${v.pedT==='conseguido'?'u':'n'}">Pedido ${v.pedT}${v.pedI!==''&&v.pedI!=null?' · '+eur(v.pedI):''}</span>`:'';
 function visDL(c,v){return `<dl style="margin:0">
     ${v.repId?`<dt>Representante</dt><dd>${esc(repNom(v.repId))}</dd>`:''}${v.persona?`<dt>Persona con la que hablé</dt><dd>${esc(v.persona)}</dd>`:''}
     ${v.hablamos?`<dt>Qué hablamos</dt><dd>${esc(v.hablamos)}</dd>`:''}${v.pidio?`<dt>Qué nos pidió</dt><dd>${esc(v.pidio)}</dd>`:''}${v.productos?`<dt>Productos / exposiciones comentadas</dt><dd>${esc(v.productos)}</dd>`:''}
     ${v.expoNueva?`<dt>Nuevos modelos expuestos</dt><dd>${esc(v.expoNueva)}</dd>`:''}${v.expoPend?`<dt>Posibles incorporaciones</dt><dd>${esc(v.expoPend)}</dd>`:''}
-    ${v.pedT?`<dt>Pedido</dt><dd>${pedChip(v)} ${esc(v.pedTxt||'')}</dd>`:''}
+    <dt>Resultado de la visita</dt><dd>${v.pedT&&v.pedT!=='ninguno'?pedChip(v)+' '+esc(v.pedTxt||''):resChip(v)}</dd>
     ${v.compromisos?`<dt>Compromisos</dt><dd>${esc(v.compromisos)}</dd>`:''}${v.obs?`<dt>Observaciones</dt><dd>${esc(v.obs)}</dd>`:''}
     ${v.prox?`<dt>Próxima acción</dt><dd>${v.proxH?'✔ ':''}${esc(v.prox)}${v.proxF?' <span class="mut">('+fd(v.proxF)+')</span>':''}</dd>`:''}</dl>`}
 const visBtns=(c,v)=>`<button class="b2 sm" onclick="verVisita('${c.id}','${v.id}')">Ver visita</button><button class="b2 sm" onclick="visitaForm('${c.id}','${v.id}')">Editar visita</button><button class="b2 sm dng" onclick="delVisita('${c.id}','${v.id}')">Eliminar visita</button>`;
+function abrirVisitas(cid){go('cli/'+cid);setTimeout(()=>{const e=document.getElementById('visitas');if(e)e.scrollIntoView({block:'start'})},150)}
 function verVisita(cid,vid){const c=cli(cid),v=c&&c.visitas.find(x=>x.id===vid);if(!v)return;const wk=v.sem?semOf(v.sem):null;
   modal(`<h2>Visita · ${esc(c.nombre)}</h2><p class="sub" style="margin-bottom:12px">${fd(v.f)}${wk?' · 🚐 Coche expositor · '+esc(semLabel(wk)):''}</p><div class="vis">${visDL(c,v)}</div>
   <div class="acts"><button class="b2 dng" onclick="closeModal();delVisita('${c.id}','${v.id}')">Eliminar visita</button><button class="b2" onclick="closeModal();visitaForm('${c.id}','${v.id}')">Editar visita</button><button class="b1" onclick="closeModal()">Cerrar</button></div>`)}
 /* Eliminar una visita: solo se borra ese registro (y el compromiso que nació de ella). No se borra el cliente, el representante, la semana del coche, la exposición ni la facturación. */
 function delVisita(cid,vid){const c=cli(cid),v=c&&c.visitas.find(x=>x.id===vid);if(!v)return;
   const comp=c.pend.filter(p=>p.v===v.id),wk=v.sem?semOf(v.sem):null,dep=[];
-  if(v.pedT)dep.push('un <b>pedido '+esc(v.pedT)+'</b>'+(v.pedI!==''&&v.pedI!=null?' de '+eur(v.pedI):'')+(v.pedTxt?' ('+esc(v.pedTxt)+')':''));
+  if(v.pedT==='conseguido'||v.pedT==='previsto')dep.push('un <b>pedido '+esc(v.pedT)+'</b>'+(v.pedI!==''&&v.pedI!=null?' de '+eur(v.pedI):'')+(v.pedTxt?' ('+esc(v.pedTxt)+')':''));
   comp.forEach(p=>dep.push('el compromiso <b>«'+esc(p.t)+'»</b>'+(p.h?' (ya hecho)':' (pendiente)')+', que se quitará también de «Compromisos pendientes»'));
   if(v.prox)dep.push('la próxima acción <b>«'+esc(v.prox)+'»</b>'+(v.proxH?' (ya hecha)':' (pendiente)'));
   if(wk)dep.push('está en la semana del coche expositor <b>'+esc(semLabel(wk))+'</b>: desaparecerá de esa semana, pero la semana y sus ventas se conservan');
@@ -785,7 +798,7 @@ function visitasHTML(c){
     ${v.repId?`<dt>Representante</dt><dd>${esc(repNom(v.repId))}</dd>`:''}${v.persona?`<dt>Persona con la que hablé</dt><dd>${esc(v.persona)}</dd>`:''}
     ${v.hablamos?`<dt>Qué hablamos</dt><dd>${esc(v.hablamos)}</dd>`:''}${v.pidio?`<dt>Qué nos pidió</dt><dd>${esc(v.pidio)}</dd>`:''}${v.productos?`<dt>Productos / exposiciones comentadas</dt><dd>${esc(v.productos)}</dd>`:''}
     ${v.expoNueva?`<dt>Nuevos modelos expuestos</dt><dd>${esc(v.expoNueva)}</dd>`:''}${v.expoPend?`<dt>Posibles incorporaciones</dt><dd>${esc(v.expoPend)}</dd>`:''}
-    ${v.pedT?`<dt>Pedido</dt><dd>${pedChip(v)} ${esc(v.pedTxt||'')}</dd>`:''}
+    <dt>Resultado de la visita</dt><dd>${v.pedT&&v.pedT!=='ninguno'?pedChip(v)+' '+esc(v.pedTxt||''):resChip(v)}</dd>
     ${v.compromisos?`<dt>Compromisos</dt><dd>${esc(v.compromisos)}</dd>`:''}${v.obs?`<dt>Observaciones</dt><dd>${esc(v.obs)}</dd>`:''}
     ${v.prox?`<dt>Próxima acción</dt><dd><label class="task" style="padding:2px 0"><input type="checkbox" ${v.proxH?'checked':''} onchange="toggleProx('${c.id}','${v.id}')"><span>${esc(v.prox)}${v.proxF?' <span class="mut">('+fd(v.proxF)+')</span>':''}</span></label></dd>`:''}</dl></div>`}).join(''):'<span class="mut">Sin visitas registradas todavía</span>'}
 
@@ -963,9 +976,7 @@ function vSemana(id){
   const dayHTML=f=>{const l=S.vis.filter(o=>o.v.f===f),dw=(parseD(f).getDay()+6)%7;
     return `<div class="wd ${f===hoy()?'today':''}"><h4>${DIAS[dw]} ${fcorta(f)} · ${l.length} ${l.length===1?'visita':'visitas'}</h4>
     <button class="bigb" onclick="pickCliente('${x.id}','${f}')">+ AÑADIR VISITA</button>
-    ${l.map(o=>{const c=o.c,v=o.v;return `<div class="pv ok"><b onclick="go('cli/${c.id}')" style="cursor:pointer">${esc(c.nombre)}</b><small>${esc(c.poblacion)}${v.persona?' · con '+esc(v.persona):''}</small>
-      ${v.hablamos?`<div>${esc(v.hablamos.length>90?v.hablamos.slice(0,90)+'…':v.hablamos)}</div>`:''}${v.pedT?`<div>${pedChip(v)}</div>`:''}${v.compromisos?`<small>🤝 ${esc(v.compromisos)}</small>`:''}${v.prox&&!v.proxH?`<small>➡ ${esc(v.prox)}</small>`:''}
-      <div class="bt"><button onclick="verVisita('${c.id}','${v.id}')">Ver visita</button><button onclick="visitaForm('${c.id}','${v.id}')">Editar visita</button><button class="dng" onclick="delVisita('${c.id}','${v.id}')">Eliminar visita</button><button onclick="go('cli/${c.id}')">Ficha</button></div></div>`}).join('')}</div>`};
+    ${l.map(o=>{const c=o.c,v=o.v;return `<div class="vc r-${resK(v)}" onclick="abrirVisitas('${c.id}')"><b>${esc(c.nombre)}</b><small>${esc(c.poblacion||c.provincia||'Sin ciudad')}</small>${resChip(v)}</div>`}).join('')}</div>`};
   return `<div class="hb"><div><h1>Semana del ${fd(x.ini)} al ${fd(x.fin)}</h1><p class="sub" style="margin-bottom:0">${esc(x.prov||'Sin provincia')} · con ${esc(repNom(x.repId))}</p></div>
     <div class="acts"><button class="b2" onclick="weekMenu('${mondayOf(x.ini)}')">🏖 Festivo</button><select class="sel" onchange="setSemEstado('${x.id}',this.value)">${Object.keys(ESTADOS).map(k=>`<option value="${k}" ${x.estado===k?'selected':''}>${ESTADOS[k]}</option>`).join('')}</select><button class="b2" onclick="semForm('${x.id}')">Editar semana</button><button class="b2 dng" onclick="delSem('${x.id}')">Eliminar semana</button></div></div>
   ${(()=>{const L=[];for(let m=mondayOf(x.ini);m<=x.fin;m=addDays(m,7)){const fe=festOf(m);if(fe)L.push(fe)}return L.length?`<div class="festb"><span>🏖 <b>Semana festiva</b>${L.map(fe=>fe.obs?' · '+esc(fe.obs):'').join('')}</span><button class="b2 sm" onclick="weekMenu('${mondayOf(x.ini)}')">Cambiar</button></div>`:''})()}
@@ -980,7 +991,7 @@ function vSemana(id){
   <div class="grid k" style="margin-top:16px">${kc('Nuevas exposiciones',S.expoN.length,esc(S.expoN.join(', '))||'ninguna')}${kc('Exposiciones pendientes',S.expoP.length,esc(S.expoP.join(', '))||'ninguna')}${kc('Visitas por día',days.map(f=>S.vis.filter(o=>o.v.f===f).length).join(' · '),days.map(f=>DIAS[(parseD(f).getDay()+6)%7].slice(0,1)).join(' · '))}${kc('Clientes visitados',S.clientes,'')}</div>
   <h2 class="sec">Días</h2>
   <div class="wk5">${days.map(dayHTML).join('')}</div>
-  <p class="hint">Cada visita es un único registro: también la encuentras en la ficha del cliente (Historial de visitas), y si la editas en un sitio cambia en el otro. Los totales se calculan solos con las visitas registradas.</p>`}
+  <p class="hint">Pulsa un cliente para abrir su ficha en «Historial de visitas»: allí puedes ver, editar o eliminar la visita y cambiar su resultado. Cada visita es un único registro: lo que cambies en la ficha se ve al momento aquí. Verde = pedido conseguido · naranja = previsto · gris = ninguno. Los totales se calculan solos con las visitas registradas.</p>`}
 function vCocheHist(){
   const f=D.semanas.filter(x=>(!CH.y||x.ini.slice(0,4)===CH.y)&&(!CH.rep||x.repId===CH.rep)&&(!CH.prov||norm(x.prov)===norm(CH.prov))).sort((a,b)=>b.ini.localeCompare(a.ini));
   const yrs=[...new Set(D.semanas.map(x=>x.ini.slice(0,4)))].sort().reverse(),provs=[...new Set(D.semanas.map(x=>x.prov).filter(Boolean))].sort();
