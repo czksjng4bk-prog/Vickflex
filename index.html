@@ -76,7 +76,20 @@ button{font-family:inherit}
 .bars u.stk{width:42%;display:flex;flex-direction:column;text-decoration:none}.bars u i{width:100%;border-radius:0}.bars u i:first-child{border-radius:4px 4px 0 0}
 .bar2{display:flex;justify-content:space-between;align-items:center;gap:12px;margin:0 0 14px;flex-wrap:wrap}
 .badge{display:none;background:var(--ro);color:#fff;border-radius:20px;font-size:12px;font-weight:700;padding:2px 8px;margin-left:6px}
-.wk{display:grid;grid-template-columns:repeat(7,minmax(0,1fr));gap:10px}
+.wk{display:grid;grid-template-columns:repeat(5,minmax(0,1fr));gap:12px}
+.wk .wd{min-height:300px;padding:12px}
+.wk .wd h4{font-size:15px}
+.wk .pv{font-size:14px;padding:10px}
+.wr.fest{background:#f8ddd5;border:1px solid #e9b4a6;color:#9a3b2a}
+.wr.occ.fx{border-left:8px solid #e07a63;padding-left:8px}
+.lg.fest{background:#f8ddd5;border:1px solid #e9b4a6}
+.festb{background:#fbe7e1;border:1px solid #efc2b6;color:#8a3526;border-radius:14px;padding:12px 16px;margin-bottom:14px;display:flex;justify-content:space-between;align-items:center;gap:10px}
+.xres{display:grid;grid-template-columns:1fr 1fr auto;gap:14px;align-items:end}
+.big5{display:grid;grid-template-columns:repeat(5,minmax(0,1fr));gap:12px}
+.big5 .stat{background:var(--b);border-radius:12px;padding:14px 8px}
+.big5 .stat .big{font-size:24px}
+.big5 .stat.xp{background:#fbe9d8}
+@media(max-width:900px){.big5{grid-template-columns:1fr 1fr}.xres{grid-template-columns:1fr}}
 .wd{background:#fff;border-radius:14px;padding:10px;min-height:150px}.wd.today{outline:2px solid var(--v)}
 .wd h4{font-size:13px;color:var(--g);text-transform:uppercase;letter-spacing:.4px;margin-bottom:8px}
 .pv{background:var(--b);border-radius:10px;padding:8px;margin-bottom:8px;font-size:13px;line-height:1.35}.pv.ok{background:var(--v2)}
@@ -160,13 +173,13 @@ const norm=s=>String(s||'').normalize('NFD').replace(/[\u0300-\u036f]/g,'').toLo
 
 /* ---------- Datos: se guardan en este iPad (localStorage) ---------- */
 /* La app empieza vacía: sin representantes, clientes, facturación ni visitas de ejemplo */
-function emptyData(){return {schema:1,reps:[],clientes:[],equiv:[],imports:[],plan:[],semanas:[],lastBackup:null,changes:0}}
+function emptyData(){return {schema:1,reps:[],clientes:[],equiv:[],imports:[],plan:[],semanas:[],festivos:[],lastBackup:null,changes:0}}
 function migrate(d){
   d.schema=1;d.reps=d.reps||[];d.clientes=d.clientes||[];
   d.reps.forEach(r=>{['email','codigoFab','tel','ciudad','hotelN','hotelT'].forEach(k=>{if(r[k]==null)r[k]=''});if(!Array.isArray(r.provincias))r.provincias=[]});
   d.clientes.forEach(c=>{c.fact=c.fact||{};c.exposicion=c.exposicion||[];c.pend=c.pend||[];c.visitas=c.visitas||[];c.pedidos=c.pedidos||[];c.obs=c.obs||'';c.visitas=c.visitas.map(v=>{v.id=v.id||uid();if(v.hablamos==null)v.hablamos=v.t||'';['pidio','compromisos','productos','prox','proxF','persona','expoNueva','expoPend','pedT','pedTxt','pedI','obs','repId','sem'].forEach(k=>{if(v[k]==null)v[k]=''});v.proxH=!!v.proxH;return v});c.codigo=c.codigo||'';c.email=c.email||'';c.cp=c.cp==null?'':String(c.cp);c.zona=c.zona==null?'':String(c.zona);c.acumul=c.acumul&&typeof c.acumul==='object'?c.acumul:{};c.comp=c.comp&&typeof c.comp==='object'?c.comp:{};c.catalogo=c.catalogo&&typeof c.catalogo==='object'?c.catalogo:{ok:null,f:''};c.prodPend=c.prodPend||[];c.expObs=c.expObs||'';c.nombreFact=c.nombreFact||'';c.semaforo=c.semaforo||'amarillo';
     if(!c.repHist||!c.repHist.length)c.repHist=[{r:c.repId,d:null}]});
-  d.equiv=Array.isArray(d.equiv)?d.equiv:[];d.imports=Array.isArray(d.imports)?d.imports:[];d.plan=Array.isArray(d.plan)?d.plan:[];d.semanas=Array.isArray(d.semanas)?d.semanas:[];if(d.changes==null)d.changes=0; if(d.lastBackup===undefined)d.lastBackup=null; return d;
+  d.equiv=Array.isArray(d.equiv)?d.equiv:[];d.imports=Array.isArray(d.imports)?d.imports:[];d.plan=Array.isArray(d.plan)?d.plan:[];d.semanas=Array.isArray(d.semanas)?d.semanas:[];d.semanas.forEach(x=>{if(x.expoV===undefined)x.expoV=null;if(x.expoU===undefined)x.expoU=null});d.festivos=Array.isArray(d.festivos)?d.festivos:[];if(d.changes==null)d.changes=0; if(d.lastBackup===undefined)d.lastBackup=null; return d;
 }
 function load(){
   let raw=null;try{raw=localStorage.getItem(KEY)}catch(e){}
@@ -782,22 +795,24 @@ function planSem(d){PW=addDays(PW||mondayOf(hoy()),d*7);render(true)}
 function planHoy(){PW=mondayOf(hoy());render(true)}
 function setPR(v){PR=v;PP='';render(true)}function setPP(v){PP=v;render(true)}
 function vPlan(){
-  PW=PW||mondayOf(hoy());const days=[...Array(7)].map((_,i)=>addDays(PW,i)),t=hoy();
+  PW=PW||mondayOf(hoy());const days=[...Array(5)].map((_,i)=>addDays(PW,i)),t=hoy(),dom=addDays(PW,6),fde=[addDays(PW,5),dom],fst=festOf(PW);
   const okc=c=>c&&(!PR||c.repId===PR)&&(!PP||(c.provincia||'Sin provincia')===PP);
   const pls=D.plan.filter(x=>okc(cli(x.cliId)));
   const cand=D.clientes.filter(c=>!PR||c.repId===PR);const provs=[...new Set(cand.map(c=>c.provincia||'Sin provincia'))].sort();
   const col=f=>pls.filter(x=>x.f===f).sort((a,b)=>(a.h||'99').localeCompare(b.h||'99')).map(x=>{const c=cli(x.cliId);
     return `<div class="pv ${x.hecha?'ok':''}"><b onclick="go('cli/${c.id}')" style="cursor:pointer">${x.hecha?'✔ ':''}${esc(c.nombre)}</b><small>${x.h?esc(x.h)+' · ':''}${esc(c.poblacion)}<br>${esc(repNom(c.repId))}</small>${x.n?`<div>${esc(x.n)}</div>`:''}
     <div class="bt">${x.hecha?'':`<button onclick="regPlan('${x.id}')">Registrar visita</button>`}<button onclick="planForm('${x.id}')">Editar</button><button onclick="delPlan('${x.id}')">Quitar</button></div></div>`}).join('');
-  const inW=pls.filter(x=>x.f>=days[0]&&x.f<=days[6]),plannedIds=new Set(inW.map(x=>x.cliId));
+  const inW=pls.filter(x=>x.f>=days[0]&&x.f<=dom),plannedIds=new Set(inW.map(x=>x.cliId));
   const sug=cand.filter(c=>okc(c)&&!plannedIds.has(c.id)).map(c=>{const v=lastVisita(c);return {c:c,d:v?diasEntre(v.f,t):9999}}).filter(x=>x.d>=90).sort((a,b)=>b.d-a.d).slice(0,8);
-  return `<div class="bar2"><div class="seg"><button class="on">Visitas planificadas</button><button onclick="go('coche')">🚐 Coche expositor</button></div></div><div class="hb"><div><h1>Planificación semanal</h1><p class="sub" style="margin-bottom:0">Semana del ${fd(days[0])} al ${fd(days[6])}</p></div>
+  return `<div class="bar2"><div class="seg"><button class="on">Visitas planificadas</button><button onclick="go('coche')">🚐 Coche expositor</button></div></div><div class="hb"><div><h1>Planificación semanal</h1><p class="sub" style="margin-bottom:0">Semana del lunes ${fd(days[0])} al viernes ${fd(days[4])}</p></div>
    <div class="acts"><button class="b2" onclick="planSem(-1)">‹ Anterior</button><button class="b2" onclick="planHoy()">Esta semana</button><button class="b2" onclick="planSem(1)">Siguiente ›</button><button class="b1" onclick="planForm()">+ Planificar visita</button></div></div>
   <div class="bar2"><label>Representante <select class="sel" onchange="setPR(this.value)"><option value="">Todos</option>${D.reps.map(r=>`<option value="${r.id}" ${r.id===PR?'selected':''}>${esc(r.nombre)}</option>`).join('')}</select></label>
    <label>Provincia <select class="sel" onchange="setPP(this.value)"><option value="">Todas</option>${provs.map(q=>`<option ${q===PP?'selected':''}>${esc(q)}</option>`).join('')}</select></label>
    <span class="mut">${inW.length} visitas planificadas · ${inW.filter(x=>x.hecha).length} hechas</span></div>
-  <div class="wk">${days.map((f,i)=>`<div class="wd ${f===t?'today':''}"><h4>${DIAS[i]} ${fcorta(f)}</h4>${col(f)||'<span class="mut" style="font-size:12px">—</span>'}</div>`).join('')}</div>
-  <div class="card" style="margin-top:16px"><h3>Clientes que conviene visitar (sin visita desde hace 90 días o más)</h3>${sug.length?sug.map(x=>`<div class="row"><span><b>${esc(x.c.nombre)}</b> <span class="mut">${esc(x.c.poblacion)} · ${esc(repNom(x.c.repId))}</span></span><span>${x.d===9999?'<span class="mut">sin visitas registradas</span>':'hace '+x.d+' días'} <button class="b2 sm" onclick="planForm(null,{cliId:'${x.c.id}',f:'${days[0]>t?days[0]:(t<=days[6]?t:days[0])}'})">Planificar</button></span></div>`).join(''):'<span class="mut">Nada pendiente con los filtros actuales.</span>'}</div>
+  ${fst?`<div class="festb"><span>🏖 <b>Semana festiva</b>${fst.obs?' · '+esc(fst.obs):''}</span><button class="b2 sm" onclick="weekMenu('${PW}')">Cambiar</button></div>`:''}
+  <div class="wk">${days.map((f,i)=>`<div class="wd ${f===t?'today':''}"><h4>${DIAS[i]} ${fcorta(f)}</h4>${col(f)||'<span class="mut" style="font-size:13px">Sin visitas</span>'}</div>`).join('')}</div>
+  ${fde.some(f=>col(f))?`<div class="card" style="margin-top:14px"><h3>Visitas planificadas en fin de semana</h3><div class="grid c2">${fde.map((f,i)=>col(f)?`<div><h4 style="margin:0 0 8px">${DIAS[5+i]} ${fcorta(f)}</h4>${col(f)}</div>`:'').join('')}</div></div>`:''}
+  <div class="card" style="margin-top:16px"><h3>Clientes que conviene visitar (sin visita desde hace 90 días o más)</h3>${sug.length?sug.map(x=>`<div class="row"><span><b>${esc(x.c.nombre)}</b> <span class="mut">${esc(x.c.poblacion)} · ${esc(repNom(x.c.repId))}</span></span><span>${x.d===9999?'<span class="mut">sin visitas registradas</span>':'hace '+x.d+' días'} <button class="b2 sm" onclick="planForm(null,{cliId:'${x.c.id}',f:'${days[0]>t?days[0]:(t<=days[4]?t:days[0])}'})">Planificar</button></span></div>`).join(''):'<span class="mut">Nada pendiente con los filtros actuales.</span>'}</div>
   <p class="hint">Las visitas planificadas no se borran al pasar la semana. Cuando hagas la visita, pulsa «Registrar visita»: se guarda en el historial del cliente (que nunca se borra) y la visita planificada queda marcada como hecha.</p>`}
 
 /* --- Alertas (se calculan solas con los datos; no hay que mantenerlas a mano) --- */
@@ -834,6 +849,20 @@ let CY=YEAR,CH={y:'',rep:'',prov:''},PK={sem:'',f:''};
 function isoW(f){const d=parseD(f),t=new Date(d.getTime());t.setDate(d.getDate()+3-((d.getDay()+6)%7));const y=t.getFullYear(),j=new Date(y,0,4);j.setDate(j.getDate()+3-((j.getDay()+6)%7));return {y:y,w:1+Math.round((t-j)/(7*864e5))}}
 function weeksOfYear(y){let m=mondayOf(y+'-01-04');const o=[];while(isoW(m).y===y){o.push(m);m=addDays(m,7)}return o}
 const semsIn=(ini,fin,ex)=>D.semanas.filter(x=>x.id!==ex&&x.ini<=fin&&x.fin>=ini);
+/* Semanas festivas: se guardan por el lunes de la semana (D.festivos=[{w:'aaaa-mm-dd',obs:''}]). Solo son una marca visual: no borran visitas ni planificaciones. */
+const festOf=mon=>(D.festivos||[]).find(x=>x.w===mon);
+let FS=false;
+function weekMenu(mon){const f=festOf(mon),w=isoW(mon).w,sl=semsIn(mon,addDays(mon,6));FS=!!f;
+  modal(`<h2>Semana ${w} · ${fd(mon)} – ${fd(addDays(mon,4))}</h2>
+  <h3 class="fsec" style="margin-top:12px">Festivo</h3>
+  <div style="display:flex;gap:14px;align-items:center;margin:12px 0"><span style="font-size:16px">¿Semana festiva?</span><div class="seg" id="fsg"><button type="button" class="${f?'':'on'}" onclick="fsel(0)">NO</button><button type="button" class="${f?'on':''}" onclick="fsel(1)">SÍ</button></div></div>
+  <label class="f"><span>Observación (opcional)</span><input id="fobs" list="fobsl" value="${esc(f?f.obs:'')}" placeholder="Vacaciones, festivo nacional, puente, cierre de fábrica…"></label>
+  <datalist id="fobsl">${['Vacaciones','Festivo nacional','Festivo autonómico','Festivo local','Puente','Cierre de fábrica'].map(o=>`<option value="${o}">`).join('')}</datalist>
+  <p class="hint">Marcar una semana como festiva solo cambia su color en el calendario. No borra visitas ni planificaciones.</p>
+  <div class="acts"><button class="b2" onclick="closeModal()">Cancelar</button><button class="b1" onclick="festSave('${mon}')">Guardar</button></div>
+  <h3 class="fsec" style="margin-top:16px">Coche expositor</h3><div class="acts l" style="flex-wrap:wrap">${sl.length?sl.map(x=>`<button class="b2" onclick="closeModal();go('semana/${x.id}')">Abrir semana: ${esc(semLabel(x))}</button>`).join(''):`<button class="b1" onclick="closeModal();semForm(null,{ini:'${mon}',fin:'${addDays(mon,4)}'})">+ Planificar semana del coche</button>`}</div>`)}
+function fsel(v){FS=!!v;const b=document.querySelectorAll('#fsg button');b[0].classList.toggle('on',!FS);b[1].classList.toggle('on',FS)}
+function festSave(mon){const o=($('#fobs').value||'').trim();D.festivos=D.festivos.filter(x=>x.w!==mon);if(FS)D.festivos.push({w:mon,obs:o});save();closeModal();render(true);toast(FS?'Semana marcada como festiva.':'Semana sin marca de festivo.')}
 function semStats(x){const vis=[];D.clientes.forEach(c=>c.visitas.forEach(v=>{if(v.sem===x.id)vis.push({c:c,v:v})}));
   const ped={cn:0,cI:0,pn:0,pI:0};vis.forEach(o=>{const v=o.v;if(v.pedT==='conseguido'){ped.cn++;ped.cI+=+v.pedI||0}else if(v.pedT==='previsto'){ped.pn++;ped.pI+=+v.pedI||0}});
   return {vis:vis,n:vis.length,clientes:new Set(vis.map(o=>o.c.id)).size,ped:ped,
@@ -847,15 +876,18 @@ function vCoche(){
   const all=[].concat(...byM),occ=all.filter(m=>semsIn(m,addDays(m,6)).length).length;
   const yrs=[...new Set(D.semanas.map(x=>+x.ini.slice(0,4)).concat([YEAR,YEAR+1,y]))].sort();
   const row=mon=>{const sl=semsIn(mon,addDays(mon,6)),w=isoW(mon).w,cur=t>=mon&&t<=addDays(mon,6);
-    if(!sl.length)return `<div class="wr ${cur?'now':''}" onclick="semForm(null,{ini:'${mon}',fin:'${addDays(mon,4)}'})"><span><b>S${w}</b> ${fcorta(mon)}–${fcorta(addDays(mon,4))}</span><span>Disponible</span></div>`;
-    return sl.map(x=>{const n=semStats(x).n;return `<div class="wr occ e${EN[x.estado]||1} ${cur?'now':''}" onclick="go('semana/${x.id}')"><span><b>S${w}</b> ${fcorta(x.ini)}–${fcorta(x.fin)}</span><span class="ell">${esc(x.prov||'—')} · ${esc(repNom(x.repId))}${n?' · '+n+' vis.':''}</span></div>`}).join('')};
+    const fe=festOf(mon);
+    if(!sl.length)return fe?`<div class="wr fest ${cur?'now':''}" onclick="weekMenu('${mon}')"><span><b>S${w}</b> ${fcorta(mon)}–${fcorta(addDays(mon,4))}</span><span class="ell">🏖 Festivo${fe.obs?' · '+esc(fe.obs):''}</span></div>`
+      :`<div class="wr ${cur?'now':''}" onclick="weekMenu('${mon}')"><span><b>S${w}</b> ${fcorta(mon)}–${fcorta(addDays(mon,4))}</span><span>Disponible</span></div>`;
+    return sl.map(x=>{const n=semStats(x).n;return `<div class="wr occ e${EN[x.estado]||1} ${fe?'fx':''} ${cur?'now':''}" onclick="go('semana/${x.id}')"><span><b>S${w}</b> ${fcorta(x.ini)}–${fcorta(x.fin)}</span><span class="ell">${fe?'🏖 ':''}${esc(x.prov||'—')} · ${esc(repNom(x.repId))}${n?' · '+n+' vis.':''}</span></div>`}).join('')};
+  const nf=all.filter(m=>festOf(m)).length;
   return `<div class="hb"><div><h1>Coche expositor</h1><p class="sub" style="margin-bottom:0">Calendario anual de semanas con tus representantes</p></div><div class="acts"><button class="b1" onclick="semForm()">+ Planificar semana</button></div></div>
   ${cocheTabs('cal')}
   <div class="bar2"><div class="acts" style="display:flex;gap:8px;align-items:center"><button class="b2" onclick="setCY(${y-1})">‹</button><select class="sel" onchange="setCY(+this.value)">${yrs.map(a=>`<option ${a===y?'selected':''}>${a}</option>`).join('')}</select><button class="b2" onclick="setCY(${y+1})">›</button></div>
-   <span class="mut">${occ} ${occ===1?'semana ocupada':'semanas ocupadas'} · ${all.length-occ} disponibles</span>
-   <span class="leg2"><i class="lg"></i>Disponible <i class="lg e1"></i>Planificada <i class="lg e2"></i>En curso <i class="lg e3"></i>Finalizada</span></div>
+   <span class="mut">${occ} ${occ===1?'semana ocupada':'semanas ocupadas'} · ${nf} ${nf===1?'festiva':'festivas'} · ${all.filter(m=>!semsIn(m,addDays(m,6)).length&&!festOf(m)).length} disponibles</span>
+   <span class="leg2"><i class="lg"></i>Disponible <i class="lg e1"></i>Planificada <i class="lg e2"></i>En curso <i class="lg e3"></i>Finalizada <i class="lg fest"></i>Festivo</span></div>
   <div class="cal">${byM.map((l,i)=>`<div class="mon"><h3>${MESN[i]} ${y}</h3>${l.map(row).join('')||'<span class="mut">—</span>'}</div>`).join('')}</div>
-  <p class="hint">Pulsa una semana disponible para planificarla, o una ocupada para entrar en ella. Cada semana se asigna al mes en el que cae su jueves. Puedes consultar años anteriores con las flechas.</p>`}
+  <p class="hint">Pulsa una semana disponible para planificarla o marcarla como festiva, o una ocupada para entrar en ella (dentro tienes el botón «Festivo»). Las semanas festivas salen en color salmón; si además tienen coche planificado, llevan una franja salmón a la izquierda. Cada semana se asigna al mes en el que cae su jueves. Puedes consultar años anteriores con las flechas.</p>`}
 function semForm(id,pre){
   const x=id?semOf(id):null;pre=pre||{};
   if(!D.reps.length)return toast('Primero crea un representante.',1);
@@ -871,6 +903,10 @@ function semForm(id,pre){
     if(x){const fuera=D.clientes.reduce((t,c)=>t+c.visitas.filter(v=>v.sem===x.id&&(v.f<o.ini||v.f>o.fin)).length,0);if(fuera)return 'Hay '+fuera+' visitas registradas fuera de esas fechas. Amplía el rango o cambia primero la fecha de esas visitas.'}
     if(x){snap('Editar semana del coche expositor');Object.assign(x,o);save();render(true);return}
     const n=Object.assign({id:uid()},o);D.semanas.push(n);save();go('semana/'+n.id)})}
+function semRes(id){const x=semOf(id),v=num($('#xv').value),u=num($('#xu').value);
+  if(Number.isNaN(v)||(v!=null&&v<0))return toast('Escribe las ventas en euros, por ejemplo 4800 o 4.800,50.',1);
+  if(Number.isNaN(u)||(u!=null&&(u<0||u!==Math.round(u))))return toast('Escribe los colchones como un número entero, por ejemplo 19.',1);
+  snap('Resultados del coche expositor');x.expoV=v;x.expoU=u;save();render(true);toast('Resultados guardados.')}
 function setSemEstado(id,v){semOf(id).estado=v;save();render(true)}
 function delSem(id){const x=semOf(id),n=semStats(x).n;
   ask(`¿Eliminar la semana <b>${esc(semLabel(x))}</b> del coche expositor? ${n?`Las <b>${n} visitas</b> registradas NO se borran: se quedan en las fichas de sus clientes.`:'No tiene visitas.'}`,'Eliminar semana',()=>{snap('Eliminar semana del coche expositor');D.clientes.forEach(c=>c.visitas.forEach(v=>{if(v.sem===id)v.sem=''}));D.semanas=D.semanas.filter(y=>y.id!==id);save();go('coche');toast('Semana eliminada.')})}
@@ -906,7 +942,13 @@ function vSemana(id){
       ${v.hablamos?`<div>${esc(v.hablamos.length>90?v.hablamos.slice(0,90)+'…':v.hablamos)}</div>`:''}${v.pedT?`<div>${pedChip(v)}</div>`:''}${v.compromisos?`<small>🤝 ${esc(v.compromisos)}</small>`:''}${v.prox&&!v.proxH?`<small>➡ ${esc(v.prox)}</small>`:''}
       <div class="bt"><button onclick="visitaForm('${c.id}','${v.id}')">Editar</button><button onclick="go('cli/${c.id}')">Ficha</button></div></div>`}).join('')}</div>`};
   return `<div class="hb"><div><h1>Semana del ${fd(x.ini)} al ${fd(x.fin)}</h1><p class="sub" style="margin-bottom:0">${esc(x.prov||'Sin provincia')} · con ${esc(repNom(x.repId))}</p></div>
-    <div class="acts"><select class="sel" onchange="setSemEstado('${x.id}',this.value)">${Object.keys(ESTADOS).map(k=>`<option value="${k}" ${x.estado===k?'selected':''}>${ESTADOS[k]}</option>`).join('')}</select><button class="b2" onclick="semForm('${x.id}')">Editar semana</button><button class="b2 dng" onclick="delSem('${x.id}')">Eliminar semana</button></div></div>
+    <div class="acts"><button class="b2" onclick="weekMenu('${mondayOf(x.ini)}')">🏖 Festivo</button><select class="sel" onchange="setSemEstado('${x.id}',this.value)">${Object.keys(ESTADOS).map(k=>`<option value="${k}" ${x.estado===k?'selected':''}>${ESTADOS[k]}</option>`).join('')}</select><button class="b2" onclick="semForm('${x.id}')">Editar semana</button><button class="b2 dng" onclick="delSem('${x.id}')">Eliminar semana</button></div></div>
+  ${(()=>{const L=[];for(let m=mondayOf(x.ini);m<=x.fin;m=addDays(m,7)){const fe=festOf(m);if(fe)L.push(fe)}return L.length?`<div class="festb"><span>🏖 <b>Semana festiva</b>${L.map(fe=>fe.obs?' · '+esc(fe.obs):'').join('')}</span><button class="b2 sm" onclick="weekMenu('${mondayOf(x.ini)}')">Cambiar</button></div>`:''})()}
+  <div class="card" style="margin-bottom:16px;background:#fdf7ee"><div class="hb" style="margin-bottom:10px"><h3 style="margin:0">💶 Resultados del coche expositor</h3><span class="mut" style="font-size:13px">Informativo · no se suma a la facturación del representante</span></div>
+   <div class="xres"><label class="f"><span>Ventas del expositor (€)</span><input id="xv" inputmode="decimal" autocomplete="off" value="${x.expoV==null?'':String(x.expoV).replace('.',',')}" placeholder="Ej. 4800"></label>
+   <label class="f"><span>Colchones vendidos (unidades)</span><input id="xu" inputmode="numeric" autocomplete="off" value="${x.expoU==null?'':x.expoU}" placeholder="Ej. 19"></label>
+   <button class="b1" onclick="semRes('${x.id}')">Guardar resultados</button></div>
+   <p class="hint" style="margin-top:8px">${x.expoV==null&&x.expoU==null?'Todavía sin registrar.':'Registrado: <b>'+(x.expoV==null?'—':eur(x.expoV))+'</b> · <b>'+(x.expoU==null?'—':x.expoU+' colchones')+'</b>. Puedes cambiarlo cuando quieras; el resumen del representante se actualiza solo.'}</p></div>
   ${x.obs?`<div class="card" style="margin-bottom:16px"><h3>Observaciones de la semana</h3><p style="line-height:1.5">${esc(x.obs)}</p></div>`:''}
   <h2 class="sec" style="margin-top:6px">Resumen de la semana</h2>
   <div class="grid k">${kc('Visitas',S.n,S.clientes+' clientes distintos')}${kc('Pedidos',S.ped.cn+S.ped.pn,S.ped.cn+' conseguidos ('+eu(S.ped.cI)+') · '+S.ped.pn+' previstos ('+eu(S.ped.pI)+')')}${kc('Compromisos',S.comp,S.compPend+' pendientes')}${kc('Acciones pendientes',S.acc,'próximas acciones sin hacer')}</div>
@@ -917,23 +959,41 @@ function vSemana(id){
 function vCocheHist(){
   const f=D.semanas.filter(x=>(!CH.y||x.ini.slice(0,4)===CH.y)&&(!CH.rep||x.repId===CH.rep)&&(!CH.prov||norm(x.prov)===norm(CH.prov))).sort((a,b)=>b.ini.localeCompare(a.ini));
   const yrs=[...new Set(D.semanas.map(x=>x.ini.slice(0,4)))].sort().reverse(),provs=[...new Set(D.semanas.map(x=>x.prov).filter(Boolean))].sort();
-  const rows=f.map(x=>{const S=semStats(x),names=[...new Set(S.vis.map(o=>o.c.nombre))];return `<tr onclick="go('semana/${x.id}')"><td><b>${fd(x.ini)}</b> – ${fd(x.fin)}</td><td>${esc(x.prov||'—')}</td><td>${esc(repNom(x.repId))}</td><td><span class="pill ${x.estado==='finalizada'?'u':x.estado==='curso'?'n':'m'}">${ESTADOS[x.estado]}</span></td><td class="r">${S.n}</td><td>${esc(names.slice(0,6).join(', '))}${names.length>6?' … (+'+(names.length-6)+')':''}</td></tr>`}).join('');
+  const rows=f.map(x=>{const S=semStats(x),names=[...new Set(S.vis.map(o=>o.c.nombre))];return `<tr onclick="go('semana/${x.id}')"><td><b>${fd(x.ini)}</b> – ${fd(x.fin)}</td><td>${esc(x.prov||'—')}</td><td>${esc(repNom(x.repId))}</td><td><span class="pill ${x.estado==='finalizada'?'u':x.estado==='curso'?'n':'m'}">${ESTADOS[x.estado]}</span></td><td class="r">${S.n}</td><td class="r">${x.expoV==null?'<span class="mut">—</span>':eur(x.expoV)}</td><td class="r">${x.expoU==null?'<span class="mut">—</span>':x.expoU}</td><td>${esc(names.slice(0,6).join(', '))}${names.length>6?' … (+'+(names.length-6)+')':''}</td></tr>`}).join('');
   const g={};f.forEach(x=>{const k=x.prov||'Sin provincia',S=semStats(x);const o=g[k]=g[k]||{n:0,v:0,u:''};o.n++;o.v+=S.n;if(x.ini>o.u)o.u=x.ini});
   return `<div class="hb"><div><h1>Coche expositor</h1><p class="sub" style="margin-bottom:0">Historial de semanas: dónde estuviste, con quién y a quién visitaste</p></div></div>${cocheTabs('hist')}
   <div class="bar2"><label>Año <select class="sel" onchange="CH.y=this.value;render(true)"><option value="">Todos</option>${yrs.map(y=>`<option ${y===CH.y?'selected':''}>${y}</option>`).join('')}</select></label>
    <label>Representante <select class="sel" onchange="CH.rep=this.value;render(true)"><option value="">Todos</option>${D.reps.map(r=>`<option value="${r.id}" ${r.id===CH.rep?'selected':''}>${esc(r.nombre)}</option>`).join('')}</select></label>
    <label>Provincia <select class="sel" onchange="CH.prov=this.value;render(true)"><option value="">Todas</option>${provs.map(q=>`<option ${q===CH.prov?'selected':''}>${esc(q)}</option>`).join('')}</select></label></div>
-  <div class="grid c2"><div class="card"><h3>Semanas</h3>${f.length?`<table class="tb"><thead><tr><th>Fechas</th><th>Provincia</th><th>Representante</th><th>Estado</th><th class="r">Visitas</th><th>Clientes visitados</th></tr></thead><tbody>${rows}</tbody></table>`:'<span class="mut">Todavía no hay semanas. Planifica la primera en el Calendario.</span>'}</div>
+  <div class="grid c2"><div class="card"><h3>Semanas</h3>${f.length?`<table class="tb"><thead><tr><th>Fechas</th><th>Provincia</th><th>Representante</th><th>Estado</th><th class="r">Visitas</th><th class="r">Ventas expositor</th><th class="r">Colchones</th><th>Clientes visitados</th></tr></thead><tbody>${rows}</tbody></table>`:'<span class="mut">Todavía no hay semanas. Planifica la primera en el Calendario.</span>'}</div>
   <div class="card"><h3>Por provincia</h3>${Object.keys(g).length?Object.keys(g).sort().map(k=>`<div class="row"><span><b>${esc(k)}</b><br><small style="color:#999">última vez: ${fd(g[k].u)}</small></span><span>${g[k].n} sem. · ${g[k].v} vis.</span></div>`).join(''):'<span class="mut">—</span>'}</div></div>`}
+let RCY=YEAR;
+function setRCY(y){RCY=+y;render(true)}
 function repCoche(r){
-  const ws=D.semanas.filter(x=>x.repId===r.id&&x.ini.slice(0,4)===String(YEAR)).sort((a,b)=>b.ini.localeCompare(a.ini)),st=ws.map(semStats);
+  const y=RCY,ys=String(y),yrs=[...new Set(D.semanas.filter(x=>x.repId===r.id).map(x=>+x.ini.slice(0,4)).concat([YEAR,YEAR-1,y]))].sort((a,b)=>b-a);
+  const ws=D.semanas.filter(x=>x.repId===r.id&&x.ini.slice(0,4)===ys).sort((a,b)=>b.ini.localeCompare(a.ini)),st=ws.map(semStats);
   const worked=ws.filter(x=>x.estado!=='planificada').length,vis=st.reduce((t,s)=>t+s.n,0),cl=new Map(),cp=[];
   st.forEach(s=>s.vis.forEach(o=>{cl.set(o.c.id,o.c);o.c.pend.filter(p=>p.v===o.v.id&&!p.h).forEach(p=>cp.push({c:o.c,t:p.t}))}));
-  return `<div class="card" style="margin-top:16px"><div class="hb" style="margin-bottom:8px"><h3 style="margin:0">🚐 Coche expositor con ${esc(r.nombre)} · ${YEAR}</h3><button class="b2 sm" onclick="go('cochehist')">Ver historial</button></div>
-   <div class="big3"><div class="stat"><div class="big">${worked}</div><small>Semanas trabajadas juntos</small></div><div class="stat"><div class="big">${ws.length-worked}</div><small>Planificadas</small></div><div class="stat"><div class="big">${vis}</div><small>Visitas realizadas</small></div><div class="stat"><div class="big">${cl.size}</div><small>Clientes visitados</small></div><div class="stat"><div class="big" style="color:var(--am)">${cp.length}</div><small>Compromisos pendientes</small></div></div>
-   ${ws.length?`<div style="margin-top:12px">${ws.map((x,i)=>`<div class="row lk" onclick="go('semana/${x.id}')"><span><b>${fd(x.ini)}</b> – ${fd(x.fin)} · ${esc(x.prov||'—')}</span><span>${ESTADOS[x.estado]} · ${st[i].n} visitas</span></div>`).join('')}</div>`:'<p class="mut" style="margin-top:10px">Sin semanas este año con este representante.</p>'}
+  const conV=ws.filter(x=>x.expoV!=null),conU=ws.filter(x=>x.expoU!=null),sv=conV.reduce((t,x)=>t+(+x.expoV||0),0),su=conU.reduce((t,x)=>t+(+x.expoU||0),0),sinR=ws.filter(x=>x.estado!=='planificada'&&x.expoV==null&&x.expoU==null).length;
+  /* Facturación habitual: la de siempre (principal + complementos de sus clientes). Las ventas del coche NO se suman aquí. */
+  const cs=clientsOf(r.id),hf=cs.some(c=>has(c,y,12,'total')),fh=cs.reduce((t,c)=>t+acum(c,y,12,'total'),0),pm=y===YEAR?' (ene–'+MES[corte()-1]+')':'';
+  const nd='<span class="mut" style="font-size:18px">Sin datos</span>';
+  return `<div class="card" style="margin-top:16px"><div class="hb" style="margin-bottom:12px"><h3 style="margin:0">🚐 Resultados coche expositor · ${esc(r.nombre)}</h3>
+   <div class="acts" style="display:flex;gap:8px;align-items:center"><button class="b2 sm" onclick="setRCY(${y-1})">‹</button><select class="sel" onchange="setRCY(this.value)">${yrs.map(a=>`<option ${a===y?'selected':''}>${a}</option>`).join('')}</select><button class="b2 sm" onclick="setRCY(${y+1})">›</button><button class="b2 sm" onclick="go('cochehist')">Ver historial</button></div></div>
+   <div class="big5">
+    <div class="stat"><div class="big">${hf?eur(fh):nd}</div><small>Facturación habitual ${y}${pm}</small></div>
+    <div class="stat xp"><div class="big">${conV.length?eur(sv):nd}</div><small>Ventas coche expositor<br>(aparte, no se suman)</small></div>
+    <div class="stat xp"><div class="big">${conU.length?su:nd}</div><small>Colchones vendidos con expositor</small></div>
+    <div class="stat"><div class="big">${worked}</div><small>Semanas trabajadas juntos${ws.length-worked?'<br>+'+(ws.length-worked)+' planificadas':''}</small></div>
+    <div class="stat"><div class="big">${cl.size}</div><small>Clientes visitados<br>(${vis} visitas)</small></div>
+   </div>
+   ${sinR?`<p class="hint">⚠ ${sinR} ${sinR===1?'semana trabajada no tiene':'semanas trabajadas no tienen'} resultados registrados. Entra en la semana para anotarlos.</p>`:''}
+   ${ws.length?`<table class="tb" style="margin-top:12px"><thead><tr><th>Semana</th><th>Zona</th><th>Estado</th><th class="r">Visitas</th><th class="r">Ventas expositor</th><th class="r">Colchones</th></tr></thead><tbody>
+    ${ws.map((x,i)=>`<tr onclick="go('semana/${x.id}')"><td><b>${fd(x.ini)}</b> – ${fd(x.fin)}${festOf(mondayOf(x.ini))?' 🏖':''}</td><td>${esc(x.prov||'—')}</td><td>${ESTADOS[x.estado]}</td><td class="r">${st[i].n}</td><td class="r">${x.expoV==null?'<span class="mut">—</span>':eur(x.expoV)}</td><td class="r">${x.expoU==null?'<span class="mut">—</span>':x.expoU}</td></tr>`).join('')}
+    <tr class="tot"><td colspan="3">Total ${y}</td><td class="r">${vis}</td><td class="r">${conV.length?eur(sv):'—'}</td><td class="r">${conU.length?su:'—'}</td></tr></tbody></table>`:`<p class="mut" style="margin-top:12px">Sin semanas del coche expositor en ${y} con este representante.</p>`}
    ${cl.size?`<div style="margin-top:12px"><h3>Clientes visitados</h3>${[...cl.values()].map(c=>`<span class="tag" style="cursor:pointer" onclick="go('cli/${c.id}')">${esc(c.nombre)}</span>`).join('')}</div>`:''}
-   ${cp.length?`<div style="margin-top:12px"><h3>Compromisos pendientes</h3>${cp.slice(0,6).map(x=>`<div class="row"><span><b>${esc(x.c.nombre)}</b> · ${esc(x.t)}</span></div>`).join('')}</div>`:''}</div>`}
+   ${cp.length?`<div style="margin-top:12px"><h3>Compromisos pendientes</h3>${cp.slice(0,6).map(x=>`<div class="row"><span><b>${esc(x.c.nombre)}</b> · ${esc(x.t)}</span></div>`).join('')}</div>`:''}
+   <p class="hint">Las ventas del coche expositor se anotan dentro de cada semana y aquí se suman solas. Son solo informativas: no se suman a la facturación mensual, trimestral ni anual, ni a las comparativas con el año anterior.</p></div>`}
 function accCard(c){const L=[];CATS2.forEach(k=>Object.keys((c.acumul&&c.acumul[k])||{}).forEach(y=>Object.keys(c.acumul[k][y]).forEach(mm=>L.push({k:k,y:+y,m:+mm,v:c.acumul[k][y][mm]}))));
   if(!L.length)return '';L.sort((a,b)=>b.y-a.y||a.m-b.m||a.k.localeCompare(b.k));
   return `<div class="card" style="margin-top:16px"><h3>Acumulados importados (sin desglose mensual)</h3>${L.map(x=>`<div class="row"><span>${x.k==='comp'?'Complementos':'Principal'} · ene–${MES[x.m-1]} ${x.y}</span><b>${eur(x.v)}</b></div>`).join('')}<p class="hint">Vienen de informes «ventas entre fechas». Solo se usan para comparar ese mismo periodo; no se reparten por meses ni se suman a otros datos.</p></div>`}
