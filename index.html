@@ -421,8 +421,9 @@ function pdfPct(o){if(!o.ok)return 'Faltan datos';if(o.p===0&&o.s>0)return 'Nuev
 let INF=null;
 const infCS=()=>INF.cli?[cli(INF.cli)].filter(Boolean):clientsOf(INF.rep);
 const infIsMes=()=>INF.t==='mes'||(INF.t==='cli'&&INF.pk==='mes');
-const infMs=()=>infIsMes()?[INF.m]:[INF.q*3,INF.q*3+1,INF.q*3+2];
-function infPer(){const I=INF,y=I.y;if(infIsMes())return cap(MESL[I.m])+' '+y;
+const infAll=()=>(INF.t==='mes'&&INF.m===12)||(INF.t==='tri'&&INF.q===4);
+const infMs=()=>infAll()?[0,1,2,3,4,5,6,7,8,9,10,11]:infIsMes()?[INF.m]:[INF.q*3,INF.q*3+1,INF.q*3+2];
+function infPer(){const I=INF,y=I.y;if(I.t==='mes'&&I.m===12)return 'Todo el año '+y+' (enero–diciembre)';if(I.t==='tri'&&I.q===4)return 'Todos los trimestres '+y+' (1.º a 4.º)';if(infIsMes())return cap(MESL[I.m])+' '+y;
   if(I.t==='tri'||I.pk==='tri')return QNAME[I.q]+' '+y+' ('+MESL[I.q*3]+'–'+MESL[I.q*3+2]+')';
   const m=y===YEAR?corte():12;return 'Año '+y+(m<12?' (enero–'+MESL[m-1]+')':'')}
 const INFT={mes:'Facturación mensual',tri:'Facturación trimestral',cli:'Facturación de clientes'};
@@ -432,6 +433,18 @@ function infBody(){const r=rep(INF.rep);return 'Hola'+(r&&!INF.cli?' '+r.nombre.
 function infBuild(){const I=INF,cs=infCS(),r=rep(I.rep),c=I.cli?cli(I.cli):null,y=I.y,ms=infMs(),per=infPer(),notas=[];
   const info=[['Representante',r?r.nombre:'Sin representante']];if(c)info.push(['Cliente',c.nombre+(c.codigo?' · Código '+c.codigo:'')+(c.poblacion?' · '+c.poblacion:'')]);info.push(['Período',per]);
   const cmpRow=(k,lab)=>{const o=perCalc(cs,y,k,ms);if(!o.ok&&o.why&&(o.ha||o.hp))notas.push(lab+': '+o.why+'.');return {o:o,row:[lab,o.ha?eur(o.s):null,o.hp?eur(o.p):null,o.ok?pdfS(o.d):null,pdfPct(o)]}};
+  if(infAll()){const T=cmpRow('total','Total'),o=T.o,ks=['principal','comp'].filter(k=>{const x=perCalc(cs,y,k,ms);return x.ha||x.hp}),R=ks.map(k=>cmpRow(k,CAT[k]));
+      const oP=perCalc(cs,y,'principal',ms),oC=perCalc(cs,y,'comp',ms),lab=o.enCurso&&o.span.length?'Acumulado ene–'+MES[o.span[o.span.length-1]]:'Total anual '+y;
+      const cols=f=>[{t:f,w:128,b:1},{t:'Principal '+y,w:80,al:'r'},{t:'Complem. '+y,w:78,al:'r'},{t:'Total '+y,w:80,al:'r'},{t:'Total '+(y-1),w:80,al:'r'},{t:'Dif. €',w:70,al:'r'},{t:'Dif. %',w:60,al:'r'}];
+      const tot=[lab,oP.ha?eur(oP.s):null,oC.ha?eur(oC.s):null,o.ha?eur(o.s):null,o.hp?eur(o.p):null,o.ok?pdfS(o.d):null,pdfPct(o)];
+      let tb;if(I.t==='mes')tb={titulo:'Facturación mes a mes · '+y+' frente a '+(y-1),cols:cols('Mes'),tot:tot,rows:ms.map(i=>{const P=monV(cs,y,i,'principal'),C=monV(cs,y,i,'comp'),Tt=monV(cs,y,i,'total'),pv=monV(cs,y-1,i,'total'),oo=perCalc(cs,y,'total',[i]);
+          return [cap(MESL[i]),pdfE(P),pdfE(C),pdfE(Tt),pdfE(pv),Tt!=null&&oo.ok?pdfS(oo.d):null,Tt!=null?pdfPct(oo):null]})};
+      else tb={titulo:'Facturación por trimestres · '+y+' frente a '+(y-1),cols:cols('Trimestre'),tot:tot,rows:[0,1,2,3].map(q=>{const qm=[q*3,q*3+1,q*3+2],a=perCalc(cs,y,'principal',qm),b=perCalc(cs,y,'comp',qm),t=perCalc(cs,y,'total',qm);
+          return [(q+1)+'.º trimestre',a.ha?eur(a.s):null,b.ha?eur(b.s):null,t.ha?eur(t.s):null,t.hp?eur(t.p):null,t.ok?pdfS(t.d):null,t.ha?pdfPct(t):null]})};
+      if(o.enCurso&&o.span.length)notas.push('Año en curso: el total y la comparativa solo incluyen los meses con datos (enero–'+MESL[o.span[o.span.length-1]]+') frente a esos mismos meses de '+(y-1)+'.');
+      notas.push('Total = facturación principal + complementos. «—» significa que no hay dato (no es 0 €). Las ventas del coche expositor no se incluyen.');
+      return {titulo:INFT[I.t]+' · '+y,info:info,kpi:[{l:lab,v:o.ha?eur(o.s):'Sin datos',hl:1},{l:'Mismo período '+(y-1),v:o.hp?eur(o.p):'Sin datos'},{l:'Diferencia',v:o.ok?pdfS(o.d):'—',s:pdfPct(o)}],
+        tablas:[tb,{titulo:'Resumen anual por tipo · '+y+' frente a '+(y-1),cols:[{t:'Tipo',w:150,b:1},{t:String(y),w:100,al:'r'},{t:String(y-1),w:100,al:'r'},{t:'Diferencia €',w:100,al:'r'},{t:'Diferencia %',w:90,al:'r'}],rows:R.map(x=>x.row),tot:T.row}],notas:notas}}
   if(I.t==='mes'||I.t==='tri'){const pl=I.t==='mes'?cap(MESL[I.m]):QNAME[I.q];
     const ks=['principal','comp'].filter(k=>{const o=perCalc(cs,y,k,ms);return o.ha||o.hp}),R=ks.map(k=>cmpRow(k,CAT[k])),T=cmpRow('total','Total');
     const rows=R.map(x=>x.row),o=T.o;
@@ -465,7 +478,8 @@ function infModal(){const I=INF,r=rep(I.rep),c=I.cli?cli(I.cli):null,cs=infCS();
   const ys=[...new Set(cs.flatMap(x=>Object.keys(x.fact||{}).concat(Object.keys(x.comp||{}),Object.keys((x.acumul&&x.acumul.principal)||{}),Object.keys((x.acumul&&x.acumul.comp)||{}))).map(Number).concat([YEAR,YEAR-1,I.y]))].filter(y=>y>2000&&y<=YEAR+1).sort((a,b)=>b-a);
   const sel=(k,o,l)=>`<label class="f"><span>${l}</span><select onchange="infSet('${k}',this.value)">${o.map(x=>`<option value="${x[0]}" ${String(x[0])===String(I[k])?'selected':''}>${esc(x[1])}</option>`).join('')}</select></label>`;
   const sY=sel('y',ys.map(y=>[y,y]),'Año'),sM=sel('m',MESL.map((n,i)=>[i,cap(n)]),'Mes'),sQ=sel('q',QNAME.map((n,i)=>[i,n+' ('+QMES[i]+')']),'Trimestre');
-  let s;if(I.t==='mes')s=sY+sM;else if(I.t==='tri')s=sY+sQ;else s=sel('pk',[['mes','Mes'],['tri','Trimestre'],['anio','Año completo']],'Período')+sY+(I.pk==='mes'?sM:I.pk==='tri'?sQ:'');
+  const sM2=sel('m',MESL.map((n,i)=>[i,cap(n)]).concat([[12,'TODO EL AÑO (enero a diciembre)']]),'Mes'),sQ2=sel('q',['1.º TRIMESTRE (enero, febrero y marzo)','2.º TRIMESTRE (abril, mayo y junio)','3.º TRIMESTRE (julio, agosto y septiembre)','4.º TRIMESTRE (octubre, noviembre y diciembre)','TODOS LOS TRIMESTRES (1.º + 2.º + 3.º + 4.º)'].map((n,i)=>[i,n]),'Trimestre');
+  let s;if(I.t==='mes')s=sY+sM2;else if(I.t==='tri')s=sY+sQ2;else s=sel('pk',[['mes','Mes'],['tri','Trimestre'],['anio','Año completo']],'Período')+sY+(I.pk==='mes'?sM:I.pk==='tri'?sQ:'');
   modal(`<h2>✉ Enviar por correo · ${INFT[I.t]}</h2><p class="sub" style="margin-bottom:4px">${c?'Solo el cliente <b>'+esc(c.nombre)+'</b> · ':''}Representante: <b>${esc(r?r.nombre:'sin asignar')}</b></p>
   <div class="fg">${s}<label class="f w"><span>Para (puedes cambiarlo)</span><input id="ito" type="email" autocomplete="off" value="${esc(I.to)}" placeholder="correo@ejemplo.com" oninput="INF.to=this.value.trim()"></label>
   <label class="f w"><span>Asunto</span><input id="isu" value="${esc(infSubj())}" oninput="INF.subj=this.value;INF.subjEdited=true"></label></div>
