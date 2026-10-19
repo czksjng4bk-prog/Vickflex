@@ -438,8 +438,8 @@ function infPer(){const I=INF,y=I.y;if(I.t==='mes'&&I.m===12)return 'Todo el añ
   const m=y===YEAR?corte():12;return 'Año '+y+(m<12?' (enero–'+MESL[m-1]+')':'')}
 const INFT={mes:'Facturación mensual',tri:'Facturación trimestral',cli:'Facturación de clientes'};
 function infWho(){const r=rep(INF.rep),c=INF.cli?cli(INF.cli):null;return c?c.nombre+(r?' ('+r.nombre+')':''):(r?r.nombre:'')}
-function infSubj(){if(INF.sem)return INF.subjEdited?INF.subj:semSubj();return INF.subjEdited?INF.subj:'Informe '+INFT[INF.t].toLowerCase()+' · '+infWho()+' · '+infPer()}
-function infBody(){if(INF.sem)return semBody();const r=rep(INF.rep);return 'Hola'+(r&&!INF.cli?' '+r.nombre.split(' ')[0]:'')+',\n\nTe adjunto el informe de '+INFT[INF.t].toLowerCase()+' de '+infWho()+' correspondiente a '+infPer()+'.\n\nUn saludo.'}
+function infSubj(){if(INF.exp)return INF.subjEdited?INF.subj:expSubj();if(INF.sem)return INF.subjEdited?INF.subj:semSubj();return INF.subjEdited?INF.subj:'Informe '+INFT[INF.t].toLowerCase()+' · '+infWho()+' · '+infPer()}
+function infBody(){if(INF.exp)return expBody();if(INF.sem)return semBody();const r=rep(INF.rep);return 'Hola'+(r&&!INF.cli?' '+r.nombre.split(' ')[0]:'')+',\n\nTe adjunto el informe de '+INFT[INF.t].toLowerCase()+' de '+infWho()+' correspondiente a '+infPer()+'.\n\nUn saludo.'}
 function infBuild(){const I=INF,cs=infCS(),r=rep(I.rep),c=I.cli?cli(I.cli):null,y=I.y,ms=infMs(),per=infPer(),notas=[];
   const info=[['Representante',r?r.nombre:'Sin representante']];if(c)info.push(['Cliente',c.nombre+(c.codigo?' · Código '+c.codigo:'')+(c.poblacion?' · '+c.poblacion:'')]);info.push(['Período',per]);
   const cmpRow=(k,lab)=>{const o=perCalc(cs,y,k,ms);if(!o.ok&&o.why&&(o.ha||o.hp))notas.push(lab+': '+o.why+'.');return {o:o,row:[lab,o.ha?eur(o.s):null,o.hp?eur(o.p):null,o.ok?pdfS(o.d):null,pdfPct(o)]}};
@@ -529,6 +529,10 @@ function semRec(d){d.ops=[[]];const pg=d.page;d.page=function(){pg.call(d);d.ops
 function pdfWrap(t,b,sz,w){const L=[];let cur='';String(t||'').split(/\s+/).filter(Boolean).forEach(wd=>{
     while(pdfW(wd,b,sz)>w){let i=wd.length;while(i>1&&pdfW(wd.slice(0,i)+'-',b,sz)>w)i--;if(cur){L.push(cur);cur=''}L.push(wd.slice(0,i)+'-');wd=wd.slice(i)}
     if(cur&&pdfW(cur+' '+wd,b,sz)>w){L.push(cur);cur=wd}else cur=cur?cur+' '+wd:wd});if(cur)L.push(cur);return L.length?L:['']}
+/* Orden de registro de una visita: «creado» (visitas nuevas) o, en las antiguas, el momento de creación que va dentro de su código interno.
+   Editar una visita no cambia ninguno de los dos, así que conserva su posición. */
+const idTs=id=>{const t=parseInt(String(id||'').slice(1,9),36);return t>1.5e12&&t<4e12?t:0};
+const visSeq=v=>+v.creado||idTs(v.id)||0;
 const SEMC={conseguido:{bar:'#5fae7b',bg:'#dff1e5',tx:'#2f7a4a'},previsto:{bar:'#e9a04f',bg:'#fde9d2',tx:'#a8590e'},ninguno:{bar:'#bdb7ad',bg:'#ecebe8',tx:'#6f6a62'},sin:{bar:'#cfc8bb',bg:'#ffffff',tx:'#a39d92'}};
 function semCuenta(x){const S=semStats(x),c=k=>S.vis.filter(o=>resK(o.v)===k).length,tel=S.vis.filter(o=>esTel(o.v)).length;
   return {S:S,n:S.n,tel:tel,pres:S.n-tel,cn:c('conseguido'),pn:c('previsto'),nn:c('ninguno'),sin:c('sin')}}
@@ -547,17 +551,17 @@ function semPDF(id){const x=semOf(id),r=rep(x.repId),K=semCuenta(x),S=K.S,w=isoW
     y=by+bh+10};
   /* columnas: lunes a viernes de cada semana del calendario (sábado/domingo solo si tienen visitas) */
   const blocks=[];for(let m=mondayOf(x.ini);m<=x.fin;m=addDays(m,7)){const ds=[0,1,2,3,4].map(i=>addDays(m,i));[5,6].forEach(i=>{const f=addDays(m,i);if(S.vis.some(o=>o.v.f===f))ds.push(f)});blocks.push(ds)}
-  const card=(o,cw)=>{const c=o.c,v=o.v,tel=esTel(v),tw=cw-16-(tel?14:0),nl=pdfWrap(c.nombre,1,9,tw),cl=pdfWrap(c.poblacion||c.provincia||'Sin ciudad',0,7.8,cw-16);
-    return {o:o,tel:tel,nl:nl,cl:cl,h:6+nl.length*10.5+cl.length*9.5+4+11+6}};
+  const NW=16,card=(o,cw,n)=>{const c=o.c,v=o.v,tel=esTel(v),tw=cw-16-NW-(tel?14:0),nl=pdfWrap(c.nombre,1,9,tw),cl=pdfWrap(c.poblacion||c.provincia||'Sin ciudad',0,7.8,cw-16);
+    return {o:o,n:n,tel:tel,nl:nl,cl:cl,h:6+nl.length*10.5+cl.length*9.5+4+11+6}};
   const drawCard=(k,cx,cy,cw)=>{const v=k.o.v,rk=resK(v),C=SEMC[rk];
     d.rrect(cx,cy,cw,k.h,4,{f:'#ffffff',s:'#e3dacb',lw:.6});d.rrect(cx,cy,3.5,k.h,1.5,{f:C.bar});
-    let ty=cy+6+7.6;k.nl.forEach(l=>{d.text(cx+9,ty,l,{sz:9,b:1});ty+=10.5});if(k.tel)d.phone(cx+cw-17,cy+5,11,TELC);
-    ty+=.5;k.cl.forEach(l=>{d.text(cx+9,ty,l,{sz:7.8,col:PDFG});ty+=9.5});
+    let ty=cy+6+7.6;d.text(cx+9,ty,k.n+'.',{sz:9,b:1,col:PDFG});k.nl.forEach(l=>{d.text(cx+9+NW,ty,l,{sz:9,b:1});ty+=10.5});if(k.tel)d.phone(cx+cw-17,cy+5,11,TELC);
+    ty+=.5;k.cl.forEach(l=>{d.text(cx+9+NW,ty,l,{sz:7.8,col:PDFG});ty+=9.5});
     const lab=(RES[v.pedT]||'Sin indicar').toUpperCase(),lw=pdfW(lab,1,6.6)+10,chy=ty-5;
-    d.rrect(cx+9,chy,lw,11,5.5,rk==='sin'?{f:C.bg,s:'#cfc8bb',lw:.6}:{f:C.bg});d.text(cx+14,chy+7.8,lab,{sz:6.6,b:1,col:C.tx})};
+    d.rrect(cx+9+NW,chy,lw,11,5.5,rk==='sin'?{f:C.bg,s:'#cfc8bb',lw:.6}:{f:C.bg});d.text(cx+14+NW,chy+7.8,lab,{sz:6.6,b:1,col:C.tx})};
   let first=true,bottom=0;
   blocks.forEach(ds=>{const nc=ds.length,cw=(W-G*(nc-1))/nc;
-    let Q=ds.map(f=>S.vis.filter(o=>o.v.f===f).sort((a,b)=>a.c.nombre.localeCompare(b.c.nombre,'es')).map(o=>card(o,cw))),cont=false;
+    let Q=ds.map(f=>S.vis.filter(o=>o.v.f===f).sort((a,b)=>visSeq(a.v)-visSeq(b.v)).map((o,i)=>card(o,cw,i+1))),cont=false;
     const tot=Q.map(q=>q.length);
     do{if(!first)d.page();head(!first&&cont);first=false;const y0=y+30;let mx=y0;
       ds.forEach((f,ci)=>{const cx=M+ci*(cw+G),dw=(parseD(f).getDay()+6)%7,fuera=f<x.ini||f>x.fin;
@@ -569,7 +573,7 @@ function semPDF(id){const x=semOf(id),r=rep(x.repId),K=semCuenta(x),S=K.S,w=isoW
         Q[ci]=q.slice(i);if(yy>mx)mx=yy});
       bottom=mx;cont=true}while(Q.some(q=>q.length))});
   /* resumen comercial destacado al final */
-  const SH=152;let sy=bottom+8;if(sy+SH>PH-34){d.page();head(true);sy=y}
+  const SH=152;let sy=bottom+6;if(sy+SH>PH-30){d.page();head(true);sy=y}
   d.rrect(M,sy,W,SH,6,{f:PDFL});d.rect(M,sy+8,3,SH-16,PDFV);
   d.text(M+16,sy+20,'RESUMEN COMERCIAL',{sz:11,b:1,col:PDFV});d.text(PW-M-14,sy+20,'Semana '+w+' · '+fd(x.ini)+' al '+fd(x.fin)+' · '+(r?r.nombre:''),{sz:8,col:PDFG,al:'r'});
   const pct=v=>K.n?Math.round(v/K.n*100)+' % del total':'';
@@ -619,6 +623,66 @@ function semModal(){const I=INF,x=semOf(I.sem),r=rep(x.repId),K=semCuenta(x);
   if(I.file)setTimeout(semPreview,30)}
 function semPrep(){try{const x=semOf(INF.sem),o=semPDF(INF.sem),name='VICKFLEX_Resumen_coche_expositor_'+slug(repNom(x.repId)).replace(/-/g,'_')+'_semana_'+isoW(x.ini).w+'_'+isoW(x.ini).y+'.pdf';
   INF.file=new File([o.blob],name,{type:'application/pdf'});INF.pages=o.pages;INF.ops=o.ops;INF.W=o.W;INF.H=o.H;semModal()}catch(e){console.error(e);toast('No se ha podido preparar el PDF.',1)}}
+
+/* ===================== INFORME DE EXPOSICIONES DE CLIENTES (PDF A4 horizontal) =====================
+   Se genera en el momento desde las fichas de los clientes (c.exposicion) del representante que tienen asignado AHORA (c.repId).
+   No hay un segundo listado: si añades o retiras un modelo, o cambias un cliente de representante, el siguiente informe ya sale actualizado.
+   La app guarda los modelos expuestos (nombres), no las unidades: cada modelo registrado cuenta como 1 colchón en exposición. */
+function expDatos(rid){const r=rep(rid);
+  const L=clientsOf(rid).map(c=>{const vis=new Set(),m=[];(c.exposicion||[]).forEach(t=>{t=String(t||'').trim();const k=norm(t);if(t&&!vis.has(k)){vis.add(k);m.push(t)}});return {c:c,m:m}})
+    .filter(x=>x.m.length).sort((a,b)=>a.c.nombre.localeCompare(b.c.nombre,'es'));
+  const dist=new Map();L.forEach(x=>x.m.forEach(t=>{const k=norm(t),o=dist.get(k)||{t:t,n:0};o.n++;dist.set(k,o)}));
+  return {r:r,L:L,tot:L.reduce((s,x)=>s+x.m.length,0),dist:[...dist.values()].sort((a,b)=>b.n-a.n||a.t.localeCompare(b.t,'es'))}}
+function expPDF(rid){const X=expDatos(rid),r=X.r,PW=PDFH,PH=PDFW,M=28,W=PW-2*M,YMAX=PH-40,d=semRec(new PDFDoc(PW,PH));d.img=logoJPG();
+  let y=0;const SZ=10,LH=13;
+  const head=cont=>{if(d.img){const h=30,iw=Math.min(170,d.img.w*h/d.img.h);d.image(M,20,iw,iw*d.img.h/d.img.w)}else d.text(M,42,'VICKFLEX Descanso',{sz:15,b:1,col:PDFV});
+    d.text(PW-M,34,'VICKFLEX DESCANSO',{sz:13,b:1,col:PDFV,al:'r'});d.text(PW-M,48,'INFORME DE EXPOSICIONES'+(cont?' (continuación)':''),{sz:9.5,b:1,col:PDFG,al:'r'});
+    d.rect(M,58,W,2,PDFB2);d.rect(M,58,64,2,PDFV);
+    const by=66,bh=36;d.rrect(M,by,W,bh,5,{f:PDFB});
+    const F=[['REPRESENTANTE',r?r.nombre:'Sin representante',300],['ZONA COMERCIAL',(r&&r.provincias&&r.provincias.join(', '))||'Sin indicar',300],['FECHA DEL INFORME',fd(hoy()),W-600]];
+    let fx=M+12;F.forEach(f=>{d.text(fx,by+14,f[0],{sz:6.8,b:1,col:PDFG});d.text(fx,by+28,pdfFit(f[1],1,10.5,f[2]-16),{sz:10.5,b:1});fx+=f[2]});y=by+bh+12};
+  const cols=[{t:'Nº',w:34,al:'r'},{t:'CLIENTE',w:220},{t:'POBLACIÓN',w:150},{t:'MODELOS EN EXPOSICIÓN',w:W-404}];
+  const thead=()=>{d.rrect(M,y,W,22,4,{f:PDFV});let x=M;cols.forEach(c=>{d.text(c.al==='r'?x+c.w-8:x+8,y+14.5,c.t,{sz:8.5,b:1,col:'#ffffff',al:c.al});x+=c.w});y+=26};
+  head(false);thead();
+  if(!X.L.length){d.rrect(M,y,W,40,4,{s:'#e3dacb'});d.text(M+W/2,y+24,'Este representante no tiene clientes con exposición registrada en sus fichas.',{sz:10,col:PDFG,al:'c'});y+=48}
+  X.L.forEach((x,i)=>{const c=x.c,nl=pdfWrap(c.nombre,1,SZ,cols[1].w-16),pl=pdfWrap(c.poblacion||c.provincia||'—',0,SZ,cols[2].w-16),ml=pdfWrap(x.m.join(', '),0,SZ,cols[3].w-16);
+    const h=Math.max(nl.length,pl.length,ml.length)*LH+12;
+    if(y+h>YMAX){d.page();head(true);thead()}   /* una fila nunca se parte entre dos páginas */
+    if(i%2)d.rect(M,y,W,h,'#faf7f1');d.line(M,y+h,M+W,y+h,'#e9e0d0',.6);
+    let x0=M;const col=(L,ci,o)=>{L.forEach((l,k)=>d.text(cols[ci].al==='r'?x0+cols[ci].w-8:x0+8,y+6+9.6+k*LH,l,Object.assign({sz:SZ},o||{})));x0+=cols[ci].w};
+    col([String(i+1)],0,{col:PDFG,al:'r'});col(nl,1,{b:1});col(pl,2,{col:'#4a463f'});col(ml,3);y+=h});
+  /* resumen final */
+  const dl=pdfWrap(X.dist.map(o=>o.t+' ('+o.n+')').join(' · '),0,8.5,W-32),SH=30+56+14+(X.dist.length?14+dl.length*11.5:0)+26;
+  let sy=y+14;if(sy+SH>PH-34){d.page();head(true);sy=y}
+  d.rrect(M,sy,W,SH,6,{f:PDFL});d.rect(M,sy+8,3,SH-16,PDFV);d.text(M+16,sy+20,'RESUMEN',{sz:11,b:1,col:PDFV});
+  const kp=[['TOTAL CLIENTES CON EXPOSICIÓN',String(X.L.length),clientsOf(rid).length+' clientes asignados en total'],['TOTAL COLCHONES EN EXPOSICIÓN',String(X.tot),'1 por cada modelo registrado (ver nota)'],['TOTAL MODELOS DIFERENTES',String(X.dist.length),'referencias distintas']];
+  const bw=(W-32-2*10)/3;kp.forEach((k,i)=>{const bx=M+16+i*(bw+10),byy=sy+30;d.rrect(bx,byy,bw,50,4,{f:'#ffffff',s:PDFV,lw:.8});
+    d.text(bx+12,byy+14,k[0],{sz:7.5,b:1,col:PDFG});d.text(bx+12,byy+38,k[1],{sz:20,b:1,col:PDFV});d.text(bx+bw-12,byy+38,pdfFit(k[2],0,8,bw-80),{sz:8,col:PDFG,al:'r'})});
+  let ly=sy+30+56+10;if(X.dist.length){d.text(M+16,ly+9,'Modelos en exposición (nº de clientes que lo tienen):',{sz:8.5,b:1,col:'#2b2b2b'});ly+=14;dl.forEach(l=>{d.text(M+16,ly+9,l,{sz:8.5,col:'#4a463f'});ly+=11.5})}
+  d.text(M+16,sy+SH-16,'Nota: las fichas de clientes guardan qué modelos están expuestos, no cuántas unidades de cada uno. Por eso «Colchones en exposición» cuenta 1 colchón por cada modelo registrado en cada cliente.',{sz:7.5,col:PDFG});
+  d.text(M+16,sy+SH-6,'Datos tomados de las fichas de clientes asignados actualmente a este representante, en el momento de generar el informe.',{sz:7.5,col:PDFG});
+  const N=d.pages.length;d.pages.forEach((pc,i)=>{d.c=pc;d.pi=i;d.line(M,PH-26,PW-M,PH-26,PDFB2,.6);d.text(M,PH-14,'Documento confidencial · Información comercial de VICKFLEX Descanso · Emitido el '+fd(hoy()),{sz:7.5,col:PDFG});d.text(PW-M,PH-14,'Página '+(i+1)+' de '+N,{sz:7.5,col:PDFG,al:'r'})});
+  return {blob:d.blob(),pages:N,ops:d.ops,W:PW,H:PH,X:X}}
+/* --- Ventana «PDF exposiciones de clientes» (mismo sistema que los informes de facturación) --- */
+function expMail(rid){const r=rep(rid);if(!r)return;INF={exp:rid,t:'exp',rep:rid,cli:'',to:r.email||'',subj:'',subjEdited:false,file:null};expModal()}
+function expSubj(){return 'VICKFLEX DESCANSO — INFORME DE EXPOSICIONES — '+repNom(INF.exp).toUpperCase()+' — '+fd(hoy())}
+function expBody(){const X=expDatos(INF.exp),r=X.r;return 'Hola'+(r?' '+r.nombre.split(' ')[0]:'')+',\n\nTe adjunto el informe de exposiciones de tus clientes a fecha '+fd(hoy())+': '+X.L.length+' clientes con exposición, '+X.tot+' colchones en exposición y '+X.dist.length+' modelos diferentes.\n\nUn saludo.'}
+function expModal(){const I=INF,r=rep(I.exp),X=expDatos(I.exp);
+  modalW(`<h2>PDF exposiciones de clientes</h2><p class="sub" style="margin-bottom:4px">Representante: <b>${esc(r.nombre)}</b> · ${X.L.length} ${X.L.length===1?'cliente':'clientes'} con exposición de ${clientsOf(r.id).length} · ${X.tot} colchones · ${X.dist.length} modelos diferentes</p>
+  <div class="fg"><label class="f w"><span>Para (puedes cambiarlo o elegir otro de la lista)</span><input id="ito" type="email" list="semto" autocomplete="off" value="${esc(I.to)}" placeholder="correo@ejemplo.com" oninput="INF.to=this.value.trim()"></label>
+  <datalist id="semto">${D.reps.filter(z=>z.email).map(z=>`<option value="${esc(z.email)}">${esc(z.nombre)}</option>`).join('')}</datalist>
+  <label class="f w"><span>Asunto</span><input id="isu" value="${esc(infSubj())}" oninput="INF.subj=this.value;INF.subjEdited=true"></label></div>
+  ${!r.email?'<p class="hint" style="margin-top:0">Este representante no tiene correo en su ficha. Escríbelo aquí o añádelo en «Editar» del representante.</p>':''}
+  ${!X.L.length?'<p class="hint" style="margin-top:0">Ningún cliente de este representante tiene modelos en exposición. Se añaden en la ficha de cada cliente, apartado Exposición.</p>':''}
+  <div id="infout">${I.file?infReady()+`<div class="acts l" style="margin-top:0"><button class="b2" onclick="infPrint()">🖨 Imprimir</button></div><h3 style="margin:14px 0 0">Vista previa del PDF · A4 horizontal · ${I.pages} ${I.pages===1?'página':'páginas'}</h3><div class="semprev" id="semprev"></div>`:''}</div>
+  <div class="acts"><button class="b2" onclick="closeModal()">Cerrar</button>${I.file?'<button class="b2" onclick="expPrep()">↻ Volver a generar</button>':'<button class="b1" onclick="expPrep()">Generar PDF</button>'}</div>`);
+  if(I.file)setTimeout(semPreview,30)}
+function expPrep(){try{const o=expPDF(INF.exp),name='VICKFLEX_Exposiciones_clientes_'+slug(repNom(INF.exp)).replace(/-/g,'_')+'_'+hoy()+'.pdf';
+  INF.file=new File([o.blob],name,{type:'application/pdf'});INF.pages=o.pages;INF.ops=o.ops;INF.W=o.W;INF.H=o.H;expModal()}catch(e){console.error(e);toast('No se ha podido preparar el PDF.',1)}}
+/* Imprimir: en el iPad se abre Compartir, donde aparece «Imprimir»; si no hay Compartir, se abre el PDF para imprimirlo desde el navegador */
+function infPrint(){const I=INF;if(!I||!I.file)return;let sh=false;try{sh=!!(navigator.canShare&&navigator.canShare({files:[I.file]}))}catch(e){}
+  if(sh){toast('En el menú Compartir, elige «Imprimir».');navigator.share({files:[I.file],title:infSubj()}).catch(()=>{});return}
+  const u=URL.createObjectURL(I.file),w=window.open(u,'_blank');setTimeout(()=>URL.revokeObjectURL(u),120000);if(!w)infDown();else toast('PDF abierto: imprímelo desde el navegador.')}
 
 /* ---------- Pantallas ---------- */
 function banner(){
@@ -686,7 +750,7 @@ function vRep(id){
     <td>${lp?fd(lp.f):'<span class="mut">sin fecha</span>'}${ms?`<small class="dn">sin facturar ${ms} meses</small>`:''}</td>
     <td onclick="event.stopPropagation();cycSem('${c.id}')" title="Pulsa para cambiar el estado">${dot(c.semaforo)}</td></tr>`}).join('');
   return `<div class="hb"><div><h1>${esc(r.nombre)}</h1><p class="sub" style="margin-bottom:0">${esc(r.provincias.join(' · ')||'Sin provincia')}${r.ciudad?' · '+esc(r.ciudad):''}</p></div>
-    <div class="acts"><button class="b1" onclick="cliForm(null,'${r.id}')">+ Nuevo cliente</button><button class="b2" onclick="repForm('${r.id}')">Editar</button><button class="b2 dng" onclick="delRep('${r.id}')">Eliminar</button><button class="b2" onclick="nomOpen('${r.id}')">Importar solo nombres</button><button class="b1" onclick="impOpen('${r.id}','principal')">Importar principal</button><button class="b1" onclick="impOpen('${r.id}','comp')">Importar complementos</button></div></div>
+    <div class="acts"><button class="b1" onclick="cliForm(null,'${r.id}')">+ Nuevo cliente</button><button class="b2" onclick="repForm('${r.id}')">Editar</button><button class="b2 dng" onclick="delRep('${r.id}')">Eliminar</button><button class="b2" onclick="expMail('${r.id}')">PDF EXPOSICIONES DE CLIENTES</button><button class="b2" onclick="nomOpen('${r.id}')">Importar solo nombres</button><button class="b1" onclick="impOpen('${r.id}','principal')">Importar principal</button><button class="b1" onclick="impOpen('${r.id}','comp')">Importar complementos</button></div></div>
   ${repFicha(r)}
   <div class="bar2">${catSel()}<span class="mut">Las cifras de abajo muestran: <b>${CAT[VC]}</b></span></div>
   <div class="grid k">
@@ -1027,7 +1091,7 @@ function visitaForm(cid,vid,planId,fecha,ctx){
     o.tipo=o.tipo==='telefonica'?'telefonica':'presencial';o.pedI=pi;let vv=v;
     if(v){snap('Editar visita '+fd(v.f)+' de '+c.nombre);Object.assign(v,o);
       const pe=c.pend.find(x=>x.v===v.id);if(pe&&o.compromisos){pe.t=o.compromisos}else if(!pe&&o.compromisos){c.pend.push({t:o.compromisos,h:false,v:v.id,f:o.f})}}
-    else{vv=Object.assign({id:uid(),proxH:false},o);c.visitas.push(vv);
+    else{vv=Object.assign({id:uid(),proxH:false,creado:Date.now()},o);c.visitas.push(vv);
       if(o.compromisos)c.pend.push({t:o.compromisos,h:false,v:vv.id,f:o.f});
       if(planId){const pl=D.plan.find(x=>x.id===planId);if(pl){pl.hecha=true;pl.visitId=vv.id}}}
     /* los modelos nuevos pasan a la exposición del cliente y las posibles incorporaciones a sus pendientes (solo se añaden, nunca se quitan) */
