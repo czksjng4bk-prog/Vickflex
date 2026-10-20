@@ -750,7 +750,7 @@ function vRep(id){
     <td>${lp?fd(lp.f):'<span class="mut">sin fecha</span>'}${ms?`<small class="dn">sin facturar ${ms} meses</small>`:''}</td>
     <td onclick="event.stopPropagation();cycSem('${c.id}')" title="Pulsa para cambiar el estado">${dot(c.semaforo)}</td></tr>`}).join('');
   return `<div class="hb"><div><h1>${esc(r.nombre)}</h1><p class="sub" style="margin-bottom:0">${esc(r.provincias.join(' · ')||'Sin provincia')}${r.ciudad?' · '+esc(r.ciudad):''}</p></div>
-    <div class="acts"><button class="b1" onclick="cliForm(null,'${r.id}')">+ Nuevo cliente</button><button class="b2" onclick="repForm('${r.id}')">Editar</button><button class="b2 dng" onclick="delRep('${r.id}')">Eliminar</button><button class="b2" onclick="expMail('${r.id}')">PDF EXPOSICIONES DE CLIENTES</button><button class="b2" onclick="nomOpen('${r.id}')">Importar solo nombres</button><button class="b1" onclick="impOpen('${r.id}','principal')">Importar principal</button><button class="b1" onclick="impOpen('${r.id}','comp')">Importar complementos</button></div></div>
+    <div class="acts"><button class="b1" onclick="cliForm(null,'${r.id}')">+ Nuevo cliente</button><button class="b2" onclick="repForm('${r.id}')">Editar</button><button class="b2 dng" onclick="delRep('${r.id}')">Eliminar</button><button class="b2" onclick="expMail('${r.id}')">PDF EXPOSICIONES DE CLIENTES</button><button class="b1" onclick="clOpen('${r.id}')">IMPORTAR CLIENTES</button><button class="b2" onclick="nomOpen('${r.id}')">Importar solo nombres</button><button class="b1" onclick="impOpen('${r.id}','principal')">Importar principal</button><button class="b1" onclick="impOpen('${r.id}','comp')">Importar complementos</button></div></div>
   ${repFicha(r)}
   <div class="bar2">${catSel()}<span class="mut">Las cifras de abajo muestran: <b>${CAT[VC]}</b></span></div>
   <div class="grid k">
@@ -1701,7 +1701,7 @@ function impAplicar(){
 function impHist(r){
   const l=(D.imports||[]).filter(x=>x.rep===r.id).slice().reverse();
   if(!l.length)return '';
-  return `<div class="card" style="margin-top:14px"><h3>Informes importados</h3><table class="tb"><thead><tr><th>Fecha</th><th>Tipo</th><th>Periodo</th><th class="r">Clientes</th><th class="r">Total</th><th>Archivo</th></tr></thead><tbody>${l.slice(0,15).map(x=>`<tr><td>${fd(new Date(x.at).toISOString().slice(0,10))}</td><td>${x.modo==='nombres'?'Solo nombres':CATL[x.tipo]}</td><td>${x.modo==='nombres'?'—':x.modo==='mes'?MES[x.m-1]+' '+x.y:'Acumulado ene–'+MES[x.m-1]+' '+x.y}</td><td class="r">${x.n}</td><td class="r">${x.modo==='nombres'?'—':eur2(x.total)}</td><td>${esc(x.archivo||'')}</td></tr>`).join('')}</tbody></table></div>`}
+  return `<div class="card" style="margin-top:14px"><h3>Informes importados</h3><table class="tb"><thead><tr><th>Fecha</th><th>Tipo</th><th>Periodo</th><th class="r">Clientes</th><th class="r">Total</th><th>Archivo</th></tr></thead><tbody>${l.slice(0,15).map(x=>`<tr><td>${fd(new Date(x.at).toISOString().slice(0,10))}</td><td>${x.modo==='nombres'?'Solo nombres':x.modo==='clientes'?'Fichas de clientes':CATL[x.tipo]}</td><td>${x.modo==='nombres'||x.modo==='clientes'?'—':x.modo==='mes'?MES[x.m-1]+' '+x.y:'Acumulado ene–'+MES[x.m-1]+' '+x.y}</td><td class="r">${x.n}</td><td class="r">${x.modo==='nombres'||x.modo==='clientes'?'—':eur2(x.total)}</td><td>${esc(x.archivo||'')}</td></tr>`).join('')}</tbody></table></div>`}
 
 /* ======================= IMPORTAR SOLO NOMBRES DE CLIENTES =======================
    Pega una lista (uno por línea). Se ignoran números de orden e importes. Solo crea los clientes
@@ -1760,6 +1760,187 @@ function nomAplicar(){
     D.clientes.push({id:uid(),codigo:'',nombreFact:o.n,nombre:o.n,poblacion:'',cp:'',provincia:prov,zona:o.z||'',direccion:'',telefono:'',contacto:'',email:'',repId:NM.rep,semaforo:'amarillo',obs:'',fact:{},comp:{},acumul:{},catalogo:{ok:null,f:''},prodPend:[],expObs:'',exposicion:[],pend:[],visitas:[],pedidos:[],repHist:[{r:NM.rep,d:Date.now()}]});n++});
   D.imports.push({id:uid(),at:Date.now(),rep:NM.rep,tipo:'principal',modo:'nombres',y:YEAR,m:0,hash:'n'+Date.now(),archivo:'solo nombres',n:n,total:0,nuevos:n});
   save();const id=NM.rep;NM=null;closeModal();go('rep/'+id);render(true);toast('Creados '+n+' clientes. Puedes deshacerlo en Copias de seguridad.')}
+
+/* ======================= IMPORTAR CLIENTES (FICHAS) DESDE EXCEL O CSV =======================
+   Crea o completa fichas de clientes de UN representante a partir de un Excel (.xlsx) o CSV, siempre con vista previa y confirmación.
+   - Los datos se leen aquí, en el iPad: no se suben a ningún sitio ni se guardan en el código de la app.
+   - Los códigos se tratan como TEXTO (se conservan los ceros iniciales). Si falta el código, se deja vacío: nunca se inventa.
+   - Sin nombre comercial, se usa provisionalmente la razón social (que también se guarda en su campo).
+   - Duplicados: 1) código de fábrica, 2) razón social / nombre / equivalencias, 3) parecidos (nombre, correo, teléfono).
+   - Nunca se borra nada de un cliente existente (visitas, facturación, exposición, seguimientos…). Solo se actualiza si tú lo eliges.
+   - Antes de guardar se hace una copia interna (Copias de seguridad › Deshacer). */
+let CL=null;
+/* --- lector .xlsx que conserva los textos tal cual (códigos, CP y teléfonos) y devuelve todas las hojas con su nombre --- */
+/* busca etiquetas con o sin prefijo (algunos programas escriben <x:row> en vez de <row>) */
+const TG=(el,n)=>{const r=el.getElementsByTagNameNS('*',n);return r.length?r:el.getElementsByTagName(n)};
+async function readXlsxHojas(buf){
+  const z=await unzipX(buf),dp=new DOMParser(),X=async n=>{const t=await z.get(n);return t?dp.parseFromString(t,'text/xml'):null};
+  const ss=[],sx=await X('xl/sharedStrings.xml');if(sx)[...TG(sx,'si')].forEach(si=>ss.push([...TG(si,'t')].map(t=>t.textContent).join('')));
+  /* formatos tipo «00000»: un número guardado con ceros a la izquierda visibles */
+  const pad=[],st=await X('xl/styles.xml');if(st){const fm={};[...TG(st,'numFmt')].forEach(f=>fm[f.getAttribute('numFmtId')]=f.getAttribute('formatCode')||'');
+    const cx=TG(st,'cellXfs')[0];if(cx)[...TG(cx,'xf')].forEach((x,i)=>{const c=(fm[x.getAttribute('numFmtId')]||'').replace(/["\\]/g,'');pad[i]=/^0+$/.test(c)?c.length:0})}
+  const nombres={},wb=await X('xl/workbook.xml'),rl=await X('xl/_rels/workbook.xml.rels');
+  if(wb&&rl){const tg={};[...TG(rl,'Relationship')].forEach(r=>tg[r.getAttribute('Id')]=r.getAttribute('Target'));
+    [...TG(wb,'sheet')].forEach(s=>{const id=s.getAttribute('r:id')||s.getAttributeNS('http://schemas.openxmlformats.org/officeDocument/2006/relationships','id');let t=tg[id]||'';t=t.replace(/^\/?xl\//,'').replace(/^\//,'');if(t)nombres['xl/'+t]=s.getAttribute('name')})}
+  const out=[];
+  for(const nm of z.names.filter(n=>/^xl\/worksheets\/sheet\d+\.xml$/.test(n)).sort((a,b)=>parseInt(a.match(/\d+/)[0])-parseInt(b.match(/\d+/)[0]))){
+    const d=dp.parseFromString(await z.get(nm),'text/xml'),rows=[];
+    [...TG(d,'row')].forEach(r=>{const row=[];
+      [...TG(r,'c')].forEach(c=>{const ref=c.getAttribute('r');if(!ref)return;const t=c.getAttribute('t'),v=TG(c,'v')[0];let val='';
+        if(t==='s'&&v)val=ss[+v.textContent]||'';else if(t==='inlineStr')val=[...TG(c,'t')].map(x=>x.textContent).join('');
+        else if(v){val=v.textContent;if(!t||t==='n'){if(/e/i.test(val)&&isFinite(+val))val=Number(val).toFixed(0);const p=pad[+(c.getAttribute('s')||0)];if(p&&/^\d+$/.test(val))val=val.padStart(p,'0')}}
+        row[colIdx(ref)]=String(val==null?'':val)});
+      rows.push(Array.from(row,x=>x==null?'':x))});
+    out.push({nombre:nombres[nm]||nm.replace(/^.*\//,''),rows:rows})}
+  return out}
+/* --- reconocer columnas por su título --- */
+const CLF=[['codigo','Código de cliente de fábrica'],['nombre','Nombre comercial'],['nombreFact','Razón social'],['direccion','Dirección'],['cp','Código postal'],['poblacion','Población'],['provincia','Provincia'],['telefono','Teléfono'],['contacto','Persona de contacto'],['email','Correo electrónico'],['repTxt','Representante'],['repCod','Código de vendedor']];
+function clCampo(h){h=norm(h).replace(/[^a-z0-9]+/g,' ').trim();if(!h)return '';
+  if(/^estado|^observ|^notas?$|^comentario/.test(h))return '';
+  if(/postal|^c p$|^cp$|^cod p/.test(h))return 'cp';
+  if(/(codigo|cod) (de )?(vendedor|representante|agente|comercial)/.test(h))return 'repCod';
+  if(/nombre comercial|^comercial nombre|nombre tienda|^tienda|establecimiento|rotulo/.test(h))return 'nombre';
+  if(/representante|vendedor|agente|^comercial$/.test(h))return 'repTxt';
+  if(/razon|fiscal|facturacion|^cliente|^nombre$|titular/.test(h))return 'nombreFact';
+  if(/codigo|^cod\b|^n cliente|^num(ero)? cliente|^id cliente/.test(h))return 'codigo';
+  if(/direcc|domicilio|calle/.test(h))return 'direccion';
+  if(/poblacion|localidad|municipio|ciudad/.test(h))return 'poblacion';
+  if(/provincia/.test(h))return 'provincia';
+  if(/e ?mail|correo/.test(h))return 'email';
+  if(/telef|^tel\b|^tlf|^telf|movil/.test(h))return 'telefono';
+  if(/contacto|persona/.test(h))return 'contacto';
+  return ''}
+function clDetectar(hojas){let best=null;
+  hojas.forEach((h,hi)=>{for(let r=0;r<Math.min(10,h.rows.length);r++){const m={};(h.rows[r]||[]).forEach((t,ci)=>{const k=clCampo(t);if(k&&m[k]==null)m[k]=ci});
+    const sc=Object.keys(m).length+((m.nombre!=null||m.nombreFact!=null)?3:0);if(!best||sc>best.sc)best={sc:sc,hoja:hi,fila:r,map:m}}});
+  return best}
+/* --- paso 1: elegir archivo --- */
+function clOpen(repId){if(!rep(repId))return;CL={rep:repId,archivo:'',hojas:[],hoja:0,fila:0,map:{},items:[],filtro:'todos',msg:''};clF1()}
+function clF1(){const r=rep(CL.rep),lb=D.lastBackup?new Date(D.lastBackup).toLocaleString('es-ES',{day:'numeric',month:'long',hour:'2-digit',minute:'2-digit'}):'nunca';
+  modalW(`<h2>Importar clientes · ${esc(r.nombre)}${r.codigoFab?' · '+esc(r.codigoFab):''}</h2>
+  <p class="hint" style="margin:0 0 10px">Elige un <b>Excel (.xlsx)</b> o un <b>CSV</b> con los clientes. Verás una vista previa con todos ellos y la comprobación de duplicados. <b>No se guarda nada hasta que confirmes.</b></p>
+  <div class="card" style="background:#fdf7ee;margin-bottom:12px"><b>1) Copia de seguridad</b> · Última copia: <b>${esc(lb)}</b>${D.changes?' · '+D.changes+' cambios desde entonces':''}
+   <div class="acts l" style="margin-top:8px"><button class="b2" onclick="hacerCopia()">Hacer copia ahora</button></div></div>
+  <div class="grid c2"><div class="card"><h3>2) Archivo Excel o CSV</h3><label class="b1 filebtn" style="display:inline-block">Elegir archivo<input type="file" accept=".xlsx,.csv,.txt,.tsv,.xls,.numbers,application/vnd.openxmlformats-officedocument.spreadsheetml.sheet,text/csv" onchange="clFile(this)" hidden></label>
+    <p class="hint">Se abre Archivos del iPad: busca el Excel (por ejemplo en Descargas o iCloud Drive). La primera fila debe tener los títulos de las columnas.</p></div>
+   <div class="card"><h3>…o pega las filas</h3><textarea id="clt" rows="5" style="width:100%;padding:12px;border:1px solid var(--b2);border-radius:10px;font-size:15px;font-family:inherit" placeholder="Copia las filas en Numbers o Excel (con la fila de títulos) y pégalas aquí"></textarea><div class="acts"><button class="b2" onclick="clTexto()">Leer texto pegado</button></div></div></div>
+  <p class="err" id="err">${esc(CL.msg)}</p><div class="acts"><button class="b2" onclick="CL=null;closeModal()">Cancelar</button></div>`)}
+async function clFile(inp){const f=inp.files[0];if(!f)return;CL.archivo=f.name;CL.msg='';let hojas;
+  try{if(/\.xlsx$/i.test(f.name))hojas=await readXlsxHojas(await f.arrayBuffer());
+    else if(/\.xls$/i.test(f.name)){CL.msg='Los .xls antiguos no se pueden leer. En Excel o Numbers guárdalo como .xlsx o CSV.';return clF1()}
+    else if(/\.numbers$/i.test(f.name)){CL.msg='Los archivos de Numbers no se pueden leer directamente. En Numbers: Compartir › Exportar › Excel, y elige ese archivo.';return clF1()}
+    else{let t=await f.text();if(t.indexOf('\uFFFD')>=0)t=new TextDecoder('windows-1252').decode(await f.arrayBuffer());hojas=[{nombre:f.name,rows:parseCSV(t)}]}}
+  catch(e){CL.msg=e.message==='nodecomp'?'Este navegador no puede abrir .xlsx. Guarda el archivo como CSV.':'No he podido leer ese archivo. Prueba a guardarlo como .xlsx o CSV.';return clF1()}
+  clCargar(hojas)}
+function clTexto(){const t=$('#clt').value;if(!t.trim()){CL.msg='Pega primero las filas.';return clF1()}CL.archivo='texto pegado';CL.msg='';clCargar([{nombre:'Texto pegado',rows:parseCSV(t)}])}
+function clCargar(hojas){hojas=hojas.map(h=>({nombre:h.nombre,rows:h.rows.map(r=>r.map(x=>String(x==null?'':x).replace(/\u00a0/g,' ').trim()))}));
+  if(!hojas.some(h=>h.rows.length)){CL.msg='El archivo no tiene filas.';return clF1()}
+  const b=clDetectar(hojas);CL.hojas=hojas;CL.hoja=b?b.hoja:0;CL.fila=b?b.fila:0;CL.map=b?b.map:{};clBuild();clRender()}
+function clSetHoja(i){CL.hoja=+i;const b=clDetectar([CL.hojas[CL.hoja]]);CL.fila=b?b.fila:0;CL.map=b?b.map:{};clBuild();keepScroll(clRender)}
+function clSetMap(k,v){Object.keys(CL.map).forEach(x=>{if(v!==''&&CL.map[x]===+v)delete CL.map[x]});if(v==='')delete CL.map[k];else CL.map[k]=+v;clBuild();keepScroll(clRender)}
+/* --- preparar cada fila y comprobar duplicados --- */
+const clDig=t=>String(t||'').replace(/\D/g,'');
+const clMailOk=t=>/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(t);
+function clBuild(){const H=CL.hojas[CL.hoja],M=CL.map,r=rep(CL.rep),g=(row,k)=>M[k]==null?'':String(row[M[k]]||'').replace(/\s+/g,' ').trim();
+  const items=[];(H.rows||[]).slice(CL.fila+1).forEach((row,j)=>{if(!row.some(x=>String(x).trim()))return;
+    const o={fila:CL.fila+j+2};CLF.forEach(f=>o[f[0]]=g(row,f[0]));
+    /* teléfono con un nombre detrás («686778882 JOSE»): el número queda en Teléfono y el nombre pasa a Persona de contacto */
+    const tm=/^([+\d][\d\s.\-\/]*\d)\s*[\/,;-]?\s*([A-Za-zÁÉÍÓÚÑáéíóúñªº][A-Za-zÁÉÍÓÚÑáéíóúñªº.\s]*)$/.exec(o.telefono);
+    if(tm&&clDig(tm[1]).length>=9){o.telefono=tm[1].trim();if(!o.contacto)o.contacto=tm[2].trim();o.telNota=1}
+    if(/^\d{4}$/.test(o.cp))o.cp='0'+o.cp;
+    o.prov=!o.nombre&&!!o.nombreFact;if(!o.nombre)o.nombre=o.nombreFact;if(!o.nombreFact)o.nombreFact=o.nombre;
+    items.push(o)});
+  const vistosC={},vistosN={},porMail={},porTel={};
+  items.forEach((o,i)=>{o.av=[];o.cand=[];o.ex=null;o.bloq=0;
+    if(!o.nombre){o.bloq=1;o.av.push('Sin nombre ni razón social: no se puede importar.')}
+    /* 1) mismo código de fábrica */
+    const cod=nz(o.codigo);if(cod){const r1=D.clientes.filter(c=>nz(c.codigo)===cod);if(r1.length)o.ex={c:r1[0],por:'código de fábrica'}}
+    /* 2) misma razón social / nombre / equivalencia */
+    const k=nc(o.nombreFact),k2=nc(o.nombre);
+    if(!o.ex&&o.nombre){const r2=D.clientes.find(c=>[c.nombreFact,c.nombre].some(n=>{const x=nc(n);return x&&(x===k||x===k2)})||equivOf(c.id).some(e=>nc(e.n)===k));if(r2)o.ex={c:r2,por:'razón social o nombre'}}
+    if(o.ex&&o.ex.por==='código de fábrica'&&o.nombreFact&&o.ex.c.nombreFact&&nc(o.ex.c.nombreFact)!==k&&!mismoNombre(o.ex.c.nombreFact,o.nombreFact))o.av.push('El código coincide con «'+o.ex.c.nombre+'», pero la razón social es distinta («'+o.ex.c.nombreFact+'»). Revísalo.');
+    if(o.ex&&o.ex.c.codigo&&cod&&nz(o.ex.c.codigo)!==cod)o.av.push('Ese cliente ya tiene otro código de fábrica ('+o.ex.c.codigo+'): no se cambiará.');
+    /* 3) parecidos: nombre parecido, mismo correo o mismo teléfono */
+    if(!o.ex&&o.nombre){const em=norm(o.email),tl=clDig(o.telefono).slice(-9);
+      D.clientes.forEach(c=>{const por=[];if([c.nombreFact,c.nombre].some(n=>n&&(mismoNombre(n,o.nombreFact)||mismoNombre(n,o.nombre))))por.push('nombre parecido');
+        if(em&&norm(c.email)===em)por.push('mismo correo');if(tl.length===9&&clDig(c.telefono).slice(-9)===tl)por.push('mismo teléfono');
+        if(por.length)o.cand.push({c:c,por:por.join(', ')})});o.cand=o.cand.slice(0,3)}
+    /* dentro del propio archivo */
+    if(cod){if(vistosC[cod]!=null){o.bloq=1;o.av.push('Código repetido en el archivo (ya está en la fila '+items[vistosC[cod]].fila+').')}else vistosC[cod]=i}
+    if(k&&!o.bloq){if(vistosN[k]!=null){o.bloq=1;o.av.push('Razón social repetida en el archivo (fila '+items[vistosN[k]].fila+').')}else vistosN[k]=i}
+    const em=norm(o.email),tl=clDig(o.telefono).slice(-9);if(em)(porMail[em]=porMail[em]||[]).push(i);if(tl.length===9)(porTel[tl]=porTel[tl]||[]).push(i);
+    /* representante del archivo */
+    if(o.repCod&&r.codigoFab&&nz(o.repCod)!==nz(r.codigoFab))o.av.push('En el archivo figura el vendedor '+o.repCod+', y '+r.nombre+' tiene el código '+r.codigoFab+'.');
+    else if(!o.repCod&&o.repTxt&&!mismoNombre(o.repTxt,r.nombre)&&nc(o.repTxt)!==nc(r.nombre))o.av.push('En el archivo figura el representante «'+o.repTxt+'».');
+    if(o.cp&&!/^\d{5}$/.test(o.cp))o.av.push('Código postal no válido («'+o.cp+'»).');
+    if(o.email&&!clMailOk(o.email))o.av.push('Correo con formato dudoso.')});
+  items.forEach((o,i)=>{const fm=(porMail[norm(o.email)]||[]).filter(x=>x!==i),ft=(porTel[clDig(o.telefono).slice(-9)]||[]).filter(x=>x!==i);
+    o.inf=[];if(fm.length)o.inf.push('Mismo correo que la fila '+fm.map(x=>items[x].fila).join(', '));if(ft.length)o.inf.push('Mismo teléfono que la fila '+ft.map(x=>items[x].fila).join(', '));
+    o.est=o.ex?'existe':o.cand.length?'posible':(o.av.length||o.bloq)?'revisar':'nuevo';
+    o.act=o.bloq?'skip':o.est==='existe'||o.est==='posible'?'skip':o.av.some(a=>/vendedor|representante/.test(a))?'skip':'new'});
+  CL.items=items}
+const CLE={nuevo:['Nuevo','u'],existe:['Ya existe','n'],posible:['Posible duplicado','m'],revisar:['Revisar','d']};
+const CLCAMPOS=['codigo','nombreFact','direccion','cp','poblacion','provincia','telefono','contacto','email'];
+const CLNOM={codigo:'código',nombreFact:'razón social',direccion:'dirección',cp:'CP',poblacion:'población',provincia:'provincia',telefono:'teléfono',contacto:'contacto',email:'correo'};
+/* qué cambiaría en un cliente existente: «fill» solo rellena huecos; «upd» pone los datos del Excel. Nunca cambia el nombre comercial ni un código ya puesto. */
+function clCambios(o,c,modo){const L=[];CLCAMPOS.forEach(k=>{const nv=o[k],ov=String(c[k]||'');if(!nv||nc(nv)===nc(ov))return;if(k==='codigo'&&ov)return;if(modo==='fill'&&ov)return;L.push(k)});return L}
+function clOpts(o){const r=rep(CL.rep),O=[];
+  if(o.bloq)return [['skip','No importar']];
+  const upd=(c,lab)=>{const otro=c.repId!==CL.rep;O.push(['fill|'+c.id+'|0','Completar datos vacíos de «'+c.nombre+'»'+(otro?' (sigue con '+repNom(c.repId)+')':'')]);O.push(['upd|'+c.id+'|0','Actualizar «'+c.nombre+'» con los datos del Excel'+(otro?' (sigue con '+repNom(c.repId)+')':'')]);
+    if(otro){O.push(['fill|'+c.id+'|1','Completar datos vacíos y pasar a '+r.nombre]);O.push(['upd|'+c.id+'|1','Actualizar con el Excel y pasar a '+r.nombre])}};
+  if(o.ex){O.push(['skip','Omitir (no tocarlo)']);upd(o.ex.c)}
+  else{O.push(['new','Importar como nuevo']);O.push(['skip','No importar']);o.cand.forEach(x=>upd(x.c))}
+  return O}
+function clSetAct(i,v){CL.items[i].act=v;keepScroll(clRender)}
+function clFiltro(f){CL.filtro=f;keepScroll(clRender)}
+function clResumen(){const I=CL.items,n=k=>I.filter(o=>o.est===k).length;
+  return {nuevo:n('nuevo'),existe:n('existe'),posible:n('posible'),revisar:n('revisar'),crear:I.filter(o=>o.act==='new').length,act:I.filter(o=>/^(fill|upd)/.test(o.act)).length,omit:I.filter(o=>o.act==='skip').length}}
+function clRender(){const r=rep(CL.rep),H=CL.hojas[CL.hoja],hdr=(H.rows[CL.fila]||[]),S=clResumen(),I=CL.items;
+  const colOpt=k=>`<option value="">— no usar —</option>`+hdr.map((t,ci)=>`<option value="${ci}" ${CL.map[k]===ci?'selected':''}>${esc(t||('Columna '+(ci+1)))}</option>`).join('');
+  const sinNom=CL.map.nombre==null,sinCod=CL.map.codigo==null;
+  const vis=I.map((o,i)=>[o,i]).filter(([o])=>CL.filtro==='todos'||o.est===CL.filtro);
+  const filas=vis.map(([o,i])=>{const E=CLE[o.est],ch=o.act.split('|'),c=ch[1]?cli(ch[1]):null,cmb=c?clCambios(o,c,ch[0]):[];
+    return `<tr${o.est!=='nuevo'?' style="background:'+(o.est==='revisar'?'#fff6ea':o.est==='existe'?'#f4f1ea':'#fffaf0')+'"':''}><td class="mut">${o.fila}</td><td style="min-width:190px"><span class="pill ${E[1]}">${E[0]}</span><div style="margin-top:6px"><select style="padding:8px;border:1px solid var(--b2);border-radius:8px;font-size:14px;width:200px" ${o.bloq?'disabled':''} onchange="clSetAct(${i},this.value)">${clOpts(o).map(x=>`<option value="${esc(x[0])}" ${x[0]===o.act?'selected':''}>${esc(x[1])}</option>`).join('')}</select></div></td>
+     <td>${o.codigo?'<b>'+esc(o.codigo)+'</b>':'<span class="mut">pendiente</span>'}</td>
+     <td style="min-width:180px"><b>${esc(o.nombre||'—')}</b>${o.prov?'<small>Nombre comercial provisional (= razón social)</small>':`<small>Razón social: ${esc(o.nombreFact)}</small>`}</td>
+     <td style="min-width:150px">${esc(o.direccion||'—')}<small>${esc([o.cp,o.poblacion].filter(Boolean).join(' '))}${o.provincia?' ('+esc(o.provincia)+')':''}</small></td>
+     <td style="min-width:150px;word-break:break-word">${esc(o.telefono||'—')}${o.contacto?'<small>Contacto: '+esc(o.contacto)+(o.telNota?' (venía junto al teléfono)':'')+'</small>':''}<small>${esc(o.email||'sin correo')}</small></td>
+     <td style="min-width:180px;font-size:13px;line-height:1.35">${o.ex?`<div>Coincide por <b>${esc(o.ex.por)}</b> con <a style="color:var(--v);font-weight:600" onclick="closeModal();go('cli/${o.ex.c.id}')">${esc(o.ex.c.nombre)}</a> (${esc(repNom(o.ex.c.repId))})</div>`:''}
+       ${o.cand.map(x=>`<div>Parecido a <b>${esc(x.c.nombre)}</b> (${esc(repNom(x.c.repId))}) · ${esc(x.por)}</div>`).join('')}
+       ${o.av.map(a=>`<div class="dn">⚠ ${esc(a)}</div>`).join('')}${o.inf.map(a=>`<div class="mut">ℹ ${esc(a)}</div>`).join('')}
+       ${c?`<div style="color:var(--v)">${cmb.length?'Cambiará: '+cmb.map(k=>CLNOM[k]).join(', '):'No hay datos nuevos que añadir'}${ch[2]==='1'?' · pasa a '+esc(r.nombre):''}</div>`:''}</td></tr>`}).join('');
+  const kb=(k,l,n)=>`<button class="${CL.filtro===k?'on':''}" onclick="clFiltro('${k}')">${l} · ${n}</button>`;
+  modalW(`<h2>Vista previa · importar clientes · ${esc(r.nombre)}</h2>
+  <p class="hint" style="margin:0 0 10px"><b>Todavía no se ha guardado nada.</b> Archivo: <b>${esc(CL.archivo)}</b>${CL.hojas.length>1?' · hoja <b>'+esc(H.nombre)+'</b>':''} · ${I.length} clientes leídos · todos se asignan a <b>${esc(r.nombre)}</b>.</p>
+  <div class="grid k" style="margin-bottom:12px">
+   <div class="card"><h3>Clientes nuevos</h3><div class="big" style="font-size:28px">${S.nuevo}</div><div class="mut" style="font-size:13px">sin coincidencias</div></div>
+   <div class="card"><h3>Ya existentes</h3><div class="big" style="font-size:28px">${S.existe}</div><div class="mut" style="font-size:13px">mismo código o razón social</div></div>
+   <div class="card"><h3>Posibles duplicados</h3><div class="big" style="font-size:28px">${S.posible}</div><div class="mut" style="font-size:13px">nombre, correo o teléfono parecidos</div></div>
+   <div class="card"><h3>Necesitan revisión</h3><div class="big" style="font-size:28px">${S.revisar}</div><div class="mut" style="font-size:13px">avisos en la fila</div></div></div>
+  <details class="card" style="margin-bottom:12px" ${sinNom&&CL.map.nombreFact==null?'open':''}><summary style="cursor:pointer;font-weight:600;color:var(--v)">Columnas del Excel (pulsa para comprobarlas o cambiarlas)</summary>
+   ${CL.hojas.length>1?`<label class="f" style="margin-top:10px"><span>Hoja</span><select onchange="clSetHoja(this.value)">${CL.hojas.map((h,i)=>`<option value="${i}" ${i===CL.hoja?'selected':''}>${esc(h.nombre)} (${h.rows.length} filas)</option>`).join('')}</select></label>`:''}
+   <div class="fg">${CLF.map(f=>`<label class="f"><span>${f[1]}</span><select onchange="clSetMap('${f[0]}',this.value)">${colOpt(f[0])}</select></label>`).join('')}</div>
+   <p class="hint" style="margin:0">${sinNom?'No hay columna de nombre comercial: se usará la razón social como nombre comercial provisional. ':''}${sinCod?'No hay columna de código: los clientes se crean sin código. ':''}Los códigos se guardan como texto, con sus ceros iniciales.</p></details>
+  <div class="bar2"><div class="seg">${kb('todos','Todos',I.length)}${kb('nuevo','Nuevos',S.nuevo)}${kb('existe','Existentes',S.existe)}${kb('posible','Posibles duplicados',S.posible)}${kb('revisar','Revisar',S.revisar)}</div></div>
+  <div class="card"><div style="overflow:auto;max-height:50vh;-webkit-overflow-scrolling:touch"><table class="tb" style="font-size:14px"><thead><tr><th>Fila</th><th>Estado · qué hacer</th><th>Código</th><th>Cliente</th><th>Dirección</th><th>Teléfono / correo</th><th>Comprobación</th></tr></thead><tbody>${filas||'<tr><td colspan="7" class="mut">Ninguno en este grupo.</td></tr>'}</tbody></table></div></div>
+  <p class="hint">Se van a <b>crear ${S.crear}</b> clientes nuevos, <b>actualizar ${S.act}</b> existentes y <b>omitir ${S.omit}</b>. «Completar datos vacíos» solo rellena lo que falta; «Actualizar» pone los datos del Excel. En ningún caso se cambia el nombre comercial ni un código ya puesto, ni se borran visitas, facturación, exposiciones o seguimientos.</p>
+  <div class="acts"><button class="b2" onclick="clF1()">← Elegir otro archivo</button><button class="b2" onclick="CL=null;closeModal()">Cancelar</button><button class="b1" ${S.crear+S.act?'':'disabled style="opacity:.45"'} onclick="clConfirmar()">Importar…</button></div>`)}
+function clConfirmar(){const S=clResumen(),r=rep(CL.rep);
+  ask(`Vas a importar en <b>${esc(r.nombre)}</b>:<ul style="margin:8px 0 0 18px;line-height:1.6"><li><b>${S.crear}</b> clientes nuevos</li><li><b>${S.act}</b> clientes existentes actualizados</li><li><b>${S.omit}</b> filas omitidas</li></ul><br>Antes se guarda una copia interna para poder deshacerlo (Copias de seguridad › Deshacer).`,'Importar ahora',clAplicar)}
+function clAplicar(){const r=rep(CL.rep);snap('Importar clientes de '+r.nombre+' ('+CL.archivo+')');let nu=0,ac=0,om=0;const res=[];
+  CL.items.forEach(o=>{const a=o.act.split('|');
+    if(a[0]==='new'){/* última comprobación para no duplicar nunca */
+      const cod=nz(o.codigo),k=nc(o.nombreFact);
+      if((cod&&D.clientes.some(c=>nz(c.codigo)===cod))||(k&&D.clientes.some(c=>nc(c.nombreFact)===k))){om++;res.push(o.nombre+': ya existía, no se ha creado');return}
+      D.clientes.push({id:uid(),codigo:o.codigo,nombreFact:o.nombreFact,nombre:o.nombre,poblacion:o.poblacion,cp:o.cp,zona:'',provincia:o.provincia,direccion:o.direccion,telefono:o.telefono,contacto:o.contacto,email:o.email,
+        acumul:{},repId:CL.rep,semaforo:'amarillo',obs:'',fact:{},comp:{},catalogo:{ok:null,f:''},prodPend:[],expObs:'',exposicion:[],pend:[],visitas:[],pedidos:[],repHist:[{r:CL.rep,d:Date.now()}]});nu++}
+    else if(a[0]==='fill'||a[0]==='upd'){const c=cli(a[1]);if(!c){om++;return}
+      clCambios(o,c,a[0]).forEach(k=>{if(k==='nombreFact'&&c.nombreFact&&!equivOf(c.id).some(e=>nc(e.n)===nc(c.nombreFact)))D.equiv.push({n:c.nombreFact,c:c.id});c[k]=o[k]});
+      if(a[2]==='1'&&c.repId!==CL.rep){c.repId=CL.rep;c.repHist.push({r:CL.rep,d:Date.now()})}ac++}
+    else om++});
+  D.imports.push({id:uid(),at:Date.now(),rep:CL.rep,tipo:'principal',modo:'clientes',y:YEAR,m:0,hash:'c'+Date.now(),archivo:CL.archivo,n:nu+ac,total:0,nuevos:nu});
+  if(!save())return;const id=CL.rep;CL=null;go('rep/'+id);render(true);
+  modal(`<h2>✔ Importación terminada</h2><p class="msg" style="line-height:1.7"><b>${nu}</b> clientes nuevos creados<br><b>${ac}</b> clientes existentes actualizados<br><b>${om}</b> filas omitidas${res.length?'<br><br>'+res.map(esc).join('<br>'):''}</p><p class="hint">Ya los tienes en la lista de ${esc(r.nombre)}. Si algo no está bien: Copias de seguridad › Deshacer. Recuerda hacer una copia de seguridad nueva.</p><div class="acts"><button class="b2" onclick="closeModal();go('copias')">Ir a Copias de seguridad</button><button class="b1" onclick="closeModal()">Ver clientes</button></div>`)}
 
 render();
 </script>
