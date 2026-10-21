@@ -1793,6 +1793,61 @@ async function readXlsxHojas(buf){
       rows.push(Array.from(row,x=>x==null?'':x))});
     out.push({nombre:nombres[nm]||nm.replace(/^.*\//,''),rows:rows})}
   return out}
+
+/* --- lector de Excel antiguo (.xls, el que saca el programa de fábrica). Solo lee textos y números de las celdas. --- */
+function readXlsHojas(buf){const u=new Uint8Array(buf),dv=new DataView(buf),U16=o=>dv.getUint16(o,true),U32=o=>dv.getUint32(o,true);
+  if(U32(0)!==0xE011CFD0||U32(4)!==0xE11AB1A1)throw new Error('noxls');
+  const ss=1<<U16(30),ms=1<<U16(32),cut=U32(56),off=s=>(s+1)*ss;
+  /* tabla de sectores (FAT) */
+  const difat=[];for(let i=0;i<109;i++){const v=U32(76+i*4);if(v<0xFFFFFFFA)difat.push(v)}
+  let ds=U32(68);for(let k=0;k<U32(72)&&ds<0xFFFFFFFA;k++){const o=off(ds);for(let i=0;i<ss/4-1;i++){const v=U32(o+i*4);if(v<0xFFFFFFFA)difat.push(v)}ds=U32(o+ss-4)}
+  const fat=[];difat.forEach(s=>{const o=off(s);for(let i=0;i<ss/4;i++)fat.push(U32(o+i*4))});
+  const chain=(s,t)=>{const L=[];let n=0;while(s<0xFFFFFFFA&&n++<1e6){L.push(s);s=t[s]}return L};
+  const leer=(s,size)=>{const L=chain(s,fat),o=new Uint8Array(L.length*ss);L.forEach((x,i)=>o.set(u.subarray(off(x),off(x)+ss),i*ss));return o.subarray(0,size)};
+  /* directorio: buscar el flujo «Workbook» */
+  const dir=leer(U32(48),1e9),dd=new DataView(dir.buffer,dir.byteOffset,dir.byteLength),ents=[];
+  for(let p=0;p+128<=dir.length;p+=128){const nl=dd.getUint16(p+64,true);let nm='';for(let i=0;i<Math.max(0,nl/2-1);i++)nm+=String.fromCharCode(dd.getUint16(p+i*2,true));ents.push({nm:nm,t:dir[p+66],s:dd.getUint32(p+116,true),z:dd.getUint32(p+120,true)})}
+  const wbE=ents.find(e=>e.t===2&&/^(workbook|book)$/i.test(e.nm));if(!wbE)throw new Error('noxls');
+  let W;if(wbE.z>=cut)W=leer(wbE.s,wbE.z);
+  else{const root=ents.find(e=>e.t===5),mini=leer(root.s,root.z),mf=[];chain(U32(60),fat).forEach(s=>{const o=off(s);for(let i=0;i<ss/4;i++)mf.push(U32(o+i*4))});
+    const L=chain(wbE.s,mf);W=new Uint8Array(L.length*ms);L.forEach((x,i)=>W.set(mini.subarray(x*ms,x*ms+ms),i*ms));W=W.subarray(0,wbE.z)}
+  const wv=new DataView(W.buffer,W.byteOffset,W.byteLength),w16=o=>wv.getUint16(o,true),w32=o=>wv.getUint32(o,true);
+  /* registros BIFF8 */
+  const recs=[];for(let p=0;p+4<=W.length;){const t=w16(p),l=w16(p+2);recs.push({t:t,p:p,d:p+4,l:l});p+=4+l}
+  const str16=(o,cch,hi)=>{let s='';for(let i=0;i<cch;i++)s+=String.fromCharCode(hi?w16(o+i*2):W[o+i]);return s};
+  const uniStr=o=>{const cch=w16(o),f=W[o+2];let q=o+3;if(f&8)q+=2;if(f&4)q+=4;return str16(q,cch,f&1)};
+  const sst=[],fmts={},xfs=[],hojas=[],porPos={};let cp=1252;
+  for(let i=0;i<recs.length;i++){const r=recs[i];
+    if(r.t===0x00FC){/* SST con sus CONTINUE */const segs=[W.subarray(r.d+8,r.d+r.l)];let j=i+1;while(j<recs.length&&recs[j].t===0x003C){segs.push(W.subarray(recs[j].d,recs[j].d+recs[j].l));j++}
+      let si=0,pi=0;const by=()=>{while(si<segs.length&&pi>=segs[si].length){si++;pi=0}return si<segs.length?segs[si][pi++]:0},u16=()=>by()|(by()<<8);
+      const n=w32(r.d+4);for(let k=0;k<n&&si<segs.length;k++){const cch=u16(),f=by();let hi=f&1,run=0,ext=0;if(f&8)run=u16();if(f&4)ext=by()|(by()<<8)|(by()<<16)|(by()<<24);
+        let s='';for(let c=0;c<cch;c++){if(si<segs.length&&pi>=segs[si].length){si++;pi=0;hi=by()&1}s+=String.fromCharCode(hi?u16():by())}
+        for(let x=0;x<run*4+ext;x++)by();sst.push(s)}}
+    else if(r.t===0x041E){fmts[w16(r.d)]=uniStr(r.d+2)}
+    else if(r.t===0x00E0){xfs.push(w16(r.d+2))}
+    else if(r.t===0x0042){cp=w16(r.d)}
+    else if(r.t===0x0085){const h={nombre:uniStr8(r.d+6),rows:[]};porPos[w32(r.d)]=h;if(!(W[r.d+5]))hojas.push(h)}}
+  function uniStr8(o){const cch=W[o],f=W[o+1];return str16(o+2,cch,f&1)}
+  /* números: sin decimales innecesarios; si la celda tiene formato «00000» se respetan los ceros */
+  const numTxt=(v,xf)=>{let s=Number.isInteger(v)?String(v):String(+v.toFixed(10)).replace('.',',');const fc=(fmts[xfs[xf]]||'').replace(/["\\]/g,'');if(/^0+$/.test(fc)&&/^\d+$/.test(s))s=s.padStart(fc.length,'0');return s};
+  const rk=x=>{let v=(x&2)?(x>>2):(()=>{const b=new DataView(new ArrayBuffer(8));b.setUint32(4,x&0xFFFFFFFC,true);return b.getFloat64(0,true)})();return (x&1)?v/100:v};
+  let h=null,pendF=null;
+  for(let i=0;i<recs.length;i++){const r=recs[i],d=r.d;
+    if(r.t===0x0809){h=porPos[r.p]||null;continue}
+    if(!h)continue;
+    const put=(row,col,v)=>{(h.rows[row]=h.rows[row]||[])[col]=v};
+    if(r.t===0x00FD)put(w16(d),w16(d+2),sst[w32(d+6)]||'');
+    else if(r.t===0x0204)put(w16(d),w16(d+2),uniStr(d+6));
+    else if(r.t===0x0203)put(w16(d),w16(d+2),numTxt(wv.getFloat64(d+6,true),w16(d+4)));
+    else if(r.t===0x027E)put(w16(d),w16(d+2),numTxt(rk(w32(d+6)),w16(d+4)));
+    else if(r.t===0x00BD){const row=w16(d),c0=w16(d+2),n=(r.l-6)/6;for(let k=0;k<n;k++)put(row,c0+k,numTxt(rk(w32(d+4+k*6+2)),w16(d+4+k*6)))}
+    else if(r.t===0x0006){const row=w16(d),col=w16(d+2);if(w16(d+12)===0xFFFF){if(W[d+6]===0)pendF=[row,col];else if(W[d+6]===1)put(row,col,W[d+8]?'VERDADERO':'FALSO')}else put(row,col,numTxt(wv.getFloat64(d+6,true),w16(d+4)))}
+    else if(r.t===0x0207&&pendF){put(pendF[0],pendF[1],uniStr(d));pendF=null}
+    else if(r.t===0x000A)h=null}
+  hojas.forEach(x=>{x.rows=Array.from(x.rows,rw=>Array.from(rw||[],v=>v==null?'':v))});
+  return hojas}
+/* Provincia a partir de las dos primeras cifras del código postal */
+const CPPROV=['','Álava','Albacete','Alicante','Almería','Ávila','Badajoz','Illes Balears','Barcelona','Burgos','Cáceres','Cádiz','Castellón','Ciudad Real','Córdoba','A Coruña','Cuenca','Girona','Granada','Guadalajara','Gipuzkoa','Huelva','Huesca','Jaén','León','Lleida','La Rioja','Lugo','Madrid','Málaga','Murcia','Navarra','Ourense','Asturias','Palencia','Las Palmas','Pontevedra','Salamanca','Santa Cruz de Tenerife','Cantabria','Segovia','Sevilla','Soria','Tarragona','Teruel','Toledo','Valencia','Valladolid','Bizkaia','Zamora','Zaragoza','Ceuta','Melilla'];
 /* --- reconocer columnas por su título --- */
 const CLF=[['codigo','Código de cliente de fábrica'],['nombre','Nombre comercial'],['nombreFact','Razón social'],['direccion','Dirección'],['cp','Código postal'],['poblacion','Población'],['provincia','Provincia'],['telefono','Teléfono'],['contacto','Persona de contacto'],['email','Correo electrónico'],['repTxt','Representante'],['repCod','Código de vendedor']];
 function clCampo(h){h=norm(h).replace(/[^a-z0-9]+/g,' ').trim();if(!h)return '';
@@ -1818,7 +1873,7 @@ function clDetectar(hojas){let best=null;
 function clOpen(repId){if(!rep(repId))return;CL={rep:repId,archivo:'',hojas:[],hoja:0,fila:0,map:{},items:[],filtro:'todos',msg:''};clF1()}
 function clF1(){const r=rep(CL.rep),lb=D.lastBackup?new Date(D.lastBackup).toLocaleString('es-ES',{day:'numeric',month:'long',hour:'2-digit',minute:'2-digit'}):'nunca';
   modalW(`<h2>Importar clientes · ${esc(r.nombre)}${r.codigoFab?' · '+esc(r.codigoFab):''}</h2>
-  <p class="hint" style="margin:0 0 10px">Elige un <b>Excel (.xlsx)</b> o un <b>CSV</b> con los clientes. Verás una vista previa con todos ellos y la comprobación de duplicados. <b>No se guarda nada hasta que confirmes.</b></p>
+  <p class="hint" style="margin:0 0 10px">Elige el <b>Excel</b> de clientes (.xls de fábrica, .xlsx) o un <b>CSV</b>. Verás una vista previa con todos ellos y la comprobación de duplicados. <b>No se guarda nada hasta que confirmes.</b></p>
   <div class="card" style="background:#fdf7ee;margin-bottom:12px"><b>1) Copia de seguridad</b> · Última copia: <b>${esc(lb)}</b>${D.changes?' · '+D.changes+' cambios desde entonces':''}
    <div class="acts l" style="margin-top:8px"><button class="b2" onclick="hacerCopia()">Hacer copia ahora</button></div></div>
   <div class="grid c2"><div class="card"><h3>2) Archivo Excel o CSV</h3><label class="b1 filebtn" style="display:inline-block">Elegir archivo<input type="file" accept=".xlsx,.csv,.txt,.tsv,.xls,.numbers,application/vnd.openxmlformats-officedocument.spreadsheetml.sheet,text/csv" onchange="clFile(this)" hidden></label>
@@ -1827,27 +1882,39 @@ function clF1(){const r=rep(CL.rep),lb=D.lastBackup?new Date(D.lastBackup).toLoc
   <p class="err" id="err">${esc(CL.msg)}</p><div class="acts"><button class="b2" onclick="CL=null;closeModal()">Cancelar</button></div>`)}
 async function clFile(inp){const f=inp.files[0];if(!f)return;CL.archivo=f.name;CL.msg='';let hojas;
   try{if(/\.xlsx$/i.test(f.name))hojas=await readXlsxHojas(await f.arrayBuffer());
-    else if(/\.xls$/i.test(f.name)){CL.msg='Los .xls antiguos no se pueden leer. En Excel o Numbers guárdalo como .xlsx o CSV.';return clF1()}
+    else if(/\.xls$/i.test(f.name)){const ab=await f.arrayBuffer(),b4=new Uint8Array(ab.slice(0,4));
+      if(b4[0]===0xD0&&b4[1]===0xCF)hojas=readXlsHojas(ab);
+      else if(b4[0]===0x50&&b4[1]===0x4B)hojas=await readXlsxHojas(ab);
+      else{/* algunos programas guardan como .xls una tabla de texto o HTML */let t=await f.text();if(t.indexOf('\uFFFD')>=0)t=new TextDecoder('windows-1252').decode(ab);
+        if(/<table/i.test(t)){const dc=new DOMParser().parseFromString(t,'text/html');hojas=[...dc.querySelectorAll('table')].map((tb,i)=>({nombre:'Tabla '+(i+1),rows:[...tb.rows].map(tr=>[...tr.cells].map(td=>td.textContent))}))}
+        else hojas=[{nombre:f.name,rows:parseCSV(t)}]}}
     else if(/\.numbers$/i.test(f.name)){CL.msg='Los archivos de Numbers no se pueden leer directamente. En Numbers: Compartir › Exportar › Excel, y elige ese archivo.';return clF1()}
     else{let t=await f.text();if(t.indexOf('\uFFFD')>=0)t=new TextDecoder('windows-1252').decode(await f.arrayBuffer());hojas=[{nombre:f.name,rows:parseCSV(t)}]}}
-  catch(e){CL.msg=e.message==='nodecomp'?'Este navegador no puede abrir .xlsx. Guarda el archivo como CSV.':'No he podido leer ese archivo. Prueba a guardarlo como .xlsx o CSV.';return clF1()}
+  catch(e){console.error(e);CL.msg=e.message==='noxls'?'Ese .xls no se puede leer. Ábrelo en Numbers y expórtalo como Excel (.xlsx).':e.message==='nodecomp'?'Este navegador no puede abrir .xlsx. Guarda el archivo como CSV.':'No he podido leer ese archivo. Prueba a guardarlo como .xlsx o CSV.';return clF1()}
   clCargar(hojas)}
 function clTexto(){const t=$('#clt').value;if(!t.trim()){CL.msg='Pega primero las filas.';return clF1()}CL.archivo='texto pegado';CL.msg='';clCargar([{nombre:'Texto pegado',rows:parseCSV(t)}])}
 function clCargar(hojas){hojas=hojas.map(h=>({nombre:h.nombre,rows:h.rows.map(r=>r.map(x=>String(x==null?'':x).replace(/\u00a0/g,' ').trim()))}));
   if(!hojas.some(h=>h.rows.length)){CL.msg='El archivo no tiene filas.';return clF1()}
   const b=clDetectar(hojas);CL.hojas=hojas;CL.hoja=b?b.hoja:0;CL.fila=b?b.fila:0;CL.map=b?b.map:{};clBuild();clRender()}
+/* listados de fábrica: el vendedor viene en una fila de título, p. ej. «V61 - PEPE ADELL» */
+function clRepArchivo(){const H=CL.hojas[CL.hoja];for(const row of (H.rows||[]).slice(0,CL.fila))for(const t of row||[]){const m=/^\s*(V\d{1,4})\s*[-–—:]\s*(.+?)\s*$/i.exec(String(t||''));if(m)return {cod:m[1].toUpperCase(),nom:m[2]}}return null}
 function clSetHoja(i){CL.hoja=+i;const b=clDetectar([CL.hojas[CL.hoja]]);CL.fila=b?b.fila:0;CL.map=b?b.map:{};clBuild();keepScroll(clRender)}
 function clSetMap(k,v){Object.keys(CL.map).forEach(x=>{if(v!==''&&CL.map[x]===+v)delete CL.map[x]});if(v==='')delete CL.map[k];else CL.map[k]=+v;clBuild();keepScroll(clRender)}
 /* --- preparar cada fila y comprobar duplicados --- */
 const clDig=t=>String(t||'').replace(/\D/g,'');
 const clMailOk=t=>/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(t);
 function clBuild(){const H=CL.hojas[CL.hoja],M=CL.map,r=rep(CL.rep),g=(row,k)=>M[k]==null?'':String(row[M[k]]||'').replace(/\s+/g,' ').trim();
+  const FR=CL.fileRep=clRepArchivo();
   const items=[];(H.rows||[]).slice(CL.fila+1).forEach((row,j)=>{if(!row.some(x=>String(x).trim()))return;
     const o={fila:CL.fila+j+2};CLF.forEach(f=>o[f[0]]=g(row,f[0]));
+    if(FR){if(!o.repCod)o.repCod=FR.cod;if(!o.repTxt)o.repTxt=FR.nom}
+    /* «25100 Almacelles (Lleida)»: código postal, población y provincia en una sola columna */
+    const pm=/^(\d{4,5})\s+(.+?)(?:\s*\(([^)]+)\))?$/.exec(o.poblacion);if(pm&&!o.cp){o.cp=pm[1];o.poblacion=pm[2].trim();if(pm[3]&&!o.provincia)o.provincia=pm[3].trim()}
     /* teléfono con un nombre detrás («686778882 JOSE»): el número queda en Teléfono y el nombre pasa a Persona de contacto */
     const tm=/^([+\d][\d\s.\-\/]*\d)\s*[\/,;-]?\s*([A-Za-zÁÉÍÓÚÑáéíóúñªº][A-Za-zÁÉÍÓÚÑáéíóúñªº.\s]*)$/.exec(o.telefono);
     if(tm&&clDig(tm[1]).length>=9){o.telefono=tm[1].trim();if(!o.contacto)o.contacto=tm[2].trim();o.telNota=1}
     if(/^\d{4}$/.test(o.cp))o.cp='0'+o.cp;
+    if(!o.provincia&&/^\d{5}$/.test(o.cp))o.provincia=CPPROV[+o.cp.slice(0,2)]||'';
     o.prov=!o.nombre&&!!o.nombreFact;if(!o.nombre)o.nombre=o.nombreFact;if(!o.nombreFact)o.nombreFact=o.nombre;
     items.push(o)});
   const vistosC={},vistosN={},porMail={},porTel={};
@@ -1871,7 +1938,7 @@ function clBuild(){const H=CL.hojas[CL.hoja],M=CL.map,r=rep(CL.rep),g=(row,k)=>M
     const em=norm(o.email),tl=clDig(o.telefono).slice(-9);if(em)(porMail[em]=porMail[em]||[]).push(i);if(tl.length===9)(porTel[tl]=porTel[tl]||[]).push(i);
     /* representante del archivo */
     if(o.repCod&&r.codigoFab&&nz(o.repCod)!==nz(r.codigoFab))o.av.push('En el archivo figura el vendedor '+o.repCod+', y '+r.nombre+' tiene el código '+r.codigoFab+'.');
-    else if(!o.repCod&&o.repTxt&&!mismoNombre(o.repTxt,r.nombre)&&nc(o.repTxt)!==nc(r.nombre))o.av.push('En el archivo figura el representante «'+o.repTxt+'».');
+    else if((!o.repCod||!r.codigoFab)&&o.repTxt&&!mismoNombre(o.repTxt,r.nombre)&&nc(o.repTxt)!==nc(r.nombre))o.av.push('En el archivo figura el representante «'+o.repTxt+'».');
     if(o.cp&&!/^\d{5}$/.test(o.cp))o.av.push('Código postal no válido («'+o.cp+'»).');
     if(o.email&&!clMailOk(o.email))o.av.push('Correo con formato dudoso.')});
   items.forEach((o,i)=>{const fm=(porMail[norm(o.email)]||[]).filter(x=>x!==i),ft=(porTel[clDig(o.telefono).slice(-9)]||[]).filter(x=>x!==i);
@@ -1912,6 +1979,7 @@ function clRender(){const r=rep(CL.rep),H=CL.hojas[CL.hoja],hdr=(H.rows[CL.fila]
   const kb=(k,l,n)=>`<button class="${CL.filtro===k?'on':''}" onclick="clFiltro('${k}')">${l} · ${n}</button>`;
   modalW(`<h2>Vista previa · importar clientes · ${esc(r.nombre)}</h2>
   <p class="hint" style="margin:0 0 10px"><b>Todavía no se ha guardado nada.</b> Archivo: <b>${esc(CL.archivo)}</b>${CL.hojas.length>1?' · hoja <b>'+esc(H.nombre)+'</b>':''} · ${I.length} clientes leídos · todos se asignan a <b>${esc(r.nombre)}</b>.</p>
+  ${CL.fileRep?(()=>{const F=CL.fileRep,ok=(r.codigoFab&&nz(F.cod)===nz(r.codigoFab))||(!r.codigoFab&&mismoNombre(F.nom,r.nombre));return `<div class="card" style="margin-bottom:12px;background:${ok?'var(--v2)':'#fbe6e2'}"><b>${ok?'✔':'⚠'} Este listado es del vendedor ${esc(F.cod)} · ${esc(F.nom)}</b>${ok?'':` · Estás en la ficha de <b>${esc(r.nombre)}</b>${r.codigoFab?' ('+esc(r.codigoFab)+')':''}. Si es correcto, pon el código ${esc(F.cod)} en «Editar» del representante; si no, entra en la ficha del representante correcto.`}</div>`})():''}
   <div class="grid k" style="margin-bottom:12px">
    <div class="card"><h3>Clientes nuevos</h3><div class="big" style="font-size:28px">${S.nuevo}</div><div class="mut" style="font-size:13px">sin coincidencias</div></div>
    <div class="card"><h3>Ya existentes</h3><div class="big" style="font-size:28px">${S.existe}</div><div class="mut" style="font-size:13px">mismo código o razón social</div></div>
