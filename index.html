@@ -1889,15 +1889,23 @@ async function clFile(inp){const f=inp.files[0];if(!f)return;CL.archivo=f.name;C
         if(/<table/i.test(t)){const dc=new DOMParser().parseFromString(t,'text/html');hojas=[...dc.querySelectorAll('table')].map((tb,i)=>({nombre:'Tabla '+(i+1),rows:[...tb.rows].map(tr=>[...tr.cells].map(td=>td.textContent))}))}
         else hojas=[{nombre:f.name,rows:parseCSV(t)}]}}
     else if(/\.numbers$/i.test(f.name)){CL.msg='Los archivos de Numbers no se pueden leer directamente. En Numbers: Compartir › Exportar › Excel, y elige ese archivo.';return clF1()}
-    else{let t=await f.text();if(t.indexOf('\uFFFD')>=0)t=new TextDecoder('windows-1252').decode(await f.arrayBuffer());hojas=[{nombre:f.name,rows:parseCSV(t)}]}}
+    else{let t=await f.text();if(t.indexOf('\uFFFD')>=0)t=new TextDecoder('windows-1252').decode(await f.arrayBuffer());hojas=[{nombre:f.name,rows:clCSV(t)}]}}
   catch(e){console.error(e);CL.msg=e.message==='noxls'?'Ese .xls no se puede leer. Ábrelo en Numbers y expórtalo como Excel (.xlsx).':e.message==='nodecomp'?'Este navegador no puede abrir .xlsx. Guarda el archivo como CSV.':'No he podido leer ese archivo. Prueba a guardarlo como .xlsx o CSV.';return clF1()}
   clCargar(hojas)}
+const clCSV=t=>parseCSV(t.replace(/\r\n?/g,'\n').replace(/^[ \t;,]*$/gm,'§VACIA§')).map(r=>r.length===1&&r[0]==='§VACIA§'?[]:r);
 function clTexto(){const t=$('#clt').value;if(!t.trim()){CL.msg='Pega primero las filas.';return clF1()}CL.archivo='texto pegado';CL.msg='';clCargar([{nombre:'Texto pegado',rows:parseCSV(t)}])}
 function clCargar(hojas){hojas=hojas.map(h=>({nombre:h.nombre,rows:h.rows.map(r=>r.map(x=>String(x==null?'':x).replace(/\u00a0/g,' ').trim()))}));
   if(!hojas.some(h=>h.rows.length)){CL.msg='El archivo no tiene filas.';return clF1()}
   const b=clDetectar(hojas);CL.hojas=hojas;CL.hoja=b?b.hoja:0;CL.fila=b?b.fila:0;CL.map=b?b.map:{};clBuild();clRender()}
 /* listados de fábrica: el vendedor viene en una fila de título, p. ej. «V61 - PEPE ADELL» */
-function clRepArchivo(){const H=CL.hojas[CL.hoja];for(const row of (H.rows||[]).slice(0,CL.fila))for(const t of row||[]){const m=/^\s*(V\d{1,4})\s*[-–—:]\s*(.+?)\s*$/i.exec(String(t||''));if(m)return {cod:m[1].toUpperCase(),nom:m[2]}}return null}
+function clRepArchivo(){const H=CL.hojas[CL.hoja];let cod='';
+  for(const row of (H.rows||[]).slice(0,CL.fila)){const R=(row||[]).map(x=>String(x||'').trim());
+    for(let i=0;i<R.length;i++){const t=R[i];
+      let m=/^(V\d{1,4})\s*[-–—:]\s*(.+)$/i.exec(t);if(m)return {cod:m[1].toUpperCase(),nom:m[2].trim()};
+      /* «V93;NICOLAS FERNANDEZ BUSTINDUY» en dos celdas */
+      if(/^V\d{1,4}$/i.test(t)){const nom=R.slice(i+1).find(x=>x&&/[a-záéíóúñ]/i.test(x));if(nom)return {cod:t.toUpperCase(),nom:nom}}
+      m=/vendedor.*?['"«]?\s*(V\d{1,4})\b/i.exec(t);if(m)cod=m[1].toUpperCase()}}
+  return cod?{cod:cod,nom:''}:null}
 function clSetHoja(i){CL.hoja=+i;const b=clDetectar([CL.hojas[CL.hoja]]);CL.fila=b?b.fila:0;CL.map=b?b.map:{};clBuild();keepScroll(clRender)}
 function clSetMap(k,v){Object.keys(CL.map).forEach(x=>{if(v!==''&&CL.map[x]===+v)delete CL.map[x]});if(v==='')delete CL.map[k];else CL.map[k]=+v;clBuild();keepScroll(clRender)}
 /* --- preparar cada fila y comprobar duplicados --- */
@@ -1910,6 +1918,7 @@ function clBuild(){const H=CL.hojas[CL.hoja],M=CL.map,r=rep(CL.rep),g=(row,k)=>M
     if(FR){if(!o.repCod)o.repCod=FR.cod;if(!o.repTxt)o.repTxt=FR.nom}
     /* «25100 Almacelles (Lleida)»: código postal, población y provincia en una sola columna */
     const pm=/^(\d{4,5})\s+(.+?)(?:\s*\(([^)]+)\))?$/.exec(o.poblacion);if(pm&&!o.cp){o.cp=pm[1];o.poblacion=pm[2].trim();if(pm[3]&&!o.provincia)o.provincia=pm[3].trim()}
+    else if(/^GX\s?11\s?1AA\s+/i.test(o.poblacion)){o.poblacion=o.poblacion.replace(/^GX\s?11\s?1AA\s+/i,'').trim();if(!o.provincia)o.provincia='Gibraltar';o.avGib=1}
     /* teléfono con un nombre detrás («686778882 JOSE»): el número queda en Teléfono y el nombre pasa a Persona de contacto */
     const tm=/^([+\d][\d\s.\-\/]*\d)\s*[\/,;-]?\s*([A-Za-zÁÉÍÓÚÑáéíóúñªº][A-Za-zÁÉÍÓÚÑáéíóúñªº.\s]*)$/.exec(o.telefono);
     if(tm&&clDig(tm[1]).length>=9){o.telefono=tm[1].trim();if(!o.contacto)o.contacto=tm[2].trim();o.telNota=1}
@@ -1940,9 +1949,10 @@ function clBuild(){const H=CL.hojas[CL.hoja],M=CL.map,r=rep(CL.rep),g=(row,k)=>M
     if(o.repCod&&r.codigoFab&&nz(o.repCod)!==nz(r.codigoFab))o.av.push('En el archivo figura el vendedor '+o.repCod+', y '+r.nombre+' tiene el código '+r.codigoFab+'.');
     else if((!o.repCod||!r.codigoFab)&&o.repTxt&&!mismoNombre(o.repTxt,r.nombre)&&nc(o.repTxt)!==nc(r.nombre))o.av.push('En el archivo figura el representante «'+o.repTxt+'».');
     if(o.cp&&!/^\d{5}$/.test(o.cp))o.av.push('Código postal no válido («'+o.cp+'»).');
-    if(o.email&&!clMailOk(o.email))o.av.push('Correo con formato dudoso.')});
+    if(o.email&&!clMailOk(o.email))o.av.push('Correo con formato dudoso.');
+    if(o.avGib)o.inf=['Gibraltar: su código postal (GX11 1AA) no es español; se deja vacío.']});
   items.forEach((o,i)=>{const fm=(porMail[norm(o.email)]||[]).filter(x=>x!==i),ft=(porTel[clDig(o.telefono).slice(-9)]||[]).filter(x=>x!==i);
-    o.inf=[];if(fm.length)o.inf.push('Mismo correo que la fila '+fm.map(x=>items[x].fila).join(', '));if(ft.length)o.inf.push('Mismo teléfono que la fila '+ft.map(x=>items[x].fila).join(', '));
+    o.inf=o.inf||[];if(fm.length)o.inf.push('Mismo correo que la fila '+fm.map(x=>items[x].fila).join(', '));if(ft.length)o.inf.push('Mismo teléfono que la fila '+ft.map(x=>items[x].fila).join(', '));
     o.est=o.ex?'existe':o.cand.length?'posible':(o.av.length||o.bloq)?'revisar':'nuevo';
     o.act=o.bloq?'skip':o.est==='existe'||o.est==='posible'?'skip':o.av.some(a=>/vendedor|representante/.test(a))?'skip':'new'});
   CL.items=items}
