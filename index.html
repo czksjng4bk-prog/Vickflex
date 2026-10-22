@@ -44,6 +44,9 @@ h1{font-size:26px;color:var(--v)} h2{font-size:20px;color:var(--v);margin-bottom
 .pill.u{background:#e3f3e8;color:var(--ok)} .pill.d{background:#fbe6e2;color:var(--ro)} .pill.n{background:var(--b2);color:var(--g)}
 .dot{display:inline-block;width:16px;height:16px;border-radius:50%;flex:none}
 .dot.verde{background:var(--ok)} .dot.amarillo{background:var(--am)} .dot.rojo{background:var(--ro)}
+/* Coche expositor: un punto por trimestre del año en curso */
+.q4{display:inline-flex;gap:5px;white-space:nowrap;vertical-align:middle;cursor:pointer;padding:4px 0}.q4 i{display:block;width:12px;height:12px;border-radius:50%;background:var(--ro)}.q4 i.on{background:var(--ok)}.q4 i.pend{background:var(--am)}
+.q4h{display:block;font-size:10px;letter-spacing:.3px;color:#a39d92;font-weight:600;margin-top:2px;white-space:nowrap}
 .bars{display:flex;align-items:flex-end;gap:8px;height:150px}
 .bars div{flex:1;display:flex;flex-direction:column;align-items:center;justify-content:flex-end;height:100%;font-size:11px;color:var(--g)}
 .bars span{display:flex;gap:2px;align-items:flex-end;width:100%;justify-content:center;flex:1}
@@ -748,7 +751,7 @@ function vRep(id){
     return `<tr data-s="${esc(norm([c.nombre,c.nombreFact,c.codigo,c.cp,c.poblacion,c.provincia,c.zona].join(' ')))}" onclick="go('cli/${c.id}')"><td>${i+1}</td><td><b>${esc(c.nombre)}</b><small>${esc((c.cp?c.cp+' ':'')+c.poblacion)}${c.provincia?(c.poblacion?', ':'')+esc(c.provincia):''}${c.zona?' · <b>'+esc(c.zona)+'</b>':''}</small></td>
     <td class="r">${cell('principal')}</td><td class="r">${cell('comp')}</td><td class="r"><b>${cell('total')}</b></td><td class="r">${o.hp?eur(o.p):mut}</td><td class="r">${cmpHTML(o)}</td>
     <td>${lp?fd(lp.f):'<span class="mut">sin fecha</span>'}${ms?`<small class="dn">sin facturar ${ms} meses</small>`:''}</td>
-    <td onclick="event.stopPropagation();cycSem('${c.id}')" title="Pulsa para cambiar el estado">${dot(c.semaforo)}</td></tr>`}).join('');
+    <td onclick="event.stopPropagation();abrirVisitas('${c.id}')">${cocheQHTML(c)}</td></tr>`}).join('');
   return `<div class="hb"><div><h1>${esc(r.nombre)}</h1><p class="sub" style="margin-bottom:0">${esc(r.provincias.join(' · ')||'Sin provincia')}${r.ciudad?' · '+esc(r.ciudad):''}</p></div>
     <div class="acts"><button class="b1" onclick="cliForm(null,'${r.id}')">+ Nuevo cliente</button><button class="b2" onclick="repForm('${r.id}')">Editar</button><button class="b2 dng" onclick="delRep('${r.id}')">Eliminar</button><button class="b2" onclick="expMail('${r.id}')">PDF EXPOSICIONES DE CLIENTES</button><button class="b1" onclick="clOpen('${r.id}')">IMPORTAR CLIENTES</button><button class="b2" onclick="nomOpen('${r.id}')">Importar solo nombres</button><button class="b1" onclick="impOpen('${r.id}','principal')">Importar principal</button><button class="b1" onclick="impOpen('${r.id}','comp')">Importar complementos</button></div></div>
   ${repFicha(r)}
@@ -775,8 +778,8 @@ function vRep(id){
   ${cs.length?repChart(cs)+mCard(cs,`infMail('mes','${r.id}')`)+qCard(cs,`infMail('tri','${r.id}')`):''}
   <div class="card" style="margin-top:16px"><div class="hb" style="margin-bottom:8px"><h3 style="margin:0">Clientes de ${esc(r.nombre)}</h3><button class="b2" onclick="infMail('cli','${r.id}')">✉ Enviar por correo</button>
     <input class="sel" style="min-width:260px" placeholder="Filtrar por nombre, población, zona o código postal" oninput="filtrarCli(this.value)"><select class="sel" onchange="setSort(this.value)"><option value="fact" ${sortBy==='fact'?'selected':''}>Ranking por facturación total</option><option value="principal" ${sortBy==='principal'?'selected':''}>Ranking por facturación principal</option><option value="comp" ${sortBy==='comp'?'selected':''}>Ranking por complementos</option><option value="nombre" ${sortBy==='nombre'?'selected':''}>Nombre A–Z</option><option value="cp" ${sortBy==='cp'?'selected':''}>Código postal (por zonas)</option><option value="caida" ${sortBy==='caida'?'selected':''}>Mayor caída primero (${CAT[VC].toLowerCase()})</option><option value="sin" ${sortBy==='sin'?'selected':''}>Más meses sin comprar</option></select></div>
-    ${cs.length?`<table class="tb"><thead><tr><th>#</th><th>Cliente</th><th class="r">Principal ${YEAR}</th><th class="r">Compl. ${YEAR}</th><th class="r">Total ${YEAR}</th><th class="r">${CAT[VC]} ${YEAR-1}</th><th class="r">Dif. ${CAT[VC].toLowerCase()}</th><th>Última compra</th><th>Estado</th></tr></thead><tbody>${rows}</tbody></table>
-    <p class="hint">Importes acumulados ${per(m)}, comparados con el mismo periodo del año anterior. «Faltan datos» significa que falta información de algún periodo: no es lo mismo que 0 €. Si el informe no trae fechas de pedidos, la última compra aparece como «sin fecha». Pulsa el círculo para cambiar el estado.</p>`
+    ${cs.length?`<table class="tb"><thead><tr><th>#</th><th>Cliente</th><th class="r">Principal ${YEAR}</th><th class="r">Compl. ${YEAR}</th><th class="r">Total ${YEAR}</th><th class="r">${CAT[VC]} ${YEAR-1}</th><th class="r">Dif. ${CAT[VC].toLowerCase()}</th><th>Última compra</th><th>Coche expositor<span class="q4h">1T · 2T · 3T · 4T · ${YEAR}</span></th></tr></thead><tbody>${rows}</tbody></table>
+    <p class="hint">Importes acumulados ${per(m)}, comparados con el mismo periodo del año anterior. «Faltan datos» significa que falta información de algún periodo: no es lo mismo que 0 €. Si el informe no trae fechas de pedidos, la última compra aparece como «sin fecha». <b>Coche expositor</b>: un punto por trimestre de ${YEAR}; verde = visitado con el coche, rojo = no visitado, naranja = pendiente de revisar. Pulsa los puntos para ver sus visitas.</p>`
     :'<p class="msg">Este representante todavía no tiene clientes. Pulsa <b>+ Nuevo cliente</b>.</p>'}</div>
   ${repCoche(r)}
   ${cs.length?provTable(cs):''}
@@ -1385,6 +1388,17 @@ function delCli(id){
   const c=cli(id);
   ask(`¿Eliminar a <b>${esc(c.nombre)}</b>? Se borrarán su ficha, su facturación y su historial. Después podrás deshacerlo en Copias de seguridad.`,'Eliminar',()=>{snap('Eliminar cliente '+c.nombre);const r=c.repId;D.clientes=D.clientes.filter(x=>x.id!==id);D.equiv=D.equiv.filter(e=>e.c!==id);D.plan=D.plan.filter(x=>x.cliId!==id);save();go(rep(r)?'rep/'+r:'reps');toast('Cliente eliminado.')})}
 function setSem(id,s){cli(id).semaforo=s;save();render(true)}
+/* Coche expositor por trimestres (año en curso). Se calcula al momento desde las visitas: no se guarda ni se cambia nada.
+   Verde: visita realizada (fecha de hoy o anterior) y registrada dentro de una semana del coche expositor.
+   Naranja (pendiente de revisar): visita presencial sin semana del coche, pero en fechas en que había una semana del coche con su representante.
+   No cuentan las visitas telefónicas ni las de fechas futuras. */
+function cocheQ(c,y){const Q=[0,1,2,3].map(()=>({st:'off',f:[],p:[]})),ys=String(y||YEAR),h=hoy();
+  (c.visitas||[]).forEach(v=>{if(!v.f||v.f.slice(0,4)!==ys||v.f>h||esTel(v))return;const q=Q[Math.floor((+v.f.slice(5,7)-1)/3)];
+    if(v.sem&&semOf(v.sem)){q.st='on';q.f.push(v.f)}
+    else if(D.semanas.some(x=>v.f>=x.ini&&v.f<=x.fin&&x.repId===(v.repId||c.repId))){q.p.push(v.f);if(q.st!=='on')q.st='pend'}});
+  return Q}
+function cocheQHTML(c){const Q=cocheQ(c,YEAR),N=['1.er','2.º','3.er','4.º'];
+  return `<span class="q4">${Q.map((q,i)=>`<i class="${q.st==='on'?'on':q.st==='pend'?'pend':''}" title="${N[i]} trimestre ${YEAR}: ${q.st==='on'?'visitado con el coche el '+[...new Set(q.f)].sort().map(fd).join(', '):q.st==='pend'?'pendiente de revisar (visita del '+[...new Set(q.p)].sort().map(fd).join(', ')+' sin semana del coche)':'sin visita con el coche'}"></i>`).join('')}</span>`}
 function cycSem(id){const c=cli(id),o=['verde','amarillo','rojo'];c.semaforo=o[(o.indexOf(c.semaforo)+1)%3];save();render(true)}
 function togglePend(id,i){const t=cli(id).pend[i];t.h=!t.h;save();render(true)}
 function setSort(v){sortBy=v;render(true)}
