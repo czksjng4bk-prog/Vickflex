@@ -197,10 +197,13 @@ const norm=s=>String(s||'').normalize('NFD').replace(/[\u0300-\u036f]/g,'').toLo
 /* ---------- Datos: se guardan en este iPad (localStorage) ---------- */
 /* La app empieza vacía: sin representantes, clientes, facturación ni visitas de ejemplo */
 function emptyData(){return {schema:1,reps:[],clientes:[],equiv:[],imports:[],plan:[],semanas:[],festivos:[],lastBackup:null,changes:0}}
+/* Nombre comercial y provincia de los clientes siempre en MAYÚSCULAS (con tildes y Ñ). No se toca ningún otro campo. */
+const UPC=t=>String(t==null?'':t).toLocaleUpperCase('es-ES');
+function mayusCli(c){if(!c)return;c.nombre=UPC(c.nombre);c.provincia=UPC(c.provincia)}
 function migrate(d){
   d.schema=1;d.reps=d.reps||[];d.clientes=d.clientes||[];
   d.reps.forEach(r=>{['email','codigoFab','tel','ciudad','hotelN','hotelT'].forEach(k=>{if(r[k]==null)r[k]=''});if(!Array.isArray(r.provincias))r.provincias=[]});
-  d.clientes.forEach(c=>{c.fact=c.fact||{};c.exposicion=c.exposicion||[];c.pend=c.pend||[];c.visitas=c.visitas||[];c.pedidos=c.pedidos||[];c.obs=c.obs||'';c.visitas=c.visitas.map(v=>{v.id=v.id||uid();if(v.hablamos==null)v.hablamos=v.t||'';['pidio','compromisos','productos','prox','proxF','persona','expoNueva','expoPend','pedT','pedTxt','pedI','obs','repId','sem'].forEach(k=>{if(v[k]==null)v[k]=''});v.proxH=!!v.proxH;/* tipo de visita: las antiguas (sin tipo) son presenciales */if(v.tipo!=='telefonica')v.tipo='presencial';return v});c.codigo=c.codigo||'';c.email=c.email||'';c.cp=c.cp==null?'':String(c.cp);c.zona=c.zona==null?'':String(c.zona);c.acumul=c.acumul&&typeof c.acumul==='object'?c.acumul:{};c.comp=c.comp&&typeof c.comp==='object'?c.comp:{};c.catalogo=c.catalogo&&typeof c.catalogo==='object'?c.catalogo:{ok:null,f:''};c.prodPend=c.prodPend||[];c.expObs=c.expObs||'';c.nombreFact=c.nombreFact||'';c.semaforo=c.semaforo||'amarillo';
+  d.clientes.forEach(c=>{c.fact=c.fact||{};c.exposicion=c.exposicion||[];c.pend=c.pend||[];c.visitas=c.visitas||[];c.pedidos=c.pedidos||[];c.obs=c.obs||'';c.visitas=c.visitas.map(v=>{v.id=v.id||uid();if(v.hablamos==null)v.hablamos=v.t||'';['pidio','compromisos','productos','prox','proxF','persona','expoNueva','expoPend','pedT','pedTxt','pedI','obs','repId','sem'].forEach(k=>{if(v[k]==null)v[k]=''});v.proxH=!!v.proxH;/* tipo de visita: las antiguas (sin tipo) son presenciales */if(v.tipo!=='telefonica')v.tipo='presencial';return v});c.codigo=c.codigo||'';c.email=c.email||'';c.cp=c.cp==null?'':String(c.cp);c.zona=c.zona==null?'':String(c.zona);c.acumul=c.acumul&&typeof c.acumul==='object'?c.acumul:{};c.comp=c.comp&&typeof c.comp==='object'?c.comp:{};c.catalogo=c.catalogo&&typeof c.catalogo==='object'?c.catalogo:{ok:null,f:''};c.prodPend=c.prodPend||[];c.expObs=c.expObs||'';mayusCli(c);c.nombreFact=c.nombreFact||'';c.semaforo=c.semaforo||'amarillo';
     if(!c.repHist||!c.repHist.length)c.repHist=[{r:c.repId,d:null}]});
   d.equiv=Array.isArray(d.equiv)?d.equiv:[];d.imports=Array.isArray(d.imports)?d.imports:[];d.plan=Array.isArray(d.plan)?d.plan:[];d.semanas=Array.isArray(d.semanas)?d.semanas:[];d.semanas.forEach(x=>{if(x.expoV===undefined)x.expoV=null;if(x.expoU===undefined)x.expoU=null});d.festivos=Array.isArray(d.festivos)?d.festivos:[];if(d.changes==null)d.changes=0; if(d.lastBackup===undefined)d.lastBackup=null; return d;
 }
@@ -210,7 +213,7 @@ function load(){
   const d=migrate(emptyData());try{localStorage.setItem(KEY,JSON.stringify(d))}catch(e){}return d;
 }
 let D=load(),sortBy='fact';
-function persist(){try{localStorage.setItem(KEY,JSON.stringify(D));return true}catch(e){toast('No se ha podido guardar en este iPad. Haz una copia de seguridad.',1);return false}}
+function persist(){try{(D.clientes||[]).forEach(mayusCli);localStorage.setItem(KEY,JSON.stringify(D));return true}catch(e){toast('No se ha podido guardar en este iPad. Haz una copia de seguridad.',1);return false}}
 function save(){D.changes=(D.changes||0)+1;return persist()}
 function snap(label){try{localStorage.setItem(UNDO,JSON.stringify({at:Date.now(),label:label,data:D}))}catch(e){}}
 function getUndo(){try{return JSON.parse(localStorage.getItem(UNDO))}catch(e){return null}}
@@ -418,9 +421,11 @@ function infPDF(R){const d=new PDFDoc();d.img=logoJPG();const M=42,W=PDFW-2*M;le
     const tw=T.cols.reduce((a,c)=>a+c.w,0),sc=W/tw,cols=T.cols.map(c=>Object.assign({},c,{w:c.w*sc}));
     const thead=()=>{d.rect(M,y,W,20,PDFB);let x=M;cols.forEach(c=>{const tx=c.al==='r'?x+c.w-6:x+6;d.text(tx,y+13.5,pdfFit(c.t,1,8,c.w-10),{sz:8,b:1,col:PDFV,al:c.al});x+=c.w});y+=20};
     thead();
-    const row=(r,tot)=>{const h=tot?22:19;if(y+h>788){d.page();head();thead()}if(tot)d.rect(M,y,W,h,PDFL);let x=M;
+    const row=(r,tot)=>{/* columnas con «wrap»: el texto largo pasa a la línea siguiente en vez de cortarse */
+      const LS=cols.map((c,i)=>{const v=r[i]==null?'—':String(r[i]);return c.wrap&&!tot?pdfWrap(v,c.b,9,c.w-10):[pdfFit(v,tot||c.b,9,c.w-10)]});
+      const h=(tot?22:19)+(Math.max(...LS.map(l=>l.length))-1)*11;if(y+h>788){d.page();head();thead()}if(tot)d.rect(M,y,W,h,PDFL);let x=M;
       cols.forEach((c,i)=>{const v=r[i]==null?'—':String(r[i]),tx=c.al==='r'?x+c.w-6:x+6,mute=v==='—'||v==='Faltan datos';
-        d.text(tx,y+(tot?14.5:13),pdfFit(v,tot||c.b,9,c.w-10),{sz:9,b:tot||c.b,al:c.al,col:mute?PDFG:(tot?PDFV:'#2b2b2b')});x+=c.w});
+        LS[i].forEach((l,k)=>d.text(tx,y+(tot?14.5:13)+k*11,l,{sz:9,b:tot||c.b,al:c.al,col:mute?PDFG:(tot?PDFV:'#2b2b2b')}));x+=c.w});
       if(!tot)d.line(M,y+h,M+W,y+h,'#ece5d8',.5);y+=h};
     T.rows.forEach(r=>row(r));if(T.tot)row(T.tot,1);y+=16});
   if(R.notas&&R.notas.length){R.notas.forEach(t=>{const L=[];let cur='';t.split(' ').forEach(w=>{if(cur&&pdfW(cur+' '+w,0,8.5)>W){L.push(cur);cur=w}else cur=cur?cur+' '+w:w});L.push(cur);
@@ -479,7 +484,7 @@ function infBuild(){const I=INF,cs=infCS(),r=rep(I.rep),c=I.cli?cli(I.cli):null,
   if(I.pk==='anio'&&y===YEAR)notas.push('Año en curso: importes acumulados de enero a '+MESL[corte()-1]+' (incluye acumulados importados de informes «ventas entre fechas»).');
   return {titulo:'Facturación de clientes · '+per,info:info.concat([['Clientes',String(cs.length)]]),
     kpi:[{l:'Facturación total del período',v:ST==null?'Sin datos':eur(ST),hl:1},{l:'Clientes con facturación',v:String(L.filter(x=>x.T>0).length)+' de '+cs.length},{l:'Principal / complementos',v:pdfE(sum('P'))+' / '+pdfE(sum('C'))}],
-    tablas:[{titulo:'Facturación por cliente',cols:[{t:'#',w:28,al:'r'},{t:'Cliente',w:190,b:1},{t:'Código',w:62},{t:'Principal',w:80,al:'r'},{t:'Complem.',w:80,al:'r'},{t:'Total',w:85,al:'r'}],
+    tablas:[{titulo:'Facturación por cliente',cols:[{t:'#',w:28,al:'r'},{t:'Cliente',w:190,b:1,wrap:1},{t:'Código',w:62},{t:'Principal',w:80,al:'r'},{t:'Complem.',w:80,al:'r'},{t:'Total',w:85,al:'r'}],
       rows:L.map((x,i)=>[String(i+1),x.c.nombre,x.c.codigo||'—',pdfE(x.P),pdfE(x.C),x.T==null?null:eur(x.T)]),tot:['','Total ('+cs.length+' clientes)','',pdfE(sum('P')),pdfE(sum('C')),pdfE(ST)]}],notas:notas}}
 
 /* --- Ventana «Enviar por correo» --- */
@@ -1939,6 +1944,7 @@ function clBuild(){const H=CL.hojas[CL.hoja],M=CL.map,r=rep(CL.rep),g=(row,k)=>M
     if(/^\d{4}$/.test(o.cp))o.cp='0'+o.cp;
     if(!o.provincia&&/^\d{5}$/.test(o.cp))o.provincia=CPPROV[+o.cp.slice(0,2)]||'';
     o.prov=!o.nombre&&!!o.nombreFact;if(!o.nombre)o.nombre=o.nombreFact;if(!o.nombreFact)o.nombreFact=o.nombre;
+    o.nombre=UPC(o.nombre);o.provincia=UPC(o.provincia);
     items.push(o)});
   const vistosC={},vistosN={},porMail={},porTel={};
   items.forEach((o,i)=>{o.av=[];o.cand=[];o.ex=null;o.bloq=0;
