@@ -199,10 +199,12 @@ const norm=s=>String(s||'').normalize('NFD').replace(/[\u0300-\u036f]/g,'').toLo
 function emptyData(){return {schema:1,reps:[],clientes:[],equiv:[],imports:[],plan:[],semanas:[],festivos:[],lastBackup:null,changes:0}}
 /* Nombre comercial y provincia de los clientes siempre en MAYÚSCULAS (con tildes y Ñ). No se toca ningún otro campo. */
 const UPC=t=>String(t==null?'':t).toLocaleUpperCase('es-ES');
-function mayusCli(c){if(!c)return;c.nombre=UPC(c.nombre);c.provincia=UPC(c.provincia)}
+function mayusCli(c){if(!c)return;c.nombre=UPC(c.nombre);c.provincia=UPC(c.provincia);if(c.email)c.email=String(c.email).toLowerCase()}
+/* Correos electrónicos de clientes y representantes siempre en minúsculas (solo cambian las letras) */
+function minusRep(r){if(r&&r.email)r.email=String(r.email).toLowerCase()}
 function migrate(d){
   d.schema=1;d.reps=d.reps||[];d.clientes=d.clientes||[];
-  d.reps.forEach(r=>{['email','codigoFab','tel','ciudad','hotelN','hotelT'].forEach(k=>{if(r[k]==null)r[k]=''});if(!Array.isArray(r.provincias))r.provincias=[]});
+  d.reps.forEach(r=>{['email','codigoFab','tel','ciudad','hotelN','hotelT'].forEach(k=>{if(r[k]==null)r[k]=''});if(!Array.isArray(r.provincias))r.provincias=[];minusRep(r)});
   d.clientes.forEach(c=>{c.fact=c.fact||{};c.exposicion=c.exposicion||[];c.pend=c.pend||[];c.visitas=c.visitas||[];c.pedidos=c.pedidos||[];c.obs=c.obs||'';c.visitas=c.visitas.map(v=>{v.id=v.id||uid();if(v.hablamos==null)v.hablamos=v.t||'';['pidio','compromisos','productos','prox','proxF','persona','expoNueva','expoPend','pedT','pedTxt','pedI','obs','repId','sem'].forEach(k=>{if(v[k]==null)v[k]=''});v.proxH=!!v.proxH;/* tipo de visita: las antiguas (sin tipo) son presenciales */if(v.tipo!=='telefonica')v.tipo='presencial';return v});c.codigo=c.codigo||'';c.email=c.email||'';c.cp=c.cp==null?'':String(c.cp);c.zona=c.zona==null?'':String(c.zona);c.acumul=c.acumul&&typeof c.acumul==='object'?c.acumul:{};c.comp=c.comp&&typeof c.comp==='object'?c.comp:{};c.catalogo=c.catalogo&&typeof c.catalogo==='object'?c.catalogo:{ok:null,f:''};c.prodPend=c.prodPend||[];c.expObs=c.expObs||'';mayusCli(c);c.nombreFact=c.nombreFact||'';c.semaforo=c.semaforo||'amarillo';
     if(!c.repHist||!c.repHist.length)c.repHist=[{r:c.repId,d:null}]});
   d.equiv=Array.isArray(d.equiv)?d.equiv:[];d.imports=Array.isArray(d.imports)?d.imports:[];d.plan=Array.isArray(d.plan)?d.plan:[];d.semanas=Array.isArray(d.semanas)?d.semanas:[];d.semanas.forEach(x=>{if(x.expoV===undefined)x.expoV=null;if(x.expoU===undefined)x.expoU=null});d.festivos=Array.isArray(d.festivos)?d.festivos:[];if(d.changes==null)d.changes=0; if(d.lastBackup===undefined)d.lastBackup=null; return d;
@@ -213,7 +215,7 @@ function load(){
   const d=migrate(emptyData());try{localStorage.setItem(KEY,JSON.stringify(d))}catch(e){}return d;
 }
 let D=load(),sortBy='fact';
-function persist(){try{(D.clientes||[]).forEach(mayusCli);localStorage.setItem(KEY,JSON.stringify(D));return true}catch(e){toast('No se ha podido guardar en este iPad. Haz una copia de seguridad.',1);return false}}
+function persist(){try{(D.clientes||[]).forEach(mayusCli);(D.reps||[]).forEach(minusRep);localStorage.setItem(KEY,JSON.stringify(D));return true}catch(e){toast('No se ha podido guardar en este iPad. Haz una copia de seguridad.',1);return false}}
 function save(){D.changes=(D.changes||0)+1;return persist()}
 function snap(label){try{localStorage.setItem(UNDO,JSON.stringify({at:Date.now(),label:label,data:D}))}catch(e){}}
 function getUndo(){try{return JSON.parse(localStorage.getItem(UNDO))}catch(e){return null}}
@@ -859,9 +861,9 @@ function vCli(id){
       <div class="row"><span>Días desde la última compra</span><b>${lp&&dd0!=null?dd0+' días':'<span class="mut">sin fecha</span>'}</b></div>
       <div class="row"><span>¿Ha repetido compra en ${YEAR}?</span><b class="${repitio(c)?'up':'dn'}">${repitio(c)?'SÍ':'NO'}</b></div>
       <div class="row"><span>Meses sin comprar</span><b class="${ms>=3&&hasBill(c)&&hasMon(c)?'dn':''}">${hasBill(c)&&hasMon(c)?ms:'<span class="mut">—</span>'}</b></div>
-      <p class="hint">«Repetido» = al menos 2 compras en ${YEAR}, contando pedidos con fecha o meses con facturación. «Meses sin comprar» se calcula con la facturación mensual. La fecha y el importe de la última compra solo salen de pedidos que tú apuntas: la app nunca los inventa.</p></div>
+      <p class="hint">«Repetido» = al menos 2 compras en ${YEAR}, contando pedidos con fecha o meses con facturación. «Meses sin comprar» se calcula con la facturación mensual. La fecha y el importe de la última compra salen de los pedidos con fecha apuntados anteriormente: la app nunca los inventa.</p></div>
   </div>
-  <div class="grid c2" style="margin-top:16px">
+  <div style="margin-top:16px">
     <div class="card"><h3>Colchones VICKFLEX en exposición</h3>
       <div>${c.exposicion.length?c.exposicion.map((t,i)=>`<span class="tag">${esc(t)} <a class="x" onclick="delModelo('${c.id}',${i})" title="Retirar">✕</a></span>`).join(''):'<span class="mut">Ninguno anotado todavía</span>'}</div>
       <form class="addrow" onsubmit="return addModelo('${c.id}',this)"><input name="v" list="modelos" placeholder="Añadir modelo (ej. Nube)"><button class="b1" type="submit">Añadir</button></form>
@@ -870,9 +872,6 @@ function vCli(id){
       ${c.prodPend.length?c.prodPend.map((t,i)=>`<div class="row"><span>${esc(t)}</span><span><button class="b2 sm" onclick="prodAExp('${c.id}',${i})">Pasar a exposición</button> <a class="x" onclick="delProd('${c.id}',${i})" title="Quitar">✕</a></span></div>`).join(''):'<span class="mut">Ninguno</span>'}
       <form class="addrow" onsubmit="return addProd('${c.id}',this)"><input name="v" list="modelos" placeholder="Añadir producto pendiente"><button class="b1" type="submit">Añadir</button></form>
       <label class="f" style="margin-top:14px"><span>Observaciones sobre la exposición</span><textarea rows="3" onchange="setExpObs('${c.id}',this.value)">${esc(c.expObs)}</textarea></label></div>
-    <div class="card"><h3>Pedidos con fecha</h3>${c.pedidos.length?[...c.pedidos].map((o,i)=>[o,i]).sort((x,y)=>y[0].f.localeCompare(x[0].f)).map(([o,i])=>`<div class="row"><span>${fd(o.f)}</span><span>${eur(o.i)} <a class="x" onclick="delPedido('${c.id}',${i})" title="Quitar">✕</a></span></div>`).join(''):'<span class="mut">Sin pedidos con fecha</span>'}
-      <div style="margin-top:12px"><button class="b2" onclick="pedidoForm('${c.id}')">+ Apuntar pedido</button></div>
-      <p class="hint">Apuntar un pedido no cambia la facturación mensual: son datos distintos.</p></div>
   </div>
 
   <h2 class="sec">Visitas y seguimiento</h2>
@@ -1343,8 +1342,7 @@ function vSemana(id){
    <p class="hint" style="margin-top:8px">${x.expoV==null&&x.expoU==null?'Todavía sin registrar.':'Registrado: <b>'+(x.expoV==null?'—':eur(x.expoV))+'</b> · <b>'+(x.expoU==null?'—':x.expoU+' colchones')+'</b>. Puedes cambiarlo cuando quieras; el resumen del representante se actualiza solo.'}</p></div>
   ${x.obs?`<div class="card" style="margin-bottom:16px"><h3>Observaciones de la semana</h3><p style="line-height:1.5">${esc(x.obs)}</p></div>`:''}
   <h2 class="sec" style="margin-top:6px">Resumen de la semana</h2>
-  <div class="grid k">${kc('Visitas',S.n,S.clientes+' clientes distintos')}${kc('Pedidos',S.ped.cn+S.ped.pn,S.ped.cn+' conseguidos ('+eu(S.ped.cI)+') · '+S.ped.pn+' previstos ('+eu(S.ped.pI)+')')}${kc('Compromisos',S.comp,S.compPend+' pendientes')}${kc('Acciones pendientes',S.acc,'próximas acciones sin hacer')}</div>
-  <div class="grid k" style="margin-top:16px">${kc('Nuevas exposiciones',S.expoN.length,esc(S.expoN.join(', '))||'ninguna')}${kc('Exposiciones pendientes',S.expoP.length,esc(S.expoP.join(', '))||'ninguna')}${kc('Visitas por día',days.map(f=>S.vis.filter(o=>o.v.f===f).length).join(' · '),days.map(f=>DIAS[(parseD(f).getDay()+6)%7].slice(0,1)).join(' · '))}${kc('Clientes visitados',S.clientes,'')}</div>
+  <div class="grid k">${kc('Visitas',S.n,S.clientes+' clientes distintos')}${kc('Pedidos',S.ped.cn+S.ped.pn,S.ped.cn+' conseguidos ('+eu(S.ped.cI)+') · '+S.ped.pn+' previstos ('+eu(S.ped.pI)+')')}${kc('Nuevas exposiciones',S.expoN.length,esc(S.expoN.join(', '))||'ninguna')}${kc('Visitas por día',days.map(f=>S.vis.filter(o=>o.v.f===f).length).join(' · '),days.map(f=>DIAS[(parseD(f).getDay()+6)%7].slice(0,1)).join(' · '))}</div>
   <h2 class="sec">Días</h2>
   <div class="wk5">${days.map(dayHTML).join('')}</div>
   <p class="hint">Pulsa un cliente para abrir su ficha en «Historial de visitas»: allí puedes ver, editar o eliminar la visita y cambiar su resultado. Cada visita es un único registro: lo que cambies en la ficha se ve al momento aquí. Verde = pedido conseguido · naranja = previsto · gris = ninguno. ${TELI} = visita telefónica. Los totales se calculan solos con las visitas registradas.</p>`}
@@ -1944,7 +1942,7 @@ function clBuild(){const H=CL.hojas[CL.hoja],M=CL.map,r=rep(CL.rep),g=(row,k)=>M
     if(/^\d{4}$/.test(o.cp))o.cp='0'+o.cp;
     if(!o.provincia&&/^\d{5}$/.test(o.cp))o.provincia=CPPROV[+o.cp.slice(0,2)]||'';
     o.prov=!o.nombre&&!!o.nombreFact;if(!o.nombre)o.nombre=o.nombreFact;if(!o.nombreFact)o.nombreFact=o.nombre;
-    o.nombre=UPC(o.nombre);o.provincia=UPC(o.provincia);
+    o.nombre=UPC(o.nombre);o.provincia=UPC(o.provincia);o.email=o.email.toLowerCase();
     items.push(o)});
   const vistosC={},vistosN={},porMail={},porTel={};
   items.forEach((o,i)=>{o.av=[];o.cand=[];o.ex=null;o.bloq=0;
