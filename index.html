@@ -2132,7 +2132,7 @@ function clAplicar(){const r=rep(CL.rep);snap('Importar clientes de '+r.nombre+'
    Este iPad guarda una copia temporal (la misma de siempre) para poder trabajar sin cobertura: los cambios se suben
    solos en cuanto hay conexión. Si otro dispositivo ha guardado algo más nuevo, se carga lo de la nube y los cambios
    de este iPad quedan en Copias de seguridad › Deshacer. */
-const SB_URL='',SB_KEY='';   /* dirección del proyecto (Project URL) y clave pública (anon public key) de Supabase */
+const SB_URL='https://clwcrticcualxdyueamg.supabase.co',SB_KEY='sb_publishable_HiHD6_rrYRkhnPl3Qdq1pQ_wuQDZmd1';   /* dirección del proyecto (Project URL) y clave pública (anon public key) de Supabase */
 const SB_T='vickflex_datos',SYNC='vickflex_sync';
 var LOCKED=true;
 let SB={tok:null,ref:null,exp:0,uid:null,email:'',pw:null},NUBE={est:'',t:null,busy:false,again:false,n:0,at:0};
@@ -2190,7 +2190,7 @@ async function nubeSubir(){clearTimeout(NUBE.t);
   catch(e){console.warn('nube',e);nubeEst(navigator.onLine===false?'offline':'error');NUBE.t=setTimeout(nubeSubir,30000)}
   finally{NUBE.busy=false;if(NUBE.again){NUBE.again=false;nubeSubir()}}}
 /* bajar la fila de este usuario (o null si todavía no existe) */
-async function nubeBajar(){if(!await sbToken())throw new Error('auth');const r=await sbReq(sbFila+'?select=data,version&user_id=eq.'+SB.uid);if(!r.ok)throw new Error('http '+r.st);return (r.j&&r.j[0])||null}
+async function nubeBajar(){if(!await sbToken())throw new Error('auth');const r=await sbReq(sbFila+'?select=data,version&user_id=eq.'+SB.uid);if(r.st===404)throw new Error('tabla');if(!r.ok)throw new Error('http '+r.st);return (r.j&&r.j[0])||null}
 function nubeCargar(row,aviso){
   if(aviso){snap(aviso);toast('Había datos más nuevos en la nube (de otro dispositivo) y se han cargado. Los últimos cambios de este iPad están en Copias de seguridad › Deshacer.',1)}
   D=migrate(row.data||emptyData());cacheW();syncSet({uid:SB.uid,ver:row.version,pend:false});nubeEst('ok');render(true)}
@@ -2205,7 +2205,7 @@ async function nubeInicio(){
     if(mio&&s.ver===row.version){if(s.pend)nubeSubir();else nubeEst('ok');return}
     const local=(mio&&s.pend)||(!s.uid&&hayDatos(D));
     nubeCargar(row,local?'Datos de este iPad antes de cargar los de la nube':'')}
-  catch(e){console.warn('nube',e);nubeEst(navigator.onLine===false?'offline':'error');NUBE.t=setTimeout(nubeInicio,30000)}}
+  catch(e){console.warn('nube',e);if(e.message==='tabla')toast('Falta crear la tabla en Supabase: ejecuta supabase/esquema.sql en el SQL Editor.',1);nubeEst(navigator.onLine===false?'offline':'error');NUBE.t=setTimeout(nubeInicio,30000)}}
 /* al volver a la app: si no hay nada pendiente, se comprueba si otro dispositivo ha guardado algo nuevo */
 async function nubeRefrescar(){if(LOCKED||!SB.uid||NUBE.busy)return;const s=syncGet();if(s.pend)return nubeSubir();
   try{if(!await sbToken())return;const r=await sbReq(sbFila+'?select=version&user_id=eq.'+SB.uid);if(r.ok&&r.j&&r.j[0]&&r.j[0].version!==s.ver){const row=await nubeBajar();if(row&&!syncGet().pend)nubeCargar(row,'')}}catch(e){}}
