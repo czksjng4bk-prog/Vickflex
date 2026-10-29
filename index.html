@@ -165,6 +165,14 @@ button{font-family:inherit}
 #toast{position:fixed;left:50%;bottom:28px;transform:translateX(-50%);z-index:60}
 #toast div{background:#2b2b2b;color:#fff;padding:12px 20px;border-radius:14px;font-size:15px} #toast div.e{background:var(--ro)}
 @media(max-width:900px){.k,.c3,.c2{grid-template-columns:1fr 1fr}nav{width:170px}}
+/* Pantalla de acceso (correo + contraseña) */
+body.locked nav,body.locked main{visibility:hidden}
+#lock:empty{display:none}
+.lock{position:fixed;inset:0;z-index:100;background:var(--b);display:flex;align-items:center;justify-content:center;padding:20px;overflow:auto}
+.lock .mc{width:min(440px,100%);box-shadow:0 8px 30px rgba(60,40,10,.12)}
+.lock img{display:block;width:70%;max-width:260px;height:auto;margin:0 auto 14px}
+.lock .f{margin-top:12px}
+.lock .b1{width:100%;margin-top:16px}
 </style>
 </head>
 <body>
@@ -182,7 +190,7 @@ button{font-family:inherit}
   </div>
   <div id="view"></div>
 </main>
-<div id="modal"></div><div id="toast"></div>
+<div id="modal"></div><div id="toast"></div><div id="lock"></div>
 <script>
 const KEY='vickflex_data',UNDO='vickflex_undo',YEAR=new Date().getFullYear();
 const MES=['ene','feb','mar','abr','may','jun','jul','ago','sep','oct','nov','dic'];
@@ -975,6 +983,7 @@ function vCopias(){
     <div class="acts l"><button class="b2" onclick="restaurarTexto()">Restaurar desde el texto</button></div>
     <p class="hint">Antes de restaurar, la app guarda una copia interna de lo que hay ahora.</p></div>
    <div class="card"><h3>Deshacer</h3>${u?`<p style="line-height:1.6">Último cambio importante: <b>${esc(u.label)}</b> (${new Date(u.at).toLocaleString('es-ES')})</p><div class="acts l"><button class="b2" onclick="deshacer()">Volver a antes de ese cambio</button></div>`:'<p class="mut">Todavía no hay nada que deshacer.</p>'}</div>
+   <div class="card"><h3>Acceso a la app</h3><p style="line-height:1.6">Correo de acceso: <b>${esc((accGet()||{}).email||'—')}</b></p><div class="acts l" style="flex-wrap:wrap"><button class="b2" onclick="accForm()">Cambiar correo o contraseña</button><button class="b2" onclick="lockShow()">🔒 Bloquear ahora</button></div><p class="hint">La app pide el correo y la contraseña cada vez que se abre. No se pueden recuperar si se olvidan: apúntalos en un sitio seguro.</p></div>
    <div class="card"><h3>Empezar con datos reales</h3><p style="line-height:1.5">Borra todos los representantes, clientes, facturación, visitas y semanas del coche expositor para empezar de cero. Todas las pestañas siguen funcionando. Hazlo después de una copia.</p><div class="acts l"><button class="b2 dng" onclick="vaciar()">Vaciar todos los datos</button></div></div>
   </div>`}
 
@@ -986,6 +995,7 @@ function crumbs(v,id){
   if(v==='rep')return l('reps','Representantes')+s+'<b>'+esc(rep(id).nombre)+'</b>';
   const c=cli(id),r=rep(c.repId);return l('reps','Representantes')+s+(r?l('rep/'+r.id,r.nombre)+s:'')+'<b>'+esc(c.nombre)+'</b>'}
 function render(keep){
+  if(LOCKED)return;
   const p=(location.hash.slice(1)||'panel').split('/');let v=p[0],id=p[1];
   if(v==='plan')v='coche';if(v==='rep'&&!rep(id))v='reps';if(v==='cli'&&!cli(id))v='reps';if(['panel','reps','rep','cli','copias','plan','alertas','coche','cochehist','semana','modelos'].indexOf(v)<0)v='panel';if(v==='semana'&&!semOf(id))v='coche';if(v==='coche'&&id&&+id>1990)CY=+id;
   const f={modelos:vModelos,panel:vPanel,reps:vReps,rep:()=>vRep(id),cli:()=>vCli(id),copias:vCopias,plan:vPlan,alertas:vAlertas,coche:vCoche,cochehist:vCocheHist,semana:()=>vSemana(id)}[v];
@@ -2115,7 +2125,65 @@ function clAplicar(){const r=rep(CL.rep);snap('Importar clientes de '+r.nombre+'
   if(!save())return;const id=CL.rep;CL=null;go('rep/'+id);render(true);
   modal(`<h2>✔ Importación terminada</h2><p class="msg" style="line-height:1.7"><b>${nu}</b> clientes nuevos creados<br><b>${ac}</b> clientes existentes actualizados<br><b>${om}</b> filas omitidas${res.length?'<br><br>'+res.map(esc).join('<br>'):''}</p><p class="hint">Ya los tienes en la lista de ${esc(r.nombre)}. Si algo no está bien: Copias de seguridad › Deshacer. Recuerda hacer una copia de seguridad nueva.</p><div class="acts"><button class="b2" onclick="closeModal();go('copias')">Ir a Copias de seguridad</button><button class="b1" onclick="closeModal()">Ver clientes</button></div>`)}
 
-render();
+/* ======================= ACCESO CON CORREO Y CONTRASEÑA =======================
+   Cada vez que se abre la app se piden el correo y la contraseña. La primera vez se crean.
+   Se guardan en este iPad (clave aparte, fuera de los datos y de las copias de seguridad).
+   La contraseña nunca se guarda tal cual: solo su huella (SHA-256 con sal, repetida). */
+var LOCKED=true;
+const ACC='vickflex_acceso';
+let ACCF={n:0,hasta:0};
+function sha256hex(str){
+  const b=new TextEncoder().encode(str),K=[],H=[],isP=x=>{for(let i=2;i*i<=x;i++)if(x%i===0)return false;return true},fr=x=>((x-Math.floor(x))*4294967296)|0;
+  for(let n=2,c=0;c<64;n++)if(isP(n)){if(c<8)H[c]=fr(Math.pow(n,1/2));K[c]=fr(Math.pow(n,1/3));c++}
+  const l=b.length,len=((l+9+63)>>6)<<6,m=new Uint8Array(len);m.set(b);m[l]=0x80;const dv=new DataView(m.buffer);dv.setUint32(len-4,(l*8)>>>0);dv.setUint32(len-8,Math.floor(l/536870912));
+  const W=new Array(64),r=(x,k)=>(x>>>k)|(x<<(32-k));
+  for(let o=0;o<len;o+=64){
+    for(let i=0;i<16;i++)W[i]=dv.getUint32(o+i*4);
+    for(let i=16;i<64;i++){const s0=r(W[i-15],7)^r(W[i-15],18)^(W[i-15]>>>3),s1=r(W[i-2],17)^r(W[i-2],19)^(W[i-2]>>>10);W[i]=(W[i-16]+s0+W[i-7]+s1)|0}
+    let [a,bb,cc,d,e,f,g,h]=H;
+    for(let i=0;i<64;i++){const t1=(h+(r(e,6)^r(e,11)^r(e,25))+((e&f)^(~e&g))+K[i]+W[i])|0,t2=((r(a,2)^r(a,13)^r(a,22))+((a&bb)^(a&cc)^(bb&cc)))|0;h=g;g=f;f=e;e=(d+t1)|0;d=cc;cc=bb;bb=a;a=(t1+t2)|0}
+    [a,bb,cc,d,e,f,g,h].forEach((x,i)=>H[i]=(H[i]+x)|0)}
+  return H.map(x=>(x>>>0).toString(16).padStart(8,'0')).join('')}
+function accHash(pw,salt){let h=salt+'|'+pw;for(let i=0;i<2000;i++)h=sha256hex(h+'|'+salt);return h}
+function accGet(){try{const a=JSON.parse(localStorage.getItem(ACC));return a&&a.email&&a.hash&&a.salt?a:null}catch(e){return null}}
+function accPut(email,pw){const salt=uid()+uid();try{localStorage.setItem(ACC,JSON.stringify({v:1,email:email,salt:salt,hash:accHash(pw,salt)}));return true}catch(e){return false}}
+const accOk=(a,email,pw)=>a&&String(email||'').trim().toLowerCase()===a.email&&accHash(pw,a.salt)===a.hash;
+function lockShow(){LOCKED=true;closeModal();document.body.classList.add('locked');const a=accGet();
+  $('#lock').innerHTML=`<div class="lock"><form class="mc" id="lockf" autocomplete="on"><img src="logo.png" alt="VickFlex descanso">
+   <h2 style="text-align:center">${a?'Acceso':'Crea tu acceso'}</h2>
+   <p class="hint" style="text-align:center;margin-top:0">${a?'Escribe tu correo electrónico y tu contraseña para entrar.':'Es la primera vez: elige el correo y la contraseña que te pediremos cada vez que abras la app.'}</p>
+   <label class="f"><span>Correo electrónico</span><input id="lk_e" type="email" name="username" autocomplete="username" autocapitalize="none" spellcheck="false" required></label>
+   <label class="f"><span>Contraseña</span><input id="lk_p" type="password" name="password" autocomplete="${a?'current-password':'new-password'}" required></label>
+   ${a?'':'<label class="f"><span>Repite la contraseña</span><input id="lk_p2" type="password" autocomplete="new-password" required></label>'}
+   <p class="err" id="lk_err" style="margin-top:10px"></p>
+   <button type="submit" class="b1">${a?'Entrar':'Crear acceso y entrar'}</button>
+   ${a?'<p class="hint" style="text-align:center">Si has olvidado la contraseña no se puede recuperar desde la app.</p>':'<p class="hint" style="text-align:center">Apunta la contraseña en un sitio seguro: no se puede recuperar.</p>'}</form></div>`;
+  $('#lockf').onsubmit=e=>{e.preventDefault();accEntrar()};
+  setTimeout(()=>{const i=$('#lk_e');if(i)i.focus()},60)}
+function accEntrar(){const a=accGet(),em=$('#lk_e').value.trim().toLowerCase(),pw=$('#lk_p').value.trim(),err=$('#lk_err');
+  if(!a){if(!clMailOk(em))return void(err.textContent='Escribe un correo electrónico válido.');
+    if(pw.length<6)return void(err.textContent='La contraseña debe tener al menos 6 caracteres.');
+    if(pw!==$('#lk_p2').value.trim())return void(err.textContent='Las dos contraseñas no coinciden.');
+    if(!accPut(em,pw))return void(err.textContent='No se ha podido guardar el acceso en este iPad.');
+    toast('Acceso creado.');return accAbrir()}
+  const ahora=Date.now();if(ACCF.hasta>ahora)return void(err.textContent='Demasiados intentos. Espera '+Math.ceil((ACCF.hasta-ahora)/1000)+' segundos.');
+  if(accOk(a,em,pw)){ACCF={n:0,hasta:0};return accAbrir()}
+  ACCF.n++;if(ACCF.n>=5){ACCF.hasta=ahora+30000;ACCF.n=0}
+  err.textContent='Correo o contraseña incorrectos.';$('#lk_p').value='';$('#lk_p').focus()}
+function accAbrir(){LOCKED=false;$('#lock').innerHTML='';document.body.classList.remove('locked');render()}
+/* Cambiar correo o contraseña (desde Copias de seguridad): pide la contraseña actual */
+function accForm(){const a=accGet();
+  formModal('Cambiar correo o contraseña',[{n:'act',l:'Contraseña actual',w:'w'},{n:'email',l:'Correo electrónico',w:'w'},{n:'p1',l:'Contraseña nueva (déjala vacía para no cambiarla)',w:'w'},{n:'p2',l:'Repite la contraseña nueva',w:'w'}],
+    {act:'',email:a?a.email:'',p1:'',p2:''},o=>{
+    if(a&&!accOk(a,a.email,o.act))return 'La contraseña actual no es correcta.';
+    const em=o.email.toLowerCase();if(!clMailOk(em))return 'Escribe un correo electrónico válido.';
+    if(o.p1&&o.p1.length<6)return 'La contraseña nueva debe tener al menos 6 caracteres.';
+    if(o.p1!==o.p2)return 'Las dos contraseñas nuevas no coinciden.';
+    if(!accPut(em,o.p1||o.act))return 'No se ha podido guardar.';
+    render(true);toast('Acceso actualizado.')});
+  ['act','p1','p2'].forEach(n=>{const i=$('#frm').elements[n];i.type='password';i.autocomplete=n==='act'?'current-password':'new-password'});
+  $('#frm').elements.email.type='email';$('#frm').elements.email.autocapitalize='none'}
+lockShow();
 </script>
 </body>
 </html>
