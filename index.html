@@ -1559,8 +1559,9 @@ async function readXlsx(buf){
 
 /* ---- CSV / texto ---- */
 function parseCSV(t){
-  const first=t.split(/\r?\n/).find(l=>l.trim())||'';
-  const dl=first.indexOf(';')>=0?';':first.indexOf('\t')>=0?'\t':',';
+  /* separador: el que más se repite en las primeras líneas (los informes suelen empezar con una línea de título sin separadores) */
+  const ls=t.split(/\r?\n/).filter(l=>l.trim()).slice(0,30),cnt=c=>ls.filter(l=>l.split(c).length>1).length;
+  const dl=[';','\t',','].reduce((m,c)=>cnt(c)>cnt(m)?c:m,';');
   const rows=[];let row=[],cur='',q=false;
   for(let i=0;i<t.length;i++){const ch=t[i];
     if(q){if(ch==='"'){if(t[i+1]==='"'){cur+='"';i++}else q=false}else cur+=ch}
@@ -1573,7 +1574,7 @@ function parseTextoLibre(t){
   const ls=t.split(/\r?\n/).filter(l=>l.trim());
   const tabs=ls.filter(l=>l.indexOf('\t')>=0).length;
   if(ls.length&&tabs>=ls.length*0.5)return ls.map(l=>l.split('\t'));
-  const semis=ls.filter(l=>(l.match(/;/g)||[]).length>=3).length;
+  const semis=ls.filter(l=>(l.match(/;/g)||[]).length>=2).length;
   if(ls.length&&semis>=ls.length*0.5)return parseCSV(t);
   return ls.map(l=>[l])}   // una sola celda por línea -> se analiza como informe impreso
 
