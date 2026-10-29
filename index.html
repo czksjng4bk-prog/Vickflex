@@ -173,6 +173,7 @@ body.locked nav,body.locked main{visibility:hidden}
 .lock img{display:block;width:70%;max-width:260px;height:auto;margin:0 auto 14px}
 .lock .f{margin-top:12px}
 .lock .b1{width:100%;margin-top:16px}
+.nube{margin-top:auto;padding:10px 6px 0;font-size:12px;line-height:1.35;color:var(--g);cursor:pointer}.nube.error,.nube.offline{color:var(--ro)}.nube.ok{color:var(--ok)}
 </style>
 </head>
 <body>
@@ -183,6 +184,7 @@ body.locked nav,body.locked main{visibility:hidden}
   <button data-v="copias" onclick="go('copias')">Copias de seguridad</button>
   <button data-v="coche" onclick="go('coche')">Coche expositor</button>
   <button data-v="alertas" onclick="go('alertas')">Alertas <span id="nbadge" class="badge"></span></button>
+  <div id="nube" class="nube" onclick="nubeSubir()" title="Pulsa para guardar ahora en la nube"></div>
 </nav>
 <main>
   <div class="top"><div id="crumbs"></div>
@@ -223,7 +225,7 @@ function load(){
   const d=migrate(emptyData());try{localStorage.setItem(KEY,JSON.stringify(d))}catch(e){}return d;
 }
 let D=load(),sortBy='fact';
-function persist(){try{(D.clientes||[]).forEach(mayusCli);(D.reps||[]).forEach(minusRep);localStorage.setItem(KEY,JSON.stringify(D));return true}catch(e){toast('No se ha podido guardar en este iPad. Haz una copia de seguridad.',1);return false}}
+function persist(){try{(D.clientes||[]).forEach(mayusCli);(D.reps||[]).forEach(minusRep);localStorage.setItem(KEY,JSON.stringify(D))}catch(e){toast('No se ha podido guardar la copia temporal de este iPad. Se guarda en la nube.',1)}nubePend();return true}
 function save(){D.changes=(D.changes||0)+1;return persist()}
 function snap(label){try{localStorage.setItem(UNDO,JSON.stringify({at:Date.now(),label:label,data:D}))}catch(e){}}
 function getUndo(){try{return JSON.parse(localStorage.getItem(UNDO))}catch(e){return null}}
@@ -776,10 +778,9 @@ function modPrep(){try{const o=modPDF(),name='VICKFLEX_Modelo_en_exposicion_'+sl
   INF.file=new File([o.blob],name,{type:'application/pdf'});INF.pages=o.pages;INF.ops=o.ops;INF.W=o.W;INF.H=o.H;modModal()}catch(e){console.error(e);toast('No se ha podido preparar el PDF.',1)}}
 
 /* ---------- Pantallas ---------- */
-function banner(){
-  const dias=D.lastBackup?(Date.now()-D.lastBackup)/864e5:null;
-  if(!(D.changes>0&&(dias==null||dias>=7)))return '';
-  return `<div class="banner"><span>${dias==null?'Todavía no has hecho ninguna copia de seguridad.':'Hace '+Math.floor(dias)+' días de tu última copia.'} Tienes <b>${D.changes}</b> cambios sin copiar.</span><button class="b1" onclick="hacerCopia()">Hacer copia</button></div>`}
+function banner(){const s=syncGet();
+  if(!(s.pend&&(NUBE.est==='offline'||NUBE.est==='error')))return '';
+  return `<div class="banner"><span>Hay cambios guardados solo en este iPad: todavía no se han podido subir a la nube. Se reintenta solo.</span><button class="b1" onclick="nubeSubir()">Reintentar ahora</button></div>`}
 
 function vPanel(){
   const all=D.clientes,s=stats(all),m=s.m;
@@ -972,9 +973,9 @@ function vCli(id){
 
 function vCopias(){
   const lb=D.lastBackup?new Date(D.lastBackup).toLocaleDateString('es-ES',{day:'numeric',month:'long',year:'numeric'}):'Nunca',u=getUndo();
-  return `<h1>Copias de seguridad</h1><p class="sub">Tus datos están solo en este iPad. Haz copias con frecuencia.</p>
+  return `<h1>Copias de seguridad</h1><p class="sub">Tus datos se guardan en la nube (Supabase). Las copias en archivo son opcionales.</p>
   <div class="grid c2">
-   <div class="card"><h3>Copia completa</h3><p style="line-height:1.7">Última copia: <b>${lb}</b><br>Cambios desde entonces: <b>${D.changes}</b></p>
+   <div class="card"><h3>Descargar una copia (opcional)</h3><p style="line-height:1.7">Última copia: <b>${lb}</b><br>Cambios desde entonces: <b>${D.changes}</b></p>
     <div class="acts l"><button class="b1" onclick="hacerCopia()">Hacer copia</button><button class="b2" onclick="copiarTexto()">Copiar como texto</button></div>
     <p class="hint">Se abre la hoja de compartir: elige <b>Guardar en Archivos</b>, mejor en iCloud Drive. Después comprueba que el archivo está en Archivos.</p></div>
    <div class="card"><h3>Restaurar una copia</h3>
@@ -983,7 +984,7 @@ function vCopias(){
     <div class="acts l"><button class="b2" onclick="restaurarTexto()">Restaurar desde el texto</button></div>
     <p class="hint">Antes de restaurar, la app guarda una copia interna de lo que hay ahora.</p></div>
    <div class="card"><h3>Deshacer</h3>${u?`<p style="line-height:1.6">Último cambio importante: <b>${esc(u.label)}</b> (${new Date(u.at).toLocaleString('es-ES')})</p><div class="acts l"><button class="b2" onclick="deshacer()">Volver a antes de ese cambio</button></div>`:'<p class="mut">Todavía no hay nada que deshacer.</p>'}</div>
-   <div class="card"><h3>Acceso a la app</h3><p style="line-height:1.6">Correo de acceso: <b>${esc((accGet()||{}).email||'—')}</b></p><div class="acts l" style="flex-wrap:wrap"><button class="b2" onclick="accForm()">Cambiar correo o contraseña</button><button class="b2" onclick="lockShow()">🔒 Bloquear ahora</button></div><p class="hint">La app pide el correo y la contraseña cada vez que se abre. No se pueden recuperar si se olvidan: apúntalos en un sitio seguro.</p></div>
+   ${nubeCard()}
    <div class="card"><h3>Empezar con datos reales</h3><p style="line-height:1.5">Borra todos los representantes, clientes, facturación, visitas y semanas del coche expositor para empezar de cero. Todas las pestañas siguen funcionando. Hazlo después de una copia.</p><div class="acts l"><button class="b2 dng" onclick="vaciar()">Vaciar todos los datos</button></div></div>
   </div>`}
 
@@ -2125,12 +2126,16 @@ function clAplicar(){const r=rep(CL.rep);snap('Importar clientes de '+r.nombre+'
   if(!save())return;const id=CL.rep;CL=null;go('rep/'+id);render(true);
   modal(`<h2>✔ Importación terminada</h2><p class="msg" style="line-height:1.7"><b>${nu}</b> clientes nuevos creados<br><b>${ac}</b> clientes existentes actualizados<br><b>${om}</b> filas omitidas${res.length?'<br><br>'+res.map(esc).join('<br>'):''}</p><p class="hint">Ya los tienes en la lista de ${esc(r.nombre)}. Si algo no está bien: Copias de seguridad › Deshacer. Recuerda hacer una copia de seguridad nueva.</p><div class="acts"><button class="b2" onclick="closeModal();go('copias')">Ir a Copias de seguridad</button><button class="b1" onclick="closeModal()">Ver clientes</button></div>`)}
 
-/* ======================= ACCESO CON CORREO Y CONTRASEÑA =======================
-   Cada vez que se abre la app se piden el correo y la contraseña. La primera vez se crean.
-   Se guardan en este iPad (clave aparte, fuera de los datos y de las copias de seguridad).
-   La contraseña nunca se guarda tal cual: solo su huella (SHA-256 con sal, repetida). */
+/* ======================= DATOS EN LA NUBE (SUPABASE) Y ACCESO =======================
+   Los datos se guardan en Supabase, en la tabla «vickflex_datos» (una fila por usuario, con todos los datos).
+   El acceso usa las cuentas de Supabase (correo y contraseña). Cada usuario solo puede leer y cambiar su fila (reglas RLS).
+   Este iPad guarda una copia temporal (la misma de siempre) para poder trabajar sin cobertura: los cambios se suben
+   solos en cuanto hay conexión. Si otro dispositivo ha guardado algo más nuevo, se carga lo de la nube y los cambios
+   de este iPad quedan en Copias de seguridad › Deshacer. */
+const SB_URL='https://clwcrticcualxdyueamg.supabase.co',SB_KEY='sb_publishable_HiHD6_rrYRkhnPl3Qdq1pQ_wuQDZmd1';   /* dirección del proyecto (Project URL) y clave pública (anon public key) de Supabase */
+const SB_T='vickflex_datos',SYNC='vickflex_sync';
 var LOCKED=true;
-const ACC='vickflex_acceso';
+let SB={tok:null,ref:null,exp:0,uid:null,email:'',pw:null},NUBE={est:'',t:null,busy:false,again:false,n:0,at:0};
 let ACCF={n:0,hasta:0};
 function sha256hex(str){
   const b=new TextEncoder().encode(str),K=[],H=[],isP=x=>{for(let i=2;i*i<=x;i++)if(x%i===0)return false;return true},fr=x=>((x-Math.floor(x))*4294967296)|0;
@@ -2144,45 +2149,124 @@ function sha256hex(str){
     for(let i=0;i<64;i++){const t1=(h+(r(e,6)^r(e,11)^r(e,25))+((e&f)^(~e&g))+K[i]+W[i])|0,t2=((r(a,2)^r(a,13)^r(a,22))+((a&bb)^(a&cc)^(bb&cc)))|0;h=g;g=f;f=e;e=(d+t1)|0;d=cc;cc=bb;bb=a;a=(t1+t2)|0}
     [a,bb,cc,d,e,f,g,h].forEach((x,i)=>H[i]=(H[i]+x)|0)}
   return H.map(x=>(x>>>0).toString(16).padStart(8,'0')).join('')}
+/* huella de la contraseña: solo sirve para poder entrar sin cobertura; la contraseña nunca se guarda tal cual */
 function accHash(pw,salt){let h=salt+'|'+pw;for(let i=0;i<2000;i++)h=sha256hex(h+'|'+salt);return h}
-function accGet(){try{const a=JSON.parse(localStorage.getItem(ACC));return a&&a.email&&a.hash&&a.salt?a:null}catch(e){return null}}
-function accPut(email,pw){const salt=uid()+uid();try{localStorage.setItem(ACC,JSON.stringify({v:1,email:email,salt:salt,hash:accHash(pw,salt)}));return true}catch(e){return false}}
-const accOk=(a,email,pw)=>a&&String(email||'').trim().toLowerCase()===a.email&&accHash(pw,a.salt)===a.hash;
-function lockShow(){LOCKED=true;closeModal();document.body.classList.add('locked');const a=accGet();
+function syncGet(){try{return JSON.parse(localStorage.getItem(SYNC))||{}}catch(e){return {}}}
+function syncSet(o){try{localStorage.setItem(SYNC,JSON.stringify(Object.assign(syncGet(),o)))}catch(e){}}
+function cacheW(){try{localStorage.setItem(KEY,JSON.stringify(D))}catch(e){}}
+const hayDatos=d=>!!(d&&((d.reps||[]).length||(d.clientes||[]).length||(d.semanas||[]).length));
+
+/* --- conexión con Supabase (sin librerías: su API REST) --- */
+async function sbReq(path,o){o=o||{};const h=Object.assign({apikey:SB_KEY,'Content-Type':'application/json'},o.h||{});
+  if(o.auth!==false&&SB.tok)h.Authorization='Bearer '+SB.tok;
+  const r=await fetch(SB_URL.replace(/\/+$/,'')+path,{method:o.m||'GET',headers:h,body:o.b!==undefined?JSON.stringify(o.b):undefined,cache:'no-store'});
+  const t=await r.text();let j=null;try{j=t?JSON.parse(t):null}catch(e){}return {ok:r.ok,st:r.status,j:j}}
+function sbSes(j){SB.tok=j.access_token;SB.ref=j.refresh_token||SB.ref;SB.exp=Date.now()+(j.expires_in||3600)*1000;if(j.user&&j.user.id)SB.uid=j.user.id}
+async function sbLogin(email,pw){const r=await sbReq('/auth/v1/token?grant_type=password',{m:'POST',b:{email:email,password:pw},auth:false});if(r.ok)sbSes(r.j);return r}
+async function sbToken(){if(SB.tok&&Date.now()<SB.exp-60000)return true;
+  if(SB.ref){const r=await sbReq('/auth/v1/token?grant_type=refresh_token',{m:'POST',b:{refresh_token:SB.ref},auth:false});if(r.ok){sbSes(r.j);return true}}
+  if(SB.pw&&SB.email){const r=await sbLogin(SB.email,SB.pw);if(r.ok){SB.pw=null;return true}}
+  return false}
+const sbFila='/rest/v1/'+SB_T;
+
+/* --- estado visible (abajo del menú) --- */
+const NUBET={ok:'☁ Guardado en la nube',sync:'⏳ Guardando en la nube…',pend:'⏳ Cambios pendientes de subir',offline:'📴 Sin conexión · se subirá al volver',error:'⚠ No se ha podido subir · reintentando'};
+function nubeEst(e){NUBE.est=e;if(e==='ok')NUBE.at=Date.now();const el=$('#nube');if(el){el.textContent=NUBET[e]||'';el.className='nube '+(e||'')}}
+
+/* --- subir: cada cambio guardado se sube a los pocos segundos --- */
+function nubePend(){NUBE.n++;syncSet({pend:true});if(LOCKED)return;nubeEst(navigator.onLine===false?'offline':'pend');clearTimeout(NUBE.t);NUBE.t=setTimeout(nubeSubir,1500)}
+async function nubeSubir(){clearTimeout(NUBE.t);
+  if(NUBE.busy){NUBE.again=true;return}
+  const s=syncGet();if(!SB.uid||LOCKED)return;if(!s.pend){nubeEst('ok');return}
+  NUBE.busy=true;nubeEst('sync');const n0=NUBE.n;
+  try{
+    if(!await sbToken())throw new Error('auth');
+    const ver=s.ver||0,body={data:D,version:ver+1,updated_at:new Date().toISOString()};let r;
+    if(!ver)r=await sbReq(sbFila,{m:'POST',b:Object.assign({user_id:SB.uid},body),h:{Prefer:'return=representation'}});
+    else r=await sbReq(sbFila+'?user_id=eq.'+SB.uid+'&version=eq.'+ver,{m:'PATCH',b:body,h:{Prefer:'return=representation'}});
+    if(r.ok&&Array.isArray(r.j)&&r.j.length){syncSet({ver:r.j[0].version,pend:NUBE.n!==n0});nubeEst(NUBE.n!==n0?'pend':'ok');if(NUBE.n!==n0)NUBE.again=true}
+    else if(r.ok||r.st===409)await nubeConflicto();   /* otro dispositivo guardó antes */
+    else throw new Error('http '+r.st)}
+  catch(e){console.warn('nube',e);nubeEst(navigator.onLine===false?'offline':'error');NUBE.t=setTimeout(nubeSubir,30000)}
+  finally{NUBE.busy=false;if(NUBE.again){NUBE.again=false;nubeSubir()}}}
+/* bajar la fila de este usuario (o null si todavía no existe) */
+async function nubeBajar(){if(!await sbToken())throw new Error('auth');const r=await sbReq(sbFila+'?select=data,version&user_id=eq.'+SB.uid);if(r.st===404)throw new Error('tabla');if(!r.ok)throw new Error('http '+r.st);return (r.j&&r.j[0])||null}
+function nubeCargar(row,aviso){
+  if(aviso){snap(aviso);toast('Había datos más nuevos en la nube (de otro dispositivo) y se han cargado. Los últimos cambios de este iPad están en Copias de seguridad › Deshacer.',1)}
+  D=migrate(row.data||emptyData());cacheW();syncSet({uid:SB.uid,ver:row.version,pend:false});nubeEst('ok');render(true)}
+async function nubeConflicto(){const row=await nubeBajar();if(!row){syncSet({ver:0});NUBE.again=true;return}
+  nubeCargar(row,hayDatos(D)?'Cambios de este iPad sin subir (había una versión más nueva en la nube)':'')}
+/* al entrar: decidir entre lo de la nube y lo de este iPad */
+async function nubeInicio(){
+  try{const s=syncGet(),row=await nubeBajar(),mio=s.uid===SB.uid;
+    if(!row){/* nube vacía: se suben los datos que ya había en este iPad (si son de este usuario o de antes de la nube) */
+      if(s.uid&&!mio){D=migrate(emptyData());cacheW()}
+      syncSet({uid:SB.uid,ver:0,pend:true});const habia=hayDatos(D);await nubeSubir();if(habia&&NUBE.est==='ok')toast('Los datos de este iPad se han subido a la nube.');return}
+    if(mio&&s.ver===row.version){if(s.pend)nubeSubir();else nubeEst('ok');return}
+    const local=(mio&&s.pend)||(!s.uid&&hayDatos(D));
+    nubeCargar(row,local?'Datos de este iPad antes de cargar los de la nube':'')}
+  catch(e){console.warn('nube',e);if(e.message==='tabla')toast('Falta crear la tabla en Supabase: ejecuta supabase/esquema.sql en el SQL Editor.',1);nubeEst(navigator.onLine===false?'offline':'error');NUBE.t=setTimeout(nubeInicio,30000)}}
+/* al volver a la app: si no hay nada pendiente, se comprueba si otro dispositivo ha guardado algo nuevo */
+async function nubeRefrescar(){if(LOCKED||!SB.uid||NUBE.busy)return;const s=syncGet();if(s.pend)return nubeSubir();
+  try{if(!await sbToken())return;const r=await sbReq(sbFila+'?select=version&user_id=eq.'+SB.uid);if(r.ok&&r.j&&r.j[0]&&r.j[0].version!==s.ver){const row=await nubeBajar();if(row&&!syncGet().pend)nubeCargar(row,'')}}catch(e){}}
+window.addEventListener('online',()=>{if(!LOCKED){if(syncGet().pend)nubeSubir();else nubeRefrescar()}});
+window.addEventListener('offline',()=>{if(!LOCKED&&syncGet().pend)nubeEst('offline')});
+document.addEventListener('visibilitychange',()=>{if(LOCKED)return;if(document.visibilityState==='hidden'){if(syncGet().pend)nubeSubir()}else nubeRefrescar()});
+
+/* --- pantalla de acceso: se pide cada vez que se abre la app --- */
+function lockShow(){
+  if(!LOCKED&&syncGet().pend&&navigator.onLine!==false){nubeSubir().finally(lockFin);return}lockFin()}
+function lockFin(){LOCKED=true;clearTimeout(NUBE.t);SB={tok:null,ref:null,exp:0,uid:null,email:'',pw:null};closeModal();document.body.classList.add('locked');nubeEst('');
+  const cfg=!!(SB_URL&&SB_KEY),s=syncGet();
   $('#lock').innerHTML=`<div class="lock"><form class="mc" id="lockf" autocomplete="on"><img src="logo.png" alt="VickFlex descanso">
-   <h2 style="text-align:center">${a?'Acceso':'Crea tu acceso'}</h2>
-   <p class="hint" style="text-align:center;margin-top:0">${a?'Escribe tu correo electrónico y tu contraseña para entrar.':'Es la primera vez: elige el correo y la contraseña que te pediremos cada vez que abras la app.'}</p>
-   <label class="f"><span>Correo electrónico</span><input id="lk_e" type="email" name="username" autocomplete="username" autocapitalize="none" spellcheck="false" required></label>
-   <label class="f"><span>Contraseña</span><input id="lk_p" type="password" name="password" autocomplete="${a?'current-password':'new-password'}" required></label>
-   ${a?'':'<label class="f"><span>Repite la contraseña</span><input id="lk_p2" type="password" autocomplete="new-password" required></label>'}
+   <h2 style="text-align:center">Acceso</h2>
+   ${cfg?`<p class="hint" style="text-align:center;margin-top:0">Escribe el correo electrónico y la contraseña de tu cuenta de VickFlex.</p>
+   <label class="f"><span>Correo electrónico</span><input id="lk_e" type="email" name="username" autocomplete="username" autocapitalize="none" spellcheck="false" value="${esc(s.email||'')}" required></label>
+   <label class="f"><span>Contraseña</span><input id="lk_p" type="password" name="password" autocomplete="current-password" required></label>
    <p class="err" id="lk_err" style="margin-top:10px"></p>
-   <button type="submit" class="b1">${a?'Entrar':'Crear acceso y entrar'}</button>
-   ${a?'<p class="hint" style="text-align:center">Si has olvidado la contraseña no se puede recuperar desde la app.</p>':'<p class="hint" style="text-align:center">Apunta la contraseña en un sitio seguro: no se puede recuperar.</p>'}</form></div>`;
+   <button type="submit" class="b1" id="lk_b">Entrar</button>
+   <p class="hint" style="text-align:center">Tus datos se guardan en la nube. Sin cobertura puedes entrar si ya has entrado antes en este iPad.</p>`
+   :'<p class="err" style="text-align:center">La app todavía no está conectada con Supabase. Falta poner la dirección del proyecto y su clave pública en el código.</p>'}</form></div>`;
+  if(!cfg)return;
   $('#lockf').onsubmit=e=>{e.preventDefault();accEntrar()};
-  setTimeout(()=>{const i=$('#lk_e');if(i)i.focus()},60)}
-function accEntrar(){const a=accGet(),em=$('#lk_e').value.trim().toLowerCase(),pw=$('#lk_p').value.trim(),err=$('#lk_err');
-  if(!a){if(!clMailOk(em))return void(err.textContent='Escribe un correo electrónico válido.');
-    if(pw.length<6)return void(err.textContent='La contraseña debe tener al menos 6 caracteres.');
-    if(pw!==$('#lk_p2').value.trim())return void(err.textContent='Las dos contraseñas no coinciden.');
-    if(!accPut(em,pw))return void(err.textContent='No se ha podido guardar el acceso en este iPad.');
-    toast('Acceso creado.');return accAbrir()}
+  setTimeout(()=>{const i=s.email?$('#lk_p'):$('#lk_e');if(i)i.focus()},60)}
+async function accEntrar(){const em=$('#lk_e').value.trim().toLowerCase(),pw=$('#lk_p').value,err=$('#lk_err'),bt=$('#lk_b');
+  if(!clMailOk(em))return void(err.textContent='Escribe un correo electrónico válido.');
+  if(!pw)return void(err.textContent='Escribe la contraseña.');
   const ahora=Date.now();if(ACCF.hasta>ahora)return void(err.textContent='Demasiados intentos. Espera '+Math.ceil((ACCF.hasta-ahora)/1000)+' segundos.');
-  if(accOk(a,em,pw)){ACCF={n:0,hasta:0};return accAbrir()}
-  ACCF.n++;if(ACCF.n>=5){ACCF.hasta=ahora+30000;ACCF.n=0}
-  err.textContent='Correo o contraseña incorrectos.';$('#lk_p').value='';$('#lk_p').focus()}
+  err.textContent='';bt.disabled=true;bt.textContent='Entrando…';
+  let r=null;try{r=await sbLogin(em,pw)}catch(e){r=null}
+  bt.disabled=false;bt.textContent='Entrar';
+  const s=syncGet();
+  if(r&&r.ok){ACCF={n:0,hasta:0};SB.email=em;const salt=uid()+uid();
+    if(s.uid&&s.uid!==SB.uid){/* otra cuenta en este iPad: su copia temporal no se mezcla */if(hayDatos(D))snap('Datos de otra cuenta en este iPad');D=migrate(emptyData());cacheW();syncSet({ver:0,pend:false})}
+    syncSet({uid:SB.uid,email:em,salt:salt,hash:accHash(pw,salt)});try{localStorage.removeItem('vickflex_acceso')}catch(e){}
+    accAbrir();nubeEst('sync');nubeInicio();return}
+  if(r){/* respuesta de Supabase: datos incorrectos u otro error */
+    if(r.st===400||r.st===401){ACCF.n++;if(ACCF.n>=5){ACCF.hasta=ahora+30000;ACCF.n=0}
+      err.textContent=/confirm/i.test(JSON.stringify(r.j||''))?'Esta cuenta todavía no está confirmada en Supabase.':'Correo o contraseña incorrectos.';$('#lk_p').value='';$('#lk_p').focus()}
+    else err.textContent='Supabase no responde bien (error '+r.st+'). Inténtalo en un momento.';return}
+  /* sin conexión: se entra con la copia de este iPad si este correo y contraseña ya entraron aquí antes */
+  if(s.uid&&s.hash&&s.email===em&&accHash(pw,s.salt)===s.hash){SB.uid=s.uid;SB.email=em;SB.pw=pw;accAbrir();nubeEst(s.pend?'offline':'');
+    toast('Sin conexión: trabajas con la copia de este iPad. Los cambios se subirán solos al volver la conexión.');NUBE.t=setTimeout(nubeSubir,30000);return}
+  err.textContent=s.hash&&s.email===em?'Correo o contraseña incorrectos.':'No hay conexión a internet. Para entrar la primera vez en este iPad hace falta conexión.'}
 function accAbrir(){LOCKED=false;$('#lock').innerHTML='';document.body.classList.remove('locked');render()}
-/* Cambiar correo o contraseña (desde Copias de seguridad): pide la contraseña actual */
-function accForm(){const a=accGet();
-  formModal('Cambiar correo o contraseña',[{n:'act',l:'Contraseña actual',w:'w'},{n:'email',l:'Correo electrónico',w:'w'},{n:'p1',l:'Contraseña nueva (déjala vacía para no cambiarla)',w:'w'},{n:'p2',l:'Repite la contraseña nueva',w:'w'}],
-    {act:'',email:a?a.email:'',p1:'',p2:''},o=>{
-    if(a&&!accOk(a,a.email,o.act))return 'La contraseña actual no es correcta.';
-    const em=o.email.toLowerCase();if(!clMailOk(em))return 'Escribe un correo electrónico válido.';
-    if(o.p1&&o.p1.length<6)return 'La contraseña nueva debe tener al menos 6 caracteres.';
+/* Cambiar la contraseña (desde Copias de seguridad). El correo se cambia en Supabase. */
+function accForm(){
+  formModal('Cambiar contraseña',[{n:'act',l:'Contraseña actual',w:'w'},{n:'p1',l:'Contraseña nueva',w:'w'},{n:'p2',l:'Repite la contraseña nueva',w:'w'}],{act:'',p1:'',p2:''},o=>{
+    if(o.p1.length<6)return 'La contraseña nueva debe tener al menos 6 caracteres.';
     if(o.p1!==o.p2)return 'Las dos contraseñas nuevas no coinciden.';
-    if(!accPut(em,o.p1||o.act))return 'No se ha podido guardar.';
-    render(true);toast('Acceso actualizado.')});
-  ['act','p1','p2'].forEach(n=>{const i=$('#frm').elements[n];i.type='password';i.autocomplete=n==='act'?'current-password':'new-password'});
-  $('#frm').elements.email.type='email';$('#frm').elements.email.autocapitalize='none'}
+    (async()=>{const er=$('#err');er.textContent='Cambiando…';
+      try{const r=await sbLogin(SB.email,o.act);if(!r.ok){er.textContent='La contraseña actual no es correcta.';return}
+        const u=await sbReq('/auth/v1/user',{m:'PUT',b:{password:o.p1}});if(!u.ok){er.textContent=(u.j&&(u.j.msg||u.j.message))||'Supabase no ha aceptado la contraseña nueva.';return}
+        const salt=uid()+uid();syncSet({salt:salt,hash:accHash(o.p1,salt)});closeModal();toast('Contraseña cambiada.')}
+      catch(e){er.textContent='Hace falta conexión a internet para cambiar la contraseña.'}})();
+    return true});
+  ['act','p1','p2'].forEach(n=>{const i=$('#frm').elements[n];i.type='password';i.autocomplete=n==='act'?'current-password':'new-password'})}
+function nubeCard(){const s=syncGet(),pend=s.pend;
+  return `<div class="card"><h3>Datos en la nube</h3><p style="line-height:1.7">Cuenta: <b>${esc(SB.email||s.email||'—')}</b><br>Estado: <b>${esc(NUBET[NUBE.est]||(pend?NUBET.pend:'—'))}</b>${NUBE.at?'<br>Última subida o comprobación: <b>'+new Date(NUBE.at).toLocaleTimeString('es-ES',{hour:'2-digit',minute:'2-digit'})+'</b>':''}</p>
+   <div class="acts l" style="flex-wrap:wrap"><button class="b2" onclick="nubeSubir()">Guardar ahora en la nube</button><button class="b2" onclick="accForm()">Cambiar contraseña</button><button class="b2" onclick="lockShow()">🔒 Bloquear ahora</button></div>
+   <p class="hint">Los datos se guardan en Supabase. Este iPad conserva una copia temporal para poder trabajar sin cobertura; los cambios se suben solos. La contraseña no se puede recuperar desde la app: se cambia en Supabase.</p></div>`}
 lockShow();
 </script>
 </body>
