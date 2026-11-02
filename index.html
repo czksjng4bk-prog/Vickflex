@@ -173,6 +173,10 @@ body.locked nav,body.locked main{visibility:hidden}
 .lock img{display:block;width:70%;max-width:260px;height:auto;margin:0 auto 14px}
 .lock .f{margin-top:12px}
 .lock .b1{width:100%;margin-top:16px}
+.r25{display:grid;grid-template-columns:1fr 1fr 1fr auto;gap:14px;align-items:end}.r25 .tot25{padding:12px;border:1px solid var(--b2);border-radius:10px;background:#faf7f1;font-size:16px;font-weight:700;color:var(--v)}
+@media(max-width:900px){.r25{grid-template-columns:1fr 1fr}}
+.fin{width:100%;min-width:0;padding:10px;border:1px solid var(--b2);border-radius:8px;font-size:16px;font-family:inherit;text-align:right}.fmes td{padding:6px 8px}.fmes td:last-child{white-space:nowrap}
+@media(max-width:600px){.fmes th,.fmes td{padding:6px 3px}.fmes th{font-size:10px;letter-spacing:0}.fmes td{font-size:13px}.fmes td:last-child{white-space:nowrap}.fin{padding:8px 5px;font-size:15px}}
 .nube{margin-top:auto;padding:10px 6px 0;font-size:12px;line-height:1.35;color:var(--g);cursor:pointer}.nube.error,.nube.offline{color:var(--ro)}.nube.ok{color:var(--ok)}
 </style>
 </head>
@@ -214,7 +218,7 @@ function mayusCli(c){if(!c)return;c.nombre=UPC(c.nombre);c.provincia=UPC(c.provi
 function minusRep(r){if(r&&r.email)r.email=String(r.email).toLowerCase()}
 function migrate(d){
   d.schema=1;d.reps=d.reps||[];d.clientes=d.clientes||[];
-  d.reps.forEach(r=>{['email','codigoFab','tel','ciudad','hotelN','hotelT'].forEach(k=>{if(r[k]==null)r[k]=''});if(!Array.isArray(r.provincias))r.provincias=[];minusRep(r)});
+  d.reps.forEach(r=>{['email','codigoFab','tel','ciudad','hotelN','hotelT'].forEach(k=>{if(r[k]==null)r[k]=''});if(!r.factRep||typeof r.factRep!=='object')r.factRep={};if(!Array.isArray(r.provincias))r.provincias=[];minusRep(r)});
   d.clientes.forEach(c=>{c.fact=c.fact||{};c.exposicion=c.exposicion||[];c.pend=c.pend||[];c.visitas=c.visitas||[];c.pedidos=c.pedidos||[];c.obs=c.obs||'';c.visitas=c.visitas.map(v=>{v.id=v.id||uid();if(v.hablamos==null)v.hablamos=v.t||'';['pidio','compromisos','productos','prox','proxF','persona','expoNueva','expoPend','pedT','pedTxt','pedI','obs','repId','sem'].forEach(k=>{if(v[k]==null)v[k]=''});v.proxH=!!v.proxH;/* tipo de visita: las antiguas (sin tipo) son presenciales */if(v.tipo!=='telefonica')v.tipo='presencial';return v});c.codigo=c.codigo||'';c.email=c.email||'';c.cp=c.cp==null?'':String(c.cp);c.zona=c.zona==null?'':String(c.zona);c.acumul=c.acumul&&typeof c.acumul==='object'?c.acumul:{};c.comp=c.comp&&typeof c.comp==='object'?c.comp:{};c.catalogo=c.catalogo&&typeof c.catalogo==='object'?c.catalogo:{ok:null,f:''};c.prodPend=c.prodPend||[];c.expObs=c.expObs||'';mayusCli(c);c.nombreFact=c.nombreFact||'';c.semaforo=c.semaforo||'amarillo';
     if(!c.repHist||!c.repHist.length)c.repHist=[{r:c.repId,d:null}]});
   d.equiv=Array.isArray(d.equiv)?d.equiv:[];d.imports=Array.isArray(d.imports)?d.imports:[];d.plan=Array.isArray(d.plan)?d.plan:[];d.semanas=Array.isArray(d.semanas)?d.semanas:[];d.semanas.forEach(x=>{if(x.expoV===undefined)x.expoV=null;if(x.expoU===undefined)x.expoU=null});d.festivos=Array.isArray(d.festivos)?d.festivos:[];if(d.changes==null)d.changes=0; if(d.lastBackup===undefined)d.lastBackup=null; return d;
@@ -257,16 +261,32 @@ const sinComprar=(c,m)=>hasBill(c)&&hasMon(c)&&mesesSin(c,m)>=3;
 const lastM=(cs,y,k)=>{let m=0;cs.forEach(c=>{fy(c,y,k).forEach((v,i)=>{if(v!=null&&i+1>m)m=i+1});(k==='total'?CATS2:[k]).forEach(t=>Object.keys(accRec(c,y,t)).forEach(x=>{if(+x>m)m=+x}))});return m};
 /* Comparación de periodos equivalentes (ene–mm del año y frente a ene–mm del anterior).
    Si faltan datos en alguno de los dos periodos NO se calcula porcentaje: ok=false y why explica el motivo. */
+/* ===== FACTURACIÓN 2025 POR REPRESENTANTE (manual, solo total del año) =====
+   Se guarda en r.factRep[2025]={p: principal, c: complementos} (null = sin dato, nunca 0). El total es la suma.
+   Si un representante tiene su 2025 manual, en sus cifras de 2025 manda ese importe y NO se suman los importes de 2025
+   de sus clientes (que siguen guardados y visibles en cada ficha de cliente). No hay desglose por meses: solo se compara el año completo. */
+const REP_AN=2025;
+function repAn(r,k){const o=r&&r.factRep&&r.factRep[REP_AN];if(!o)return null;if(k==='total')return(o.p==null&&o.c==null)?null:(o.p||0)+(o.c||0);return k==='comp'?(o.c==null?null:o.c):(o.p==null?null:o.p)}
+const repTiene=r=>repAn(r,'principal')!=null||repAn(r,'comp')!=null;
+/* clientes del representante para los cálculos de importes: copias sin su 2025 + un registro con el total anual manual (no se guarda nada) */
+function repCS(rid,cs){cs=cs||clientsOf(rid);const r=rep(rid);if(!repTiene(r))return cs;const y=String(REP_AN);
+  const sin=c=>{const n=Object.assign({},c);['fact','comp'].forEach(f=>{if(n[f]&&n[f][y]!=null){n[f]=Object.assign({},n[f]);delete n[f][y]}});
+    if(n.acumul){n.acumul=Object.assign({},n.acumul);CATS2.forEach(k=>{if(n.acumul[k]&&n.acumul[k][y]){n.acumul[k]=Object.assign({},n.acumul[k]);delete n.acumul[k][y]}})}return n};
+  const ac={},P=repAn(r,'principal'),C=repAn(r,'comp');if(P!=null)ac.principal={[y]:{12:P}};if(C!=null)ac.comp={[y]:{12:C}};
+  return cs.map(sin).concat([{id:'_rep_'+rid,_anual:1,nombre:'',repId:rid,fact:{},comp:{},acumul:ac,pedidos:[],visitas:[],exposicion:[]}])}
+/* toda la empresa: cada representante con su ámbito, más los clientes sin representante */
+function allCS(){const o=[];D.reps.forEach(r=>o.push(...repCS(r.id)));D.clientes.filter(c=>!rep(c.repId)).forEach(c=>o.push(c));return o}
+const anSolo=(cs,y)=>cs.some(c=>c._anual&&CATS2.some(t=>accRec(c,y,t)[12]!=null));
 function cmpL(cs,y,mm,k){k=k||VC;let a=0,p=0;cs.forEach(c=>{a+=acum(c,y,mm,k);p+=acum(c,y-1,mm,k)});
   const cats=k==='total'?['principal','comp']:[k];
   const ha=cs.some(c=>has(c,y,mm,k)),hp=cs.some(c=>has(c,y-1,mm,k));let ok=true,why='';
-  if(!ha){ok=false;why='Faltan datos de '+y}else if(!hp){ok=false;why='Faltan datos de '+(y-1)}
+  if(!ha){ok=false;why=anSolo(cs,y)&&mm<12?y+' solo tiene el total del año: se compara con el año completo':'Faltan datos de '+y}else if(!hp){ok=false;why=anSolo(cs,y-1)&&mm<12?(y-1)+' solo tiene el total del año: se compara con el año completo':'Faltan datos de '+(y-1)}
   else for(const t of cats){const hy=cs.some(c=>hasAny(c,y,t)),hz=cs.some(c=>hasAny(c,y-1,t));
     if(k==='total'&&hy!==hz){ok=false;why='Faltan datos de '+CATL[t]+' en '+(hy?y-1:y);break}
     if(hy&&lastM(cs,y,t)<mm){ok=false;why='La facturación '+CATL[t]+' de '+y+' solo llega hasta '+MES[lastM(cs,y,t)-1];break}
     if(hz&&lastM(cs,y-1,t)<mm){ok=false;why='La facturación '+CATL[t]+' de '+(y-1)+' solo llega hasta '+MES[lastM(cs,y-1,t)-1];break}}
   return {a:a,p:p,d:a-p,ok:ok,why:why,ha:ha,hp:hp}}
-function stats(cs,k){k=k||VC;const m=corte(),o=cmpL(cs,YEAR,m,k);let up=0,dn=0,nu=0,sc=0,nr=0;const sem={verde:0,amarillo:0,rojo:0};
+function stats(cs,k,rid){k=k||VC;const m=corte(),o=cmpL(rid==='all'?allCS():rid?repCS(rid,cs):cs,YEAR,m,k);let up=0,dn=0,nu=0,sc=0,nr=0;const sem={verde:0,amarillo:0,rojo:0};
   cs.forEach(c=>{const x=acum(c,YEAR,m,k),y=acum(c,YEAR-1,m,k);
     if(y===0&&x>0)nu++;else if(x>y)up++;else if(x<y)dn++;
     if(sinComprar(c,m))sc++;if(!repitio(c))nr++;sem[c.semaforo||'amarillo']++});
@@ -311,15 +331,17 @@ function perCalc(cs,y,k,ms){
   const cats=k==='total'?CATS2:[k],cal=new Date().getMonth(),last=ms[ms.length-1],enCurso=y===YEAR&&last>=cal;
   let lastD=-1;cats.forEach(t=>{for(let i=11;i>=0;i--){if(monV(cs,y,i,t)!=null){if(i>lastD)lastD=i;break}}});
   const span=enCurso?ms.filter(i=>i<=lastD):ms;
+  const full=span.length===12,annV=(yy,t)=>{let x=null;cs.forEach(c=>{if(c._anual){const v=accRec(c,yy,t)[12];if(v!=null)x=(x||0)+v}});return x};
+  const act=(yy,t)=>catAct(cs,yy,t)||(full&&annV(yy,t)!=null);
   const miss=yy=>span.filter(i=>cats.some(t=>catAct(cs,yy,t)&&monV(cs,yy,i,t)==null));
-  const sum=yy=>{let s=0,h=false;span.forEach(i=>cats.forEach(t=>{const v=monV(cs,yy,i,t);if(v!=null){s+=v;h=true}}));return {s:s,h:h}};
+  const sum=yy=>{let s=0,h=false;span.forEach(i=>cats.forEach(t=>{const v=monV(cs,yy,i,t);if(v!=null){s+=v;h=true}}));if(full)cats.forEach(t=>{const v=annV(yy,t);if(v!=null){s+=v;h=true}});return {s:s,h:h}};
   const A=sum(y),B=sum(y-1),mc=miss(y),mp=miss(y-1);let ok=true,why='';
   const mn=l=>l.map(i=>MES[i]).join(', ');
   if(!span.length){ok=false;why='Sin datos de '+y}
-  else if(!A.h){ok=false;why='Faltan datos de '+y}
-  else if(!B.h){ok=false;why='Faltan datos de '+(y-1)}
-  else{const bad=k==='total'?cats.find(t=>catAct(cs,y,t)!==catAct(cs,y-1,t)):null;
-    if(bad){ok=false;why='Faltan datos de '+CATL[bad]+' en '+(catAct(cs,y,bad)?y-1:y)}
+  else if(!A.h){ok=false;why=!full&&anSolo(cs,y)?y+' solo tiene el total del año: se compara con el año completo':'Faltan datos de '+y}
+  else if(!B.h){ok=false;why=!full&&anSolo(cs,y-1)?(y-1)+' solo tiene el total del año: se compara con el año completo':'Faltan datos de '+(y-1)}
+  else{const bad=k==='total'?cats.find(t=>act(y,t)!==act(y-1,t)):null;
+    if(bad){ok=false;why='Faltan datos de '+CATL[bad]+' en '+(act(y,bad)?y-1:y)}
     else if(mc.length){ok=false;why='Faltan '+mn(mc)+' de '+y}
     else if(mp.length){ok=false;why='Faltan '+mn(mp)+' de '+(y-1)}}
   const pend=y===YEAR&&ms[0]>cal&&!A.h;
@@ -332,7 +354,7 @@ function perCalc(cs,y,k,ms){
   return {s:A.s,p:B.s,d:A.s-B.s,ok:ok,why:why,ha:A.h,hp:B.h,enCurso:enCurso,mc:mc,mp:mp,estado:estado,pend:pend,span:span}}
 function setQY(y){QY=+y;render(true)}
 function setQC(k){QC=k;render(true)}
-function qYears(cs){const ys=[...new Set(cs.flatMap(c=>Object.keys(c.fact||{}).concat(Object.keys(c.comp||{}))).map(Number).concat([YEAR]))].filter(y=>y>2000&&y<=YEAR).sort((a,b)=>b-a);if(ys.indexOf(QY)<0)QY=YEAR;return ys}
+function qYears(cs){const ys=[...new Set(cs.flatMap(c=>Object.keys(c.fact||{}).concat(Object.keys(c.comp||{}),c._anual?CATS2.flatMap(t=>Object.keys((c.acumul&&c.acumul[t])||{})):[])).map(Number).concat([YEAR]))].filter(y=>y>2000&&y<=YEAR).sort((a,b)=>b-a);if(ys.indexOf(QY)<0)QY=YEAR;return ys}
 function qCard(cs,mail){
   const ys=qYears(cs);
   const ks=QC==='todas'?['principal','comp','total']:[QC],multi=ks.length>1;
@@ -460,7 +482,7 @@ const INFT={mes:'Facturación mensual',tri:'Facturación trimestral',cli:'Factur
 function infWho(){const r=rep(INF.rep),c=INF.cli?cli(INF.cli):null;return c?c.nombre+(r?' ('+r.nombre+')':''):(r?r.nombre:'')}
 function infSubj(){if(INF.mod)return INF.subjEdited?INF.subj:modSubj();if(INF.exp)return INF.subjEdited?INF.subj:expSubj();if(INF.sem)return INF.subjEdited?INF.subj:semSubj();return INF.subjEdited?INF.subj:'Informe '+INFT[INF.t].toLowerCase()+' · '+infWho()+' · '+infPer()}
 function infBody(){if(INF.mod)return modBody();if(INF.exp)return expBody();if(INF.sem)return semBody();const r=rep(INF.rep);return 'Hola'+(r&&!INF.cli?' '+r.nombre.split(' ')[0]:'')+',\n\nTe adjunto el informe de '+INFT[INF.t].toLowerCase()+' de '+infWho()+' correspondiente a '+infPer()+'.\n\nUn saludo.'}
-function infBuild(){const I=INF,cs=infCS(),r=rep(I.rep),c=I.cli?cli(I.cli):null,y=I.y,ms=infMs(),per=infPer(),notas=[];
+function infBuild(){const I=INF,cs=(I.cli||I.t==='cli')?infCS():repCS(I.rep),r=rep(I.rep),c=I.cli?cli(I.cli):null,y=I.y,ms=infMs(),per=infPer(),notas=[];
   const info=[['Representante',r?r.nombre:'Sin representante']];if(c)info.push(['Cliente',c.nombre+(c.codigo?' · Código '+c.codigo:'')+(c.poblacion?' · '+c.poblacion:'')]);info.push(['Período',per]);
   const cmpRow=(k,lab)=>{const o=perCalc(cs,y,k,ms);if(!o.ok&&o.why&&(o.ha||o.hp))notas.push(lab+': '+o.why+'.');return {o:o,row:[lab,o.ha?eur(o.s):null,o.hp?eur(o.p):null,o.ok?pdfS(o.d):null,pdfPct(o)]}};
   if(infAll()){const T=cmpRow('total','Total'),o=T.o,ks=['principal','comp'].filter(k=>{const x=perCalc(cs,y,k,ms);return x.ha||x.hp}),R=ks.map(k=>cmpRow(k,CAT[k]));
@@ -783,11 +805,11 @@ function banner(){const s=syncGet();
   return `<div class="banner"><span>Hay cambios guardados solo en este iPad: todavía no se han podido subir a la nube. Se reintenta solo.</span><button class="b1" onclick="nubeSubir()">Reintentar ahora</button></div>`}
 
 function vPanel(){
-  const all=D.clientes,s=stats(all),m=s.m;
-  const t=(y,k)=>MES.map((_,i)=>all.reduce((a,c)=>a+(fy(c,y,k)[i]||0),0)),th=a=>a.map(v=>Math.round(v/1000));
+  const all=D.clientes,allF=allCS(),s=stats(all,VC,'all'),m=s.m;
+  const t=(y,k)=>MES.map((_,i)=>allF.reduce((a,c)=>a+(fy(c,y,k)[i]||0),0)),th=a=>a.map(v=>Math.round(v/1000));
   const t25=th(t(YEAR-1,VC)),tc=th(t(YEAR,VC)).map((v,i)=>i<m?v:null);
   const stk=VC==='total'&&all.some(c=>has(c,YEAR,12,'comp'))?{p:th(t(YEAR,'principal')),c:th(t(YEAR,'comp'))}:null;
-  const rs=D.reps.map(r=>({r:r,s:stats(clientsOf(r.id))})).filter(x=>x.s.n).sort((a,b)=>b.s.a-a.s.a);
+  const rs=D.reps.map(r=>({r:r,s:stats(clientsOf(r.id),VC,r.id)})).filter(x=>x.s.n).sort((a,b)=>b.s.a-a.s.a);
   const dej=all.filter(c=>sinComprar(c,m)).map(c=>({c:c,n:mesesSin(c,m)})).sort((a,b)=>b.n-a.n).slice(0,4);
   return `<div class="bar2"><div><h1>Buenos días</h1><p class="sub" style="margin:0">${new Date().toLocaleDateString('es-ES',{weekday:'long',day:'numeric',month:'long',year:'numeric'})} · cifras acumuladas ${per(m)}</p></div>${catSel()}</div>
   <div class="card" style="margin-bottom:16px;border-left:5px solid var(--v)"><div class="hb" style="margin-bottom:10px"><h3 style="margin:0">🔎 Buscador de modelos en exposición</h3><button class="b2 sm" onclick="go('modelos')">Abrir buscador</button></div>
@@ -799,7 +821,7 @@ function vPanel(){
     <div class="card"><h3>Variación</h3><div style="margin-top:6px">${cmpHTML(s)}</div><div class="${s.d>=0?'up':'dn'}" style="margin-top:8px;font-size:20px;font-weight:700">${s.ok?sg(s.d):''}</div>${s.ok?'':`<div class="mut" style="font-size:13px;margin-top:6px">${esc(s.why)}</div>`}</div>
     <div class="card"><h3>Clientes en rojo</h3><div class="big dn">${s.sem.rojo}</div></div>
   </div>
-  <div style="margin-top:16px">${catCards(all)}</div>
+  <div style="margin-top:16px">${catCards(allF)}</div>
   <div class="grid c2" style="margin-top:16px">
     <div class="card"><h3>Facturación mensual ${CAT[VC].toLowerCase()} (miles de €)</h3>${barsHTML(t25,tc,stk)}</div>
     ${(()=>{const t=hoy();
@@ -807,8 +829,8 @@ function vPanel(){
       const nx=D.semanas.filter(x=>x.ini>t).sort((a,b)=>a.ini.localeCompare(b.ini))[0],fe=festOf(mondayOf(t));
       return `<div class="card zona"><h3>🚐 Coche expositor · esta semana</h3><div class="big">${fe?'Semana festiva':'Sin semana del coche'}</div><p>${fe&&fe.obs?esc(fe.obs)+'<br>':''}${nx?'Próxima: '+fd(nx.ini)+' · '+esc(nx.prov||'sin provincia')+' · con '+esc(repNom(nx.repId)):'No hay próximas semanas planificadas.'}</p><button class="b2" style="margin-top:10px" onclick="go('coche')">Abrir calendario</button></div>`})()}
   </div>
-  ${mCard(all)}
-  ${qCard(all)}
+  ${mCard(allF)}
+  ${qCard(allF)}
   <div class="grid c3" style="margin-top:16px">
     <div class="card"><h3>Representantes · ranking ${CAT[VC].toLowerCase()}</h3>${rs.map((x,i)=>`<div class="row lk" onclick="go('rep/${x.r.id}')"><span>${i+1}. ${esc(x.r.nombre)}<br><small style="color:#999">${x.s.ha?eur(x.s.a):'sin datos'}</small></span>${cmpHTML(x.s)}</div>`).join('')||'<span class="mut">Sin datos</span>'}</div>
     <div class="card"><h3>Han dejado de comprar</h3>${dej.map(x=>`<div class="row lk" onclick="go('cli/${x.c.id}')"><span>${esc(x.c.nombre)}<br><small style="color:#999">${esc(x.c.poblacion)}</small></span><span class="dn">hace ${x.n} meses</span></div>`).join('')||'<span class="mut">Ninguno</span>'}</div>
@@ -818,7 +840,7 @@ function vPanel(){
   ${all.some(c=>c.zona)?provTable(all,true):''}`}
 
 function vReps(){
-  const m=corte(),rs=D.reps.map(r=>({r:r,s:stats(clientsOf(r.id)),cs:clientsOf(r.id)}));
+  const m=corte(),rs=D.reps.map(r=>({r:r,s:stats(clientsOf(r.id),VC,r.id),cs:clientsOf(r.id)}));
   rs.sort(repSort==='nombre'?(a,b)=>a.r.nombre.localeCompare(b.r.nombre,'es'):(a,b)=>b.s.a-a.s.a);
   return `<div class="hb"><div><h1>Representantes</h1><p class="sub" style="margin-bottom:0">${D.reps.length} representantes · ${D.clientes.length} clientes</p></div>
     <div class="acts"><button class="b1" onclick="repForm()">+ Nuevo representante</button></div></div>
@@ -835,7 +857,7 @@ function vReps(){
   :'<div class="card">Todavía no hay representantes. Pulsa <b>+ Nuevo representante</b>.</div>'}`}
 
 function vRep(id){
-  const r=rep(id),cs=clientsOf(id),s=stats(cs),m=s.m,vs=(c)=>cmpL([c],YEAR,m,VC);
+  const r=rep(id),cs=clientsOf(id),csF=repCS(id,cs),s=stats(cs,VC,id),m=s.m,vs=(c)=>cmpL([c],YEAR,m,VC);
   const A=(c,k)=>acum(c,YEAR,m,k);
   const fn={fact:(a,b)=>A(b,'total')-A(a,'total'),principal:(a,b)=>A(b,'principal')-A(a,'principal'),comp:(a,b)=>A(b,'comp')-A(a,'comp'),nombre:(a,b)=>a.nombre.localeCompare(b.nombre,'es'),cp:(a,b)=>String(a.cp||'~').localeCompare(String(b.cp||'~'))||a.nombre.localeCompare(b.nombre,'es'),
     caida:(a,b)=>vr(a,m)-vr(b,m),sin:(a,b)=>mesesSin(b,m)-mesesSin(a,m)}[sortBy]||((a,b)=>A(b,'total')-A(a,'total'));
@@ -847,6 +869,7 @@ function vRep(id){
   return `<div class="hb"><div><h1>${esc(r.nombre)}</h1><p class="sub" style="margin-bottom:0">${esc(r.provincias.join(' · ')||'Sin provincia')}${r.ciudad?' · '+esc(r.ciudad):''}</p></div>
     <div class="acts"><button class="b1" onclick="cliForm(null,'${r.id}')">+ Nuevo cliente</button><button class="b2" onclick="repForm('${r.id}')">Editar</button><button class="b2 dng" onclick="delRep('${r.id}')">Eliminar</button><button class="b2" onclick="expMail('${r.id}')">PDF EXPOSICIONES DE CLIENTES</button><button class="b1" onclick="clOpen('${r.id}')">IMPORTAR CLIENTES</button><button class="b2" onclick="nomOpen('${r.id}')">Importar solo nombres</button><button class="b1" onclick="impOpen('${r.id}','principal')">Importar principal</button><button class="b1" onclick="impOpen('${r.id}','comp')">Importar complementos</button></div></div>
   ${repFicha(r)}
+  ${rep25Card(r)}
   <div class="bar2">${catSel()}<span class="mut">Las cifras de abajo muestran: <b>${CAT[VC]}</b></span></div>
   <div class="grid k">
     <div class="card"><h3>Clientes</h3><div class="big">${s.n}</div></div>
@@ -854,7 +877,7 @@ function vRep(id){
     <div class="card"><h3>Mismo periodo ${YEAR-1}</h3><div class="big">${s.hp?eur(s.p):'<span class="mut" style="font-size:20px">Sin datos</span>'}</div></div>
     <div class="card"><h3>Diferencia</h3><div class="big ${s.d>=0?'up':'dn'}" style="font-size:26px">${s.ok?sg(s.d):mut}</div><div style="margin-top:6px">${cmpHTML(s)}</div>${s.ok?'':`<div class="mut" style="font-size:13px;margin-top:6px">${esc(s.why)}</div>`}</div>
   </div>
-  <div style="margin-top:16px">${catCards(cs)}</div>
+  <div style="margin-top:16px">${catCards(csF)}</div>
   <div class="grid c2" style="margin-top:16px">
     <div class="card"><h3>Evolución de sus clientes (${CAT[VC].toLowerCase()})</h3><div class="big3">
       <div class="stat"><div class="big up">${s.up}</div><small>▲ Suben</small></div>
@@ -867,7 +890,7 @@ function vRep(id){
       <div class="stat">${dot('amarillo')}<div class="big">${s.sem.amarillo}</div></div>
       <div class="stat">${dot('rojo')}<div class="big">${s.sem.rojo}</div></div></div></div>
   </div>
-  ${cs.length?repChart(cs)+mCard(cs,`infMail('mes','${r.id}')`)+qCard(cs,`infMail('tri','${r.id}')`):''}
+  ${cs.length||repTiene(r)?repChart(csF)+mCard(csF,`infMail('mes','${r.id}')`)+qCard(csF,`infMail('tri','${r.id}')`):''}
   <div class="card" style="margin-top:16px"><div class="hb" style="margin-bottom:8px"><h3 style="margin:0">Clientes de ${esc(r.nombre)}</h3><button class="b2" onclick="infMail('cli','${r.id}')">✉ Enviar por correo</button>
     <input class="sel" style="min-width:260px" placeholder="Filtrar por nombre, población, zona o código postal" oninput="filtrarCli(this.value)"><select class="sel" onchange="setSort(this.value)"><option value="fact" ${sortBy==='fact'?'selected':''}>Ranking por facturación total</option><option value="principal" ${sortBy==='principal'?'selected':''}>Ranking por facturación principal</option><option value="comp" ${sortBy==='comp'?'selected':''}>Ranking por complementos</option><option value="nombre" ${sortBy==='nombre'?'selected':''}>Nombre A–Z</option><option value="cp" ${sortBy==='cp'?'selected':''}>Código postal (por zonas)</option><option value="caida" ${sortBy==='caida'?'selected':''}>Mayor caída primero (${CAT[VC].toLowerCase()})</option><option value="sin" ${sortBy==='sin'?'selected':''}>Más meses sin comprar</option></select></div>
     ${cs.length?`<table class="tb"><thead><tr><th>#</th><th>Cliente</th><th class="r">Principal ${YEAR}</th><th class="r">Compl. ${YEAR}</th><th class="r">Total ${YEAR}</th><th class="r">${CAT[VC]} ${YEAR-1}</th><th class="r">Dif. ${CAT[VC].toLowerCase()}</th><th>Última compra</th><th>Coche expositor<span class="q4h">1T · 2T · 3T · 4T · ${YEAR}</span></th></tr></thead><tbody>${rows}</tbody></table>
@@ -1048,6 +1071,25 @@ function repForm(id){
 const telHref=t=>'tel:'+String(t||'').replace(/[^\d+]/g,'');
 const lnkTel=t=>t?`<a href="${esc(telHref(t))}">${esc(t)}</a>`:'<span class="mut">—</span>';
 const lnkMail=t=>t?`<a href="mailto:${esc(t)}">${esc(t)}</a>`:'<span class="mut">—</span>';
+function rep25Card(r){const o=(r.factRep&&r.factRep[REP_AN])||{},T=repAn(r,'total'),f=v=>v==null?'':String(v).replace('.',','),fm=v=>v%1?eur2(v):eur(v);
+  const cs=clientsOf(r.id),deCli=cs.some(c=>hasAny(c,REP_AN,'total'));
+  const prog=[];if(T)for(let y=REP_AN+1;y<=YEAR;y++){const mm=y===YEAR?corte():12;if(cs.some(c=>has(c,y,mm,'total'))){const v=cs.reduce((t,c)=>t+acum(c,y,mm,'total'),0);prog.push(`<div class="row"><span>${y} (${mm<12?'ene–'+MES[mm-1]:'año completo'})</span><span><b>${eur(v)}</b> · ${Math.round(v/T*100)} % del total ${REP_AN}${mm===12?' · <span class="'+(v>=T?'up':'dn')+'">'+sg(v-T)+'</span>':''}</span></div>`)}}
+  return `<div class="card" style="margin-bottom:16px"><div class="hb" style="margin-bottom:10px"><h3 style="margin:0">Facturación ${REP_AN} · introducida a mano</h3><span class="mut" style="font-size:13px">Total del año, sin desglose por meses</span></div>
+   <div class="r25"><label class="f"><span>Facturación principal (€)</span><input id="r25p" inputmode="decimal" autocomplete="off" value="${f(o.p)}" placeholder="sin dato" oninput="rep25Tot()"></label>
+    <label class="f"><span>Complementos (€)</span><input id="r25c" inputmode="decimal" autocomplete="off" value="${f(o.c)}" placeholder="sin dato" oninput="rep25Tot()"></label>
+    <label class="f"><span>Facturación total (automática)</span><div class="tot25" id="r25t">${T==null?'—':fm(T)}</div></label>
+    <button class="b1" onclick="rep25Save('${r.id}')">Guardar ${REP_AN}</button></div>
+   ${prog.length?`<div style="margin-top:12px">${prog.join('')}</div>`:''}
+   <p class="hint">Se usa para comparar con ${REP_AN+1} y años siguientes. Como no tiene meses, la comparación con ${REP_AN} se hace con el año completo; en meses y trimestres sale «Faltan datos».${T!=null&&deCli?` Las cifras de ${REP_AN} de sus clientes no se suman aquí (siguen guardadas en cada ficha de cliente): manda este importe.`:''}</p></div>`}
+function rep25Tot(){const a=num($('#r25p').value),b=num($('#r25c').value),ok=x=>x!=null&&!isNaN(x);
+  $('#r25t').textContent=(ok(a)||ok(b))?(v=>v%1?eur2(v):eur(v))((ok(a)?a:0)+(ok(b)?b:0)):'—'}
+function rep25Save(rid){const r=rep(rid),P=num($('#r25p').value),C=num($('#r25c').value);
+  if(Number.isNaN(P))return toast('La facturación principal no es un importe válido (ej. 215.300,50).',1);
+  if(Number.isNaN(C))return toast('Los complementos no son un importe válido (ej. 12.400).',1);
+  const o=(r.factRep&&r.factRep[REP_AN])||{},quita=[];if(o.p!=null&&P==null)quita.push('principal ('+eur(o.p)+')');if(o.c!=null&&C==null)quita.push('complementos ('+eur(o.c)+')');
+  const aplicar=()=>{snap('Facturación '+REP_AN+' de '+r.nombre);r.factRep=r.factRep||{};if(P==null&&C==null)delete r.factRep[REP_AN];else r.factRep[REP_AN]={p:P,c:C};save();render(true);toast('Facturación '+REP_AN+' guardada.')};
+  if(quita.length)return ask('Has dejado vacío: <b>'+esc(quita.join(' y '))+'</b>. ¿Quitar ese importe de '+REP_AN+'? (Se puede deshacer en Copias de seguridad.)','Quitar importe',aplicar);
+  aplicar()}
 function repFicha(r){
   const dd=(l,v)=>`<div class="row"><span style="color:var(--g)">${l}</span><span>${v}</span></div>`;
   return `<div class="rcard"><div class="card"><h3>Datos del representante</h3>${dd('Nombre y apellidos',esc(r.nombre))}${dd('Código de vendedor VICKFLEX',r.codigoFab?esc(r.codigoFab):'<span class="mut">—</span>')}${dd('Teléfono de contacto',lnkTel(r.tel))}${dd('Correo electrónico',lnkMail(r.email))}${dd('Ciudad de residencia',r.ciudad?esc(r.ciudad):'<span class="mut">—</span>')}${dd('Provincias que lleva',r.provincias.length?esc(r.provincias.join(' · ')):'<span class="mut">—</span>')}</div>
@@ -1129,17 +1171,30 @@ function delPedido(id,i){const c=cli(id),o=c.pedidos[i];ask(`¿Quitar el pedido 
 function num(t){t=String(t==null?'':t).replace(/[\s€]/g,'');if(t==='')return null;
   if(t.indexOf(',')>=0)t=t.replace(/\./g,'').replace(',','.');else if(/^-?\d{1,3}(\.\d{3})+$/.test(t))t=t.replace(/\./g,'');
   return /^-?\d+(\.\d+)?$/.test(t)?parseFloat(t):NaN}
-function factForm(id,y,k){
-  const c=cli(id);y=y||YEAR;k=k||'principal';
-  const ys=[...new Set(Object.keys(c.fact).concat(Object.keys(c.comp||{})).map(Number).concat([YEAR,YEAR-1,YEAR-2,YEAR-3,YEAR-4,YEAR-5]))].sort((a,b)=>b-a);
-  modal(`<h2>Facturación mensual de ${esc(c.nombre)}</h2><div class="fg"><label class="f"><span>Tipo de facturación</span><select onchange="factForm('${id}',${y},this.value)"><option value="principal" ${k==='principal'?'selected':''}>Principal</option><option value="comp" ${k==='comp'?'selected':''}>Complementos</option></select></label>
-  <label class="f"><span>Año</span><select onchange="factForm('${id}',+this.value,'${k}')">${ys.map(a=>`<option ${a===y?'selected':''}>${a}</option>`).join('')}</select></label></div>
-  <form id="frm"><div class="ym">${MES.map((n,i)=>{const v=rawF(c,y,k)[i];return `<label class="f"><span>${n.toUpperCase()}</span><input name="m${i}" inputmode="decimal" value="${v==null?'':String(v).replace('.',',')}" placeholder="sin dato"></label>`}).join('')}</div>
-  <p class="hint">${k==='comp'?'Escribe <b>solo los complementos</b>. No repitas aquí importes que ya estén incluidos en la facturación principal: el total los suma.':'Escribe la <b>facturación principal</b> (colchones y productos principales, sin complementos).'} Deja en blanco un mes sin datos; escribe 0 si no hubo facturación.</p><p class="err" id="err"></p>
+function factForm(id,y){
+  const c=cli(id);y=+y||YEAR;
+  const ys=[...new Set(Object.keys(c.fact||{}).concat(Object.keys(c.comp||{})).map(Number).concat([YEAR,YEAR-1,YEAR-2,YEAR-3,YEAR-4,YEAR-5]))].sort((a,b)=>b-a);
+  const P=rawF(c,y,'principal'),C=rawF(c,y,'comp'),v=x=>x==null?'':String(x).replace('.',',');
+  modal(`<h2>Facturación mensual de ${esc(c.nombre)}</h2><div class="fg"><label class="f"><span>Año</span><select onchange="factForm('${id}',+this.value)">${ys.map(a=>`<option ${a===y?'selected':''}>${a}</option>`).join('')}</select></label></div>
+  <form id="frm"><table class="tb fmes"><thead><tr><th>Mes ${y}</th><th class="r">Principal (€)</th><th class="r">Complementos (€)</th><th class="r">Total (€)</th></tr></thead><tbody>
+  ${MES.map((n,i)=>`<tr><td><b>${cap(n)}</b></td><td><input class="fin" name="p${i}" inputmode="decimal" autocomplete="off" value="${v(P[i])}" placeholder="—" oninput="factTot()"></td><td><input class="fin" name="c${i}" inputmode="decimal" autocomplete="off" value="${v(C[i])}" placeholder="—" oninput="factTot()"></td><td class="r"><b id="ft${i}"></b></td></tr>`).join('')}
+  <tr class="tot"><td>Total ${y}</td><td class="r" id="ftp"></td><td class="r" id="ftc"></td><td class="r" id="ftt"></td></tr></tbody></table>
+  <p class="hint">El total de cada mes se calcula solo: principal + complementos. Deja en blanco un mes sin datos; escribe 0 si no hubo facturación. Al guardar, el representante se actualiza solo (no hay que escribirlo dos veces).</p><p class="err" id="err"></p>
   <div class="acts"><button type="button" class="b2" onclick="closeModal()">Cancelar</button><button type="submit" class="b1">Guardar</button></div></form>`);
-  $('#frm').onsubmit=e=>{e.preventDefault();const arr=[];
-    for(let i=0;i<12;i++){const raw=$('#frm').elements['m'+i].value,n=num(raw);if(String(raw).trim()!==''&&(n==null||isNaN(n))){$('#err').textContent='El importe de '+MES[i]+' no es válido.';return}arr.push(n==null?null:n)}
-    snap('Editar facturación '+(k==='comp'?'de complementos ':'principal ')+y+' de '+c.nombre);if(k==='comp'){c.comp=c.comp||{};c.comp[y]=arr}else c.fact[y]=arr;save();closeModal();render(true);toast('Facturación guardada.')}}
+  factTot();
+  $('#frm').onsubmit=e=>{e.preventDefault();const F=$('#frm').elements,aP=[],aC=[],quita=[];
+    for(let i=0;i<12;i++){for(const [k,arr,old,lab] of [['p',aP,P,'principal'],['c',aC,C,'complementos']]){const raw=F[k+i].value,n=num(raw);
+        if(String(raw).trim()!==''&&(n==null||isNaN(n))){$('#err').textContent='El importe de '+lab+' de '+MESL[i]+' no es válido.';return}
+        arr.push(n==null?null:n);if(old[i]!=null&&n==null)quita.push(MESL[i]+' ('+lab+' '+eur(old[i])+')')}}
+    const aplicar=()=>{snap('Editar facturación '+y+' de '+c.nombre);
+      if(aP.some(x=>x!=null)||c.fact[y])c.fact[y]=aP;
+      c.comp=c.comp||{};if(aC.some(x=>x!=null)||c.comp[y])c.comp[y]=aC;
+      save();closeModal();render(true);toast('Facturación guardada.')};
+    if(quita.length)return ask('Has dejado vacíos importes que ya estaban guardados: <b>'+esc(quita.join(', '))+'</b>. ¿Quitarlos? (Se puede deshacer en Copias de seguridad.)','Quitar y guardar',aplicar);
+    aplicar()}}
+function factTot(){const F=$('#frm').elements,g=n=>{const x=num(F[n].value);return x==null||isNaN(x)?null:x},fm=v=>v==null?'—':v%1?eur2(v):eur(v);let tp=null,tc=null;
+  for(let i=0;i<12;i++){const a=g('p'+i),b=g('c'+i);if(a!=null)tp=(tp||0)+a;if(b!=null)tc=(tc||0)+b;$('#ft'+i).textContent=a==null&&b==null?'—':fm((a||0)+(b||0))}
+  $('#ftp').textContent=fm(tp);$('#ftc').textContent=fm(tc);$('#ftt').textContent=tp==null&&tc==null?'—':fm((tp||0)+(tc||0))}
 
 /* ===== Fase C: visitas, planificación semanal y alertas ===== */
 const p2=n=>String(n).padStart(2,'0');
@@ -1454,7 +1509,7 @@ function repCoche(r){
   st.forEach(s=>s.vis.forEach(o=>{cl.set(o.c.id,o.c);o.c.pend.filter(p=>p.v===o.v.id&&!p.h).forEach(p=>cp.push({c:o.c,t:p.t}))}));
   const conV=ws.filter(x=>x.expoV!=null),conU=ws.filter(x=>x.expoU!=null),sv=conV.reduce((t,x)=>t+(+x.expoV||0),0),su=conU.reduce((t,x)=>t+(+x.expoU||0),0),sinR=ws.filter(x=>x.estado!=='planificada'&&x.expoV==null&&x.expoU==null).length;
   /* Facturación habitual: la de siempre (principal + complementos de sus clientes). Las ventas del coche NO se suman aquí. */
-  const cs=clientsOf(r.id),hf=cs.some(c=>has(c,y,12,'total')),fh=cs.reduce((t,c)=>t+acum(c,y,12,'total'),0),pm=y===YEAR?' (ene–'+MES[corte()-1]+')':'';
+  const cs=repCS(r.id),hf=cs.some(c=>has(c,y,12,'total')),fh=cs.reduce((t,c)=>t+acum(c,y,12,'total'),0),pm=y===YEAR?' (ene–'+MES[corte()-1]+')':'';
   const nd='<span class="mut" style="font-size:18px">Sin datos</span>';
   return `<div class="card" style="margin-top:16px"><div class="hb" style="margin-bottom:12px"><h3 style="margin:0">🚐 Resultados coche expositor · ${esc(r.nombre)}</h3>
    <div class="acts" style="display:flex;gap:8px;align-items:center"><button class="b2 sm" onclick="setRCY(${y-1})">‹</button><select class="sel" onchange="setRCY(this.value)">${yrs.map(a=>`<option ${a===y?'selected':''}>${a}</option>`).join('')}</select><button class="b2 sm" onclick="setRCY(${y+1})">›</button><button class="b2 sm" onclick="go('cochehist')">Ver historial</button></div></div>
@@ -1559,8 +1614,9 @@ async function readXlsx(buf){
 
 /* ---- CSV / texto ---- */
 function parseCSV(t){
-  const first=t.split(/\r?\n/).find(l=>l.trim())||'';
-  const dl=first.indexOf(';')>=0?';':first.indexOf('\t')>=0?'\t':',';
+  /* separador: el que más se repite en las primeras líneas (los informes suelen empezar con una línea de título sin separadores) */
+  const ls=t.split(/\r?\n/).filter(l=>l.trim()).slice(0,30),cnt=c=>ls.filter(l=>l.split(c).length>1).length;
+  const dl=[';','\t',','].reduce((m,c)=>cnt(c)>cnt(m)?c:m,';');
   const rows=[];let row=[],cur='',q=false;
   for(let i=0;i<t.length;i++){const ch=t[i];
     if(q){if(ch==='"'){if(t[i+1]==='"'){cur+='"';i++}else q=false}else cur+=ch}
@@ -1573,7 +1629,7 @@ function parseTextoLibre(t){
   const ls=t.split(/\r?\n/).filter(l=>l.trim());
   const tabs=ls.filter(l=>l.indexOf('\t')>=0).length;
   if(ls.length&&tabs>=ls.length*0.5)return ls.map(l=>l.split('\t'));
-  const semis=ls.filter(l=>(l.match(/;/g)||[]).length>=3).length;
+  const semis=ls.filter(l=>(l.match(/;/g)||[]).length>=2).length;
   if(ls.length&&semis>=ls.length*0.5)return parseCSV(t);
   return ls.map(l=>[l])}   // una sola celda por línea -> se analiza como informe impreso
 
