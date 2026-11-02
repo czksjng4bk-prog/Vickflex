@@ -270,6 +270,8 @@ const REP_AN=2025;
 function repAn(r,k){const o=r&&r.factRep&&r.factRep[REP_AN];if(!o)return null;if(k==='total')return(o.p==null&&o.c==null)?null:(o.p||0)+(o.c||0);return k==='comp'?(o.c==null?null:o.c):(o.p==null?null:o.p)}
 /* divide un total en n partes iguales en céntimos; lo que sobra va a la última (la suma es exacta) */
 function reparte(total,n){const ct=Math.round(total*100);let base=Math.round(ct/n),ult=ct-base*(n-1);if((ct>=0&&ult<0)||(ct<0&&ult>0)){base=Math.trunc(ct/n);ult=ct-base*(n-1)}return Array.from({length:n},(_,i)=>(i===n-1?ult:base)/100)}
+/* total del año repartido en 12 meses; con sinAgo, entre 11 meses y agosto a 0 € (cerrado) */
+function reparte12(total,sinAgo){if(!sinAgo)return reparte(total,12);const v=reparte(total,11);v.splice(7,0,0);return v}
 const repMedia=r=>!!(r&&r.factRep&&r.factRep[REP_AN]&&r.factRep[REP_AN].media);
 const repTiene=r=>repAn(r,'principal')!=null||repAn(r,'comp')!=null;
 /* clientes del representante para los cálculos de importes: copias sin su 2025 + un registro con el total anual manual (no se guarda nada) */
@@ -277,9 +279,9 @@ function repCS(rid,cs){cs=cs||clientsOf(rid);const r=rep(rid);if(!repTiene(r))re
   const sin=c=>{const n=Object.assign({},c);['fact','comp'].forEach(f=>{if(n[f]&&n[f][y]!=null){n[f]=Object.assign({},n[f]);delete n[f][y]}});
     if(n.acumul){n.acumul=Object.assign({},n.acumul);CATS2.forEach(k=>{if(n.acumul[k]&&n.acumul[k][y]){n.acumul[k]=Object.assign({},n.acumul[k]);delete n.acumul[k][y]}})}return n};
   const ac={},P=repAn(r,'principal'),C=repAn(r,'comp'),fa={},co={},md=repMedia(r);
-  if(md){if(P!=null)fa[y]=reparte(P,12);if(C!=null)co[y]=reparte(C,12)}else{if(P!=null)ac.principal={[y]:{12:P}};if(C!=null)ac.comp={[y]:{12:C}}}
+  const sa=!!(md&&r.factRep[REP_AN].sinAgo);if(md){if(P!=null)fa[y]=reparte12(P,sa);if(C!=null)co[y]=reparte12(C,sa)}else{if(P!=null)ac.principal={[y]:{12:P}};if(C!=null)ac.comp={[y]:{12:C}}}
   return cs.map(sin).concat([{id:'_rep_'+rid,_anual:1,_media:md?REP_AN:0,nombre:'',repId:rid,fact:fa,comp:co,acumul:ac,pedidos:[],visitas:[],exposicion:[]}])}
-const mediaNota=(cs,y)=>{const a=[y,y-1].find(z=>cs.some(c=>c._media===z));return a?`<p class="hint">${a}: <b>media mensual</b> (total del año introducido a mano y repartido a partes iguales entre los 12 meses); no son los importes reales de cada mes.</p>`:''};
+const mediaNota=(cs,y)=>{const a=[y,y-1].find(z=>cs.some(c=>c._media===z));return a?`<p class="hint">${a}: <b>media mensual</b> (total del año introducido a mano y repartido a partes iguales entre los meses); no son los importes reales de cada mes.</p>`:''};
 /* toda la empresa: cada representante con su ámbito, más los clientes sin representante */
 function allCS(){const o=[];D.reps.forEach(r=>o.push(...repCS(r.id)));D.clientes.filter(c=>!rep(c.repId)).forEach(c=>o.push(c));return o}
 const anSolo=(cs,y)=>cs.some(c=>c._anual&&CATS2.some(t=>accRec(c,y,t)[12]!=null));
@@ -1100,20 +1102,22 @@ function rep25Card(r){const o=(r.factRep&&r.factRep[REP_AN])||{},T=repAn(r,'tota
     <label class="f"><span>Facturación total (automática)</span><div class="tot25" id="r25t">${T==null?'—':fm(T)}</div></label>
     <button class="b1" onclick="rep25Save('${r.id}')">Guardar ${REP_AN}</button></div>
    <label style="display:flex;gap:10px;align-items:center;margin-top:12px;font-size:16px;cursor:pointer"><input type="checkbox" id="r25m" ${o.media?'checked':''} onchange="rep25Tot()" style="width:22px;height:22px;accent-color:var(--v)"> Repartir entre los 12 meses (media mensual)</label>
+   <label style="display:flex;gap:10px;align-items:center;margin:8px 0 0 32px;font-size:15px;cursor:pointer"><input type="checkbox" id="r25a" ${o.sinAgo?'checked':''} onchange="rep25Tot()" style="width:20px;height:20px;accent-color:var(--v)"> Sin agosto (cerrado): repartir entre 11 meses y agosto a 0 €</label>
    <p class="hint" id="r25med" style="margin-top:6px"></p>
    ${prog.length?`<div style="margin-top:12px">${prog.join('')}</div>`:''}
-   <p class="hint">Se usa para comparar con ${REP_AN+1} y años siguientes. ${o.media?`Repartido entre los 12 meses: los meses y trimestres de ${REP_AN} son la media (total ÷ 12), no lo facturado de verdad cada mes. El total del año sigue siendo exacto.`:`Como no tiene meses, la comparación con ${REP_AN} se hace con el año completo; en meses y trimestres sale «Faltan datos». Marca «Repartir entre los 12 meses» para comparar meses y trimestres con la media.`}${T!=null&&deCli?` Las cifras de ${REP_AN} de sus clientes no se suman aquí (siguen guardadas en cada ficha de cliente): manda este importe.`:''}</p></div>`}
+   <p class="hint">Se usa para comparar con ${REP_AN+1} y años siguientes. ${o.media?`Repartido entre ${o.sinAgo?'11 meses (agosto a 0 €, cerrado)':'los 12 meses'}: los meses y trimestres de ${REP_AN} son la media (total ÷ ${o.sinAgo?11:12}), no lo facturado de verdad cada mes. El total del año sigue siendo exacto.`:`Como no tiene meses, la comparación con ${REP_AN} se hace con el año completo; en meses y trimestres sale «Faltan datos». Marca «Repartir entre los 12 meses» para comparar meses y trimestres con la media.`}${T!=null&&deCli?` Las cifras de ${REP_AN} de sus clientes no se suman aquí (siguen guardadas en cada ficha de cliente): manda este importe.`:''}</p></div>`}
 function rep25Tot(){const a=num($('#r25p').value),b=num($('#r25c').value),ok=x=>x!=null&&!isNaN(x);
   $('#r25t').textContent=(ok(a)||ok(b))?(v=>v%1?eur2(v):eur(v))((ok(a)?a:0)+(ok(b)?b:0)):'—';
   const m=$('#r25m'),e=$('#r25med');if(!m||!e)return;
+  const ag=$('#r25a');if(ag){ag.disabled=!m.checked;ag.parentNode.style.opacity=m.checked?1:.45}
   if(!m.checked||!(ok(a)||ok(b))){e.textContent='';return}
-  const pa=ok(a)?reparte(a,12):null,pc=ok(b)?reparte(b,12):null,tx=(l,x)=>x?l+' '+eur2(x[0])+(x[11]!==x[0]?' (diciembre '+eur2(x[11])+')':''):'';
-  e.innerHTML='Media de cada mes: '+[tx('principal',pa),tx('complementos',pc)].filter(Boolean).join(' · ')+' · total '+eur2((pa?pa[0]:0)+(pc?pc[0]:0))+' al mes. Pulsa <b>Guardar '+REP_AN+'</b> para aplicarlo.'}
-function rep25Save(rid){const r=rep(rid),P=num($('#r25p').value),C=num($('#r25c').value),MD=!!($('#r25m')&&$('#r25m').checked);
+  const sa=!!(ag&&ag.checked),pa=ok(a)?reparte12(a,sa):null,pc=ok(b)?reparte12(b,sa):null,tx=(l,x)=>x?l+' '+eur2(x[0])+(x[11]!==x[0]?' (diciembre '+eur2(x[11])+')':''):'';
+  e.innerHTML='Media de cada mes'+(sa?' (11 meses, agosto 0 €)':'')+': '+[tx('principal',pa),tx('complementos',pc)].filter(Boolean).join(' · ')+' · total '+eur2((pa?pa[0]:0)+(pc?pc[0]:0))+' al mes. Pulsa <b>Guardar '+REP_AN+'</b> para aplicarlo.'}
+function rep25Save(rid){const r=rep(rid),P=num($('#r25p').value),C=num($('#r25c').value),MD=!!($('#r25m')&&$('#r25m').checked),SA=MD&&!!($('#r25a')&&$('#r25a').checked);
   if(Number.isNaN(P))return toast('La facturación principal no es un importe válido (ej. 215.300,50).',1);
   if(Number.isNaN(C))return toast('Los complementos no son un importe válido (ej. 12.400).',1);
   const o=(r.factRep&&r.factRep[REP_AN])||{},quita=[];if(o.p!=null&&P==null)quita.push('principal ('+eur(o.p)+')');if(o.c!=null&&C==null)quita.push('complementos ('+eur(o.c)+')');
-  const aplicar=()=>{snap('Facturación '+REP_AN+' de '+r.nombre);r.factRep=r.factRep||{};if(P==null&&C==null)delete r.factRep[REP_AN];else{r.factRep[REP_AN]={p:P,c:C};if(MD)r.factRep[REP_AN].media=true}save();render(true);toast('Facturación '+REP_AN+' guardada.')};
+  const aplicar=()=>{snap('Facturación '+REP_AN+' de '+r.nombre);r.factRep=r.factRep||{};if(P==null&&C==null)delete r.factRep[REP_AN];else{r.factRep[REP_AN]={p:P,c:C};if(MD)r.factRep[REP_AN].media=true;if(SA)r.factRep[REP_AN].sinAgo=true}save();render(true);toast('Facturación '+REP_AN+' guardada.')};
   if(quita.length)return ask('Has dejado vacío: <b>'+esc(quita.join(' y '))+'</b>. ¿Quitar ese importe de '+REP_AN+'? (Se puede deshacer en Copias de seguridad.)','Quitar importe',aplicar);
   aplicar()}
 function repFicha(r){
@@ -1209,7 +1213,8 @@ function factForm(id,y){
    <div class="r25" style="margin-top:8px"><label class="f"><span>Tipo</span><select id="rtipo"><option value="p">Principal</option><option value="c">Complementos</option></select></label>
     <label class="f"><span>Importe total (€)</span><input id="rimp" inputmode="decimal" autocomplete="off" placeholder="Ej. 23.611"></label>
     <label class="f"><span>Desde</span><select id="rdesde">${mopt(0)}</select></label><label class="f"><span>Hasta</span><select id="rhasta">${mopt(5)}</select></label>
-    <button type="button" class="b1" onclick="factRepartir()">Repartir</button></div><p class="hint" id="rmsg" style="margin:8px 0 0"></p></details>
+    <button type="button" class="b1" onclick="factRepartir()">Repartir</button></div><label style="display:flex;gap:10px;align-items:center;margin-top:10px;font-size:15px;cursor:pointer"><input type="checkbox" id="rsinago" checked style="width:20px;height:20px;accent-color:var(--v)"> Sin agosto (cerrado): si el rango incluye agosto, se queda a 0 € y el total se reparte entre los demás meses</label>
+   <p class="hint" id="rmsg" style="margin:8px 0 0"></p></details>
   <form id="frm"><table class="tb fmes"><thead><tr><th>Mes ${y}</th><th class="r">Principal (€)</th><th class="r">Complementos (€)</th><th class="r">Total (€)</th></tr></thead><tbody>
   ${MES.map((n,i)=>`<tr><td><b>${cap(n)}</b><span class="mdl" id="fm${i}"></span></td><td><input class="fin" name="p${i}" inputmode="decimal" autocomplete="off" value="${v(P[i])}" placeholder="—" oninput="factEdit(this)"></td><td><input class="fin" name="c${i}" inputmode="decimal" autocomplete="off" value="${v(C[i])}" placeholder="—" oninput="factEdit(this)"></td><td class="r"><b id="ft${i}"></b></td></tr>`).join('')}
   <tr class="tot"><td>Total ${y}</td><td class="r" id="ftp"></td><td class="r" id="ftc"></td><td class="r" id="ftt"></td></tr></tbody></table>
@@ -1234,19 +1239,22 @@ let FMED={p:new Set(),c:new Set()},FREP='';
 function factEdit(el){const k=el.name[0],i=+el.name.slice(1);if(FMED[k])FMED[k].delete(i);FREP='';factMark();factTot()}
 function factMark(){for(let i=0;i<12;i++){const e=$('#fm'+i);if(e){const p=FMED.p.has(i),c=FMED.c.has(i);e.textContent=p||c?'media'+(p&&c?'':p?' (principal)':' (compl.)'):''}}}
 /* reparte un total a partes iguales entre los meses elegidos; los céntimos que sobran van al último mes */
-function factRepartir(){const k=$('#rtipo').value,imp=num($('#rimp').value),d=+$('#rdesde').value,h=+$('#rhasta').value,msg=$('#rmsg'),F=$('#frm').elements;
+function factRepartir(){const k=$('#rtipo').value,imp=num($('#rimp').value),d=+$('#rdesde').value,h=+$('#rhasta').value,msg=$('#rmsg'),F=$('#frm').elements,sa=!!($('#rsinago')&&$('#rsinago').checked);
   msg.className='hint';
   if(imp==null||Number.isNaN(imp)){msg.className='hint dn';msg.textContent='Escribe el importe total, por ejemplo 23.611 o 23.611,50.';return}
   if(h<d){msg.className='hint dn';msg.textContent='El mes «Hasta» no puede ser anterior a «Desde».';return}
-  const n=h-d+1,ct=Math.round(imp*100);let base=Math.round(ct/n),ult=ct-base*(n-1);if((ct>=0&&ult<0)||(ct<0&&ult>0)){base=Math.trunc(ct/n);ult=ct-base*(n-1)}const lab=k==='p'?'principal':'complementos';
-  const ocup=[];for(let i=d;i<=h;i++)if(String(F[k+i].value).trim()!=='')ocup.push(MESL[i]);
-  const clave=[k,ct,d,h].join('|');
+  const rango=[];for(let i=d;i<=h;i++)rango.push(i);const ago=sa&&rango.includes(7),ms=ago?rango.filter(i=>i!==7):rango;
+  if(!ms.length){msg.className='hint dn';msg.textContent='Solo has elegido agosto y está marcado como cerrado. Desmarca «Sin agosto» o elige más meses.';return}
+  const n=ms.length,ct=Math.round(imp*100),vals=reparte(imp,n).map(x=>Math.round(x*100)),base=vals[0],ult=vals[n-1],last=ms[n-1],lab=k==='p'?'principal':'complementos';
+  const ocup=rango.filter(i=>String(F[k+i].value).trim()!=='').map(i=>MESL[i]);
+  const clave=[k,ct,d,h,sa].join('|');
   if(ocup.length&&FREP!==clave){FREP=clave;msg.className='hint dn';msg.innerHTML='Ya hay importes de '+lab+' en: <b>'+esc(ocup.join(', '))+'</b>. Pulsa «Repartir» otra vez para sustituirlos (todavía no se guarda nada).';return}
   FREP='';const fmt=x=>String(x/100).replace('.',',');
-  for(let i=d;i<=h;i++){F[k+i].value=fmt(i===h?ult:base);FMED[k].add(i)}
+  ms.forEach((i,j)=>{F[k+i].value=fmt(vals[j]);FMED[k].add(i)});
+  if(ago){F[k+'7'].value='0';FMED[k].delete(7)}
   factMark();factTot();
   const f2=x=>eur2(x/100);
-  msg.innerHTML='✔ Repartido: '+(n>1?(base===ult?f2(base)+' en cada uno de los '+n+' meses':f2(base)+' en '+(n-1)+(n-1===1?' mes':' meses')+' y '+f2(ult)+' en '+MESL[h]):f2(ult)+' en '+MESL[h])+' ('+lab+', total '+f2(ct)+'). Revisa y pulsa <b>Guardar</b>.'}
+  msg.innerHTML='✔ Repartido: '+(n>1?(base===ult?f2(base)+' en cada uno de los '+n+' meses':f2(base)+' en '+(n-1)+(n-1===1?' mes':' meses')+' y '+f2(ult)+' en '+MESL[last]):f2(ult)+' en '+MESL[last])+(ago?' · agosto 0 € (cerrado)':'')+' ('+lab+', total '+f2(ct)+'). Revisa y pulsa <b>Guardar</b>.'}
 function factTot(){const F=$('#frm').elements,g=n=>{const x=num(F[n].value);return x==null||isNaN(x)?null:x},fm=v=>v==null?'—':v%1?eur2(v):eur(v);let tp=null,tc=null;
   for(let i=0;i<12;i++){const a=g('p'+i),b=g('c'+i);if(a!=null)tp=(tp||0)+a;if(b!=null)tc=(tc||0)+b;$('#ft'+i).textContent=a==null&&b==null?'—':fm((a||0)+(b||0))}
   $('#ftp').textContent=fm(tp);$('#ftc').textContent=fm(tc);$('#ftt').textContent=tp==null&&tc==null?'—':fm((tp||0)+(tc||0))}
