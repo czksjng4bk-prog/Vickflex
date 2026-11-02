@@ -285,6 +285,11 @@ function allCS(){const o=[];D.reps.forEach(r=>o.push(...repCS(r.id)));D.clientes
 const anSolo=(cs,y)=>cs.some(c=>c._anual&&CATS2.some(t=>accRec(c,y,t)[12]!=null));
 /* Fila «Total» del año en curso: si el año anterior solo tiene el total anual manual, se muestra ese año COMPLETO como referencia
    (lo que llevas este año frente a todo el año anterior). No cambia ningún dato ni ninguna otra comparación. */
+/* Columna del año anterior: enseña el periodo COMPLETO (trimestre o año) aunque el año en curso todavía no tenga todos los meses.
+   La diferencia sigue comparando los mismos meses; si no coinciden, debajo se indica «mismo periodo (ene–jul): …». */
+function prevCell(cs,o,y,k,ms,lab){const F=perCalc(cs,y-1,k,ms);if(!F.ha)return `<td class="r">${o.hp?eur(o.p):mut}</td>`;
+  const parcial=o.hp&&Math.abs(F.s-o.p)>0.004&&o.span&&o.span.length,per=parcial?(o.span.length>1?MES[o.span[0]]+'–'+MES[o.span[o.span.length-1]]:MES[o.span[0]]):'';
+  return `<td class="r">${eur(F.s)}${parcial||!o.hp?`<span class="qs">${lab}</span>`:''}${parcial?`<span class="qs">mismo periodo (${per}): ${eur(o.p)}</span>`:''}</td>`}
 function anRef(cs,y,k){if(!anSolo(cs,y-1))return null;const o=perCalc(cs,y-1,k,[0,1,2,3,4,5,6,7,8,9,10,11]);return o.ha?o:null}
 function anRefCells(o,ref,y,mid){const a=o.ha?o.s:0,d=a-ref.s,pc=ref.s?Math.round(a/ref.s*100):0;
   return `<td class="r">${eur(ref.s)}<span class="qs">año completo</span></td>${mid||''}<td class="r ${d>=0?'up':'dn'}">${sg(d)}</td><td class="r"><span class="pill n" title="Lo que llevas de ${y} frente a todo ${y-1}">${pc} % de ${y-1}</span></td>`}
@@ -374,7 +379,7 @@ function qCard(cs,mail){
     return R.map((o,j)=>{const k=ks[j],bold=k==='total'||!multi,ref=g.tot&&!o.ok?anRef(cs,QY,k):null;if(ref)usaRef=true;
       const first=j===0?`<td class="qn" rowspan="${ks.length}"><b>${g.n}${g.tot?' '+QY:''}</b><span class="qs">${g.sub}</span><span class="qs ${/incompletos/.test(worst.estado)?'dn':''}">${esc(worst.estado)}</span></td>`:'';
       const cur=`<td class="r">${o.ha?`${o.mc.length?'<span class="dn" title="Faltan meses">⚠ </span>':''}${bold?'<b>'+eur(o.s)+'</b>':eur(o.s)}`:mut}</td>`;
-      const cmp=ref?anRefCells(o,ref,QY,cur):`<td class="r">${o.hp?eur(o.p):mut}</td>${cur}
+      const cmp=ref?anRefCells(o,ref,QY,cur):`${prevCell(cs,o,QY,k,g.ms,g.tot?'año completo':'trimestre completo')}${cur}
       <td class="r ${o.ok?(o.d>=0?'up':'dn'):''}">${o.ok?sg(o.d):mut}</td><td class="r">${cmpHTML({a:o.s,p:o.p,ok:o.ok,why:o.why})}</td>`;
       return `<tr class="${g.tot?'tot ':''}${j===0?'g1':''}">${first}${multi?`<td>${CAT[k]}</td>`:''}${cmp}</tr>`}).join('')}).join('');
   const sel=`<select class="sel" onchange="setQY(this.value)" title="Ejercicio">${ys.map(y=>`<option ${y===QY?'selected':''}>${y}</option>`).join('')}</select>`;
@@ -394,7 +399,7 @@ function mCard(cs,mail){
     <td class="r ${T!=null&&o.ok?(o.d>=0?'up':'dn'):''}">${T!=null&&o.ok?sg(o.d):mut}</td><td class="r">${T!=null?cmpHTML({a:o.s,p:o.p,ok:o.ok,why:o.why}):mut}</td></tr>`}).join('');
   const all=[0,1,2,3,4,5,6,7,8,9,10,11],oT=perCalc(cs,y,'total',all),oP=perCalc(cs,y,'principal',all),oC=perCalc(cs,y,'comp',all);
   const lab=oT.enCurso&&oT.span.length?'Acumulado ene–'+MES[oT.span[oT.span.length-1]]:'Total '+y,refT=anRef(cs,y,'total');
-  const tot=`<tr class="tot g1"><td>${lab}${oT.mc.length?'<span class="qs dn">⚠ datos incompletos</span>':''}</td><td class="r">${oP.ha?eur(oP.s):mut}</td><td class="r">${oC.ha?eur(oC.s):mut}</td><td class="r">${oT.ha?eur(oT.s):mut}</td>${!oT.ok&&refT?anRefCells(oT,refT,y):`<td class="r">${oT.hp?eur(oT.p):mut}</td>
+  const tot=`<tr class="tot g1"><td>${lab}${oT.mc.length?'<span class="qs dn">⚠ datos incompletos</span>':''}</td><td class="r">${oP.ha?eur(oP.s):mut}</td><td class="r">${oC.ha?eur(oC.s):mut}</td><td class="r">${oT.ha?eur(oT.s):mut}</td>${!oT.ok&&refT?anRefCells(oT,refT,y):`${prevCell(cs,oT,y,'total',all,'año completo')}
     <td class="r ${oT.ok?(oT.d>=0?'up':'dn'):''}">${oT.ok?sg(oT.d):mut}</td><td class="r">${cmpHTML({a:oT.s,p:oT.p,ok:oT.ok,why:oT.why})}</td>`}</tr>`;
   const sel=`<select class="sel" onchange="setQY(this.value)" title="Ejercicio">${ys.map(a=>`<option ${a===y?'selected':''}>${a}</option>`).join('')}</select>`;
   return `<div class="card qt" style="margin-top:16px"><div class="hb" style="margin-bottom:8px"><h3 style="margin:0">Facturación mensual · ${y} frente a ${y-1}</h3><div class="acts">${mail?`<button class="b2" onclick="${mail}">✉ Enviar por correo</button>`:''}${sel}</div></div>
