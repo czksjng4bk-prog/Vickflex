@@ -268,13 +268,18 @@ const lastM=(cs,y,k)=>{let m=0;cs.forEach(c=>{fy(c,y,k).forEach((v,i)=>{if(v!=nu
    de sus clientes (que siguen guardados y visibles en cada ficha de cliente). No hay desglose por meses: solo se compara el año completo. */
 const REP_AN=2025;
 function repAn(r,k){const o=r&&r.factRep&&r.factRep[REP_AN];if(!o)return null;if(k==='total')return(o.p==null&&o.c==null)?null:(o.p||0)+(o.c||0);return k==='comp'?(o.c==null?null:o.c):(o.p==null?null:o.p)}
+/* divide un total en n partes iguales en céntimos; lo que sobra va a la última (la suma es exacta) */
+function reparte(total,n){const ct=Math.round(total*100);let base=Math.round(ct/n),ult=ct-base*(n-1);if((ct>=0&&ult<0)||(ct<0&&ult>0)){base=Math.trunc(ct/n);ult=ct-base*(n-1)}return Array.from({length:n},(_,i)=>(i===n-1?ult:base)/100)}
+const repMedia=r=>!!(r&&r.factRep&&r.factRep[REP_AN]&&r.factRep[REP_AN].media);
 const repTiene=r=>repAn(r,'principal')!=null||repAn(r,'comp')!=null;
 /* clientes del representante para los cálculos de importes: copias sin su 2025 + un registro con el total anual manual (no se guarda nada) */
 function repCS(rid,cs){cs=cs||clientsOf(rid);const r=rep(rid);if(!repTiene(r))return cs;const y=String(REP_AN);
   const sin=c=>{const n=Object.assign({},c);['fact','comp'].forEach(f=>{if(n[f]&&n[f][y]!=null){n[f]=Object.assign({},n[f]);delete n[f][y]}});
     if(n.acumul){n.acumul=Object.assign({},n.acumul);CATS2.forEach(k=>{if(n.acumul[k]&&n.acumul[k][y]){n.acumul[k]=Object.assign({},n.acumul[k]);delete n.acumul[k][y]}})}return n};
-  const ac={},P=repAn(r,'principal'),C=repAn(r,'comp');if(P!=null)ac.principal={[y]:{12:P}};if(C!=null)ac.comp={[y]:{12:C}};
-  return cs.map(sin).concat([{id:'_rep_'+rid,_anual:1,nombre:'',repId:rid,fact:{},comp:{},acumul:ac,pedidos:[],visitas:[],exposicion:[]}])}
+  const ac={},P=repAn(r,'principal'),C=repAn(r,'comp'),fa={},co={},md=repMedia(r);
+  if(md){if(P!=null)fa[y]=reparte(P,12);if(C!=null)co[y]=reparte(C,12)}else{if(P!=null)ac.principal={[y]:{12:P}};if(C!=null)ac.comp={[y]:{12:C}}}
+  return cs.map(sin).concat([{id:'_rep_'+rid,_anual:1,_media:md?REP_AN:0,nombre:'',repId:rid,fact:fa,comp:co,acumul:ac,pedidos:[],visitas:[],exposicion:[]}])}
+const mediaNota=(cs,y)=>{const a=[y,y-1].find(z=>cs.some(c=>c._media===z));return a?`<p class="hint">${a}: <b>media mensual</b> (total del año introducido a mano y repartido a partes iguales entre los 12 meses); no son los importes reales de cada mes.</p>`:''};
 /* toda la empresa: cada representante con su ámbito, más los clientes sin representante */
 function allCS(){const o=[];D.reps.forEach(r=>o.push(...repCS(r.id)));D.clientes.filter(c=>!rep(c.repId)).forEach(c=>o.push(c));return o}
 const anSolo=(cs,y)=>cs.some(c=>c._anual&&CATS2.some(t=>accRec(c,y,t)[12]!=null));
@@ -377,7 +382,7 @@ function qCard(cs,mail){
   const notas=[...new Set(G.slice(0,4).flatMap(g=>ks.map(k=>perCalc(cs,QY,k,g.ms)).filter(o=>!o.ok&&o.ha&&o.why).map(o=>g.n+': '+o.why)))];
   return `<div class="card qt" style="margin-top:16px"><div class="hb" style="margin-bottom:8px"><h3 style="margin:0">Facturación trimestral · ${QY} frente a ${QY-1}</h3><div class="acts">${mail?`<button class="b2" onclick="${mail}">✉ Enviar por correo</button>`:''}${seg}${sel}</div></div>
    <table class="tb"><thead><tr><th>Trimestre</th>${multi?'<th>Tipo</th>':''}<th class="r">${QY-1}</th><th class="r">${QY}</th><th class="r">Dif. €</th><th class="r">Dif. %</th></tr></thead><tbody>${body}</tbody></table>
-   ${notas.length?`<p class="hint dn">Datos incompletos o sin comparar: ${esc(notas.join(' · '))}.</p>`:''}${usaRef?`<p class="hint">Fila «Total anual»: ${QY-1} es el <b>año completo</b> (total introducido a mano, sin meses). La diferencia compara lo que llevas de ${QY} con todo ${QY-1}.</p>`:''}
+   ${notas.length?`<p class="hint dn">Datos incompletos o sin comparar: ${esc(notas.join(' · '))}.</p>`:''}${mediaNota(cs,QY)}${usaRef?`<p class="hint">Fila «Total anual»: ${QY-1} es el <b>año completo</b> (total introducido a mano, sin meses). La diferencia compara lo que llevas de ${QY} con todo ${QY-1}.</p>`:''}
    <p class="hint">Principal + complementos = total. Los trimestres se calculan solos sumando los meses cargados. «—» y «Faltan datos» significan que falta información: no es lo mismo que 0 €. En un trimestre en curso se comparan solo los meses disponibles con esos mismos meses del año anterior. Los acumulados importados sin desglose mensual no se reparten por trimestres.</p></div>`}
 
 /* Tabla mensual (12 meses) + gráfico del representante. Misma regla: mes sin dato = «—», nunca 0 €. */
@@ -394,7 +399,7 @@ function mCard(cs,mail){
   const sel=`<select class="sel" onchange="setQY(this.value)" title="Ejercicio">${ys.map(a=>`<option ${a===y?'selected':''}>${a}</option>`).join('')}</select>`;
   return `<div class="card qt" style="margin-top:16px"><div class="hb" style="margin-bottom:8px"><h3 style="margin:0">Facturación mensual · ${y} frente a ${y-1}</h3><div class="acts">${mail?`<button class="b2" onclick="${mail}">✉ Enviar por correo</button>`:''}${sel}</div></div>
    <table class="tb"><thead><tr><th>Mes</th><th class="r">Principal ${y}</th><th class="r">Complementos ${y}</th><th class="r">Total ${y}</th><th class="r">Total ${y-1}</th><th class="r">Dif. €</th><th class="r">Dif. %</th></tr></thead><tbody>${rows}${tot}</tbody></table>
-   ${sinC.length?`<p class="hint dn">Meses sin comparar por falta de datos: ${esc(sinC.join(', '))}.</p>`:''}${!oT.ok&&refT?`<p class="hint">Fila de total: ${y-1} es el <b>año completo</b> (total introducido a mano, sin meses). La diferencia compara lo que llevas de ${y} con todo ${y-1}.</p>`:''}
+   ${sinC.length?`<p class="hint dn">Meses sin comparar por falta de datos: ${esc(sinC.join(', '))}.</p>`:''}${mediaNota(cs,y)}${!oT.ok&&refT?`<p class="hint">Fila de total: ${y-1} es el <b>año completo</b> (total introducido a mano, sin meses). La diferencia compara lo que llevas de ${y} con todo ${y-1}.</p>`:''}
    <p class="hint">Total = principal + complementos. «—» = sin dato (no es 0 €). Solo se comparan meses con dato en ambos años; el acumulado compara los mismos meses de los dos años.</p></div>`}
 function repChart(cs){
   const m=corte(),t=(y,k)=>MES.map((_,i)=>cs.reduce((a,c)=>a+(fy(c,y,k)[i]||0),0)),th=a=>a.map(v=>Math.round(v/1000));
@@ -1035,6 +1040,7 @@ function render(keep){
   const st=$('#view').scrollTop;
   $('#view').innerHTML=(v==='copias'?'':banner())+f();
   if(v==='modelos')bmPaint();
+  if(v==='rep'&&$('#r25m'))rep25Tot();
   $('#crumbs').innerHTML=crumbs(v,id);{const n=alertas().filter(a=>a.sev==='rojo').length,b=$('#nbadge');b.textContent=n;b.style.display=n?'inline-block':'none'}
   document.querySelectorAll('nav button[data-v]').forEach(b=>b.classList.toggle('on',b.dataset.v===(v==='modelos'?'panel':(v==='rep'||v==='cli')?'reps':(v==='coche'||v==='cochehist'||v==='semana')?'coche':v)));
   $('#view').scrollTop=keep===true?st:0}
@@ -1083,20 +1089,26 @@ const lnkMail=t=>t?`<a href="mailto:${esc(t)}">${esc(t)}</a>`:'<span class="mut"
 function rep25Card(r){const o=(r.factRep&&r.factRep[REP_AN])||{},T=repAn(r,'total'),f=v=>v==null?'':String(v).replace('.',','),fm=v=>v%1?eur2(v):eur(v);
   const cs=clientsOf(r.id),deCli=cs.some(c=>hasAny(c,REP_AN,'total'));
   const prog=[];if(T)for(let y=REP_AN+1;y<=YEAR;y++){const mm=y===YEAR?corte():12;if(cs.some(c=>has(c,y,mm,'total'))){const v=cs.reduce((t,c)=>t+acum(c,y,mm,'total'),0);prog.push(`<div class="row"><span>${y} (${mm<12?'ene–'+MES[mm-1]:'año completo'})</span><span><b>${eur(v)}</b> · ${Math.round(v/T*100)} % del total ${REP_AN}${mm===12?' · <span class="'+(v>=T?'up':'dn')+'">'+sg(v-T)+'</span>':''}</span></div>`)}}
-  return `<div class="card" style="margin-bottom:16px"><div class="hb" style="margin-bottom:10px"><h3 style="margin:0">Facturación ${REP_AN} · introducida a mano</h3><span class="mut" style="font-size:13px">Total del año, sin desglose por meses</span></div>
+  return `<div class="card" style="margin-bottom:16px"><div class="hb" style="margin-bottom:10px"><h3 style="margin:0">Facturación ${REP_AN} · introducida a mano</h3><span class="mut" style="font-size:13px">Total del año${o.media?' · repartido entre los 12 meses':', sin desglose por meses'}</span></div>
    <div class="r25"><label class="f"><span>Facturación principal (€)</span><input id="r25p" inputmode="decimal" autocomplete="off" value="${f(o.p)}" placeholder="sin dato" oninput="rep25Tot()"></label>
     <label class="f"><span>Complementos (€)</span><input id="r25c" inputmode="decimal" autocomplete="off" value="${f(o.c)}" placeholder="sin dato" oninput="rep25Tot()"></label>
     <label class="f"><span>Facturación total (automática)</span><div class="tot25" id="r25t">${T==null?'—':fm(T)}</div></label>
     <button class="b1" onclick="rep25Save('${r.id}')">Guardar ${REP_AN}</button></div>
+   <label style="display:flex;gap:10px;align-items:center;margin-top:12px;font-size:16px;cursor:pointer"><input type="checkbox" id="r25m" ${o.media?'checked':''} onchange="rep25Tot()" style="width:22px;height:22px;accent-color:var(--v)"> Repartir entre los 12 meses (media mensual)</label>
+   <p class="hint" id="r25med" style="margin-top:6px"></p>
    ${prog.length?`<div style="margin-top:12px">${prog.join('')}</div>`:''}
-   <p class="hint">Se usa para comparar con ${REP_AN+1} y años siguientes. Como no tiene meses, la comparación con ${REP_AN} se hace con el año completo; en meses y trimestres sale «Faltan datos».${T!=null&&deCli?` Las cifras de ${REP_AN} de sus clientes no se suman aquí (siguen guardadas en cada ficha de cliente): manda este importe.`:''}</p></div>`}
+   <p class="hint">Se usa para comparar con ${REP_AN+1} y años siguientes. ${o.media?`Repartido entre los 12 meses: los meses y trimestres de ${REP_AN} son la media (total ÷ 12), no lo facturado de verdad cada mes. El total del año sigue siendo exacto.`:`Como no tiene meses, la comparación con ${REP_AN} se hace con el año completo; en meses y trimestres sale «Faltan datos». Marca «Repartir entre los 12 meses» para comparar meses y trimestres con la media.`}${T!=null&&deCli?` Las cifras de ${REP_AN} de sus clientes no se suman aquí (siguen guardadas en cada ficha de cliente): manda este importe.`:''}</p></div>`}
 function rep25Tot(){const a=num($('#r25p').value),b=num($('#r25c').value),ok=x=>x!=null&&!isNaN(x);
-  $('#r25t').textContent=(ok(a)||ok(b))?(v=>v%1?eur2(v):eur(v))((ok(a)?a:0)+(ok(b)?b:0)):'—'}
-function rep25Save(rid){const r=rep(rid),P=num($('#r25p').value),C=num($('#r25c').value);
+  $('#r25t').textContent=(ok(a)||ok(b))?(v=>v%1?eur2(v):eur(v))((ok(a)?a:0)+(ok(b)?b:0)):'—';
+  const m=$('#r25m'),e=$('#r25med');if(!m||!e)return;
+  if(!m.checked||!(ok(a)||ok(b))){e.textContent='';return}
+  const pa=ok(a)?reparte(a,12):null,pc=ok(b)?reparte(b,12):null,tx=(l,x)=>x?l+' '+eur2(x[0])+(x[11]!==x[0]?' (diciembre '+eur2(x[11])+')':''):'';
+  e.innerHTML='Media de cada mes: '+[tx('principal',pa),tx('complementos',pc)].filter(Boolean).join(' · ')+' · total '+eur2((pa?pa[0]:0)+(pc?pc[0]:0))+' al mes. Pulsa <b>Guardar '+REP_AN+'</b> para aplicarlo.'}
+function rep25Save(rid){const r=rep(rid),P=num($('#r25p').value),C=num($('#r25c').value),MD=!!($('#r25m')&&$('#r25m').checked);
   if(Number.isNaN(P))return toast('La facturación principal no es un importe válido (ej. 215.300,50).',1);
   if(Number.isNaN(C))return toast('Los complementos no son un importe válido (ej. 12.400).',1);
   const o=(r.factRep&&r.factRep[REP_AN])||{},quita=[];if(o.p!=null&&P==null)quita.push('principal ('+eur(o.p)+')');if(o.c!=null&&C==null)quita.push('complementos ('+eur(o.c)+')');
-  const aplicar=()=>{snap('Facturación '+REP_AN+' de '+r.nombre);r.factRep=r.factRep||{};if(P==null&&C==null)delete r.factRep[REP_AN];else r.factRep[REP_AN]={p:P,c:C};save();render(true);toast('Facturación '+REP_AN+' guardada.')};
+  const aplicar=()=>{snap('Facturación '+REP_AN+' de '+r.nombre);r.factRep=r.factRep||{};if(P==null&&C==null)delete r.factRep[REP_AN];else{r.factRep[REP_AN]={p:P,c:C};if(MD)r.factRep[REP_AN].media=true}save();render(true);toast('Facturación '+REP_AN+' guardada.')};
   if(quita.length)return ask('Has dejado vacío: <b>'+esc(quita.join(' y '))+'</b>. ¿Quitar ese importe de '+REP_AN+'? (Se puede deshacer en Copias de seguridad.)','Quitar importe',aplicar);
   aplicar()}
 function repFicha(r){
