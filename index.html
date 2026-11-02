@@ -177,6 +177,7 @@ body.locked nav,body.locked main{visibility:hidden}
 @media(max-width:900px){.r25{grid-template-columns:1fr 1fr}}
 .fin{width:100%;min-width:0;padding:10px;border:1px solid var(--b2);border-radius:8px;font-size:16px;font-family:inherit;text-align:right}.fmes td{padding:6px 8px}.fmes td:last-child{white-space:nowrap}
 @media(max-width:600px){.fmes th,.fmes td{padding:6px 3px}.fmes th{font-size:10px;letter-spacing:0}.fmes td{font-size:13px}.fmes td:last-child{white-space:nowrap}.fin{padding:8px 5px;font-size:15px}}
+.mdl{display:block;font-size:11px;font-weight:600;color:#a8590e;line-height:1.2}.mdl:empty{display:none}
 .nube{margin-top:auto;padding:10px 6px 0;font-size:12px;line-height:1.35;color:var(--g);cursor:pointer}.nube.error,.nube.offline{color:var(--ro)}.nube.ok{color:var(--ok)}
 </style>
 </head>
@@ -219,7 +220,7 @@ function minusRep(r){if(r&&r.email)r.email=String(r.email).toLowerCase()}
 function migrate(d){
   d.schema=1;d.reps=d.reps||[];d.clientes=d.clientes||[];
   d.reps.forEach(r=>{['email','codigoFab','tel','ciudad','hotelN','hotelT'].forEach(k=>{if(r[k]==null)r[k]=''});if(!r.factRep||typeof r.factRep!=='object')r.factRep={};if(!Array.isArray(r.provincias))r.provincias=[];minusRep(r)});
-  d.clientes.forEach(c=>{c.fact=c.fact||{};c.exposicion=c.exposicion||[];c.pend=c.pend||[];c.visitas=c.visitas||[];c.pedidos=c.pedidos||[];c.obs=c.obs||'';c.visitas=c.visitas.map(v=>{v.id=v.id||uid();if(v.hablamos==null)v.hablamos=v.t||'';['pidio','compromisos','productos','prox','proxF','persona','expoNueva','expoPend','pedT','pedTxt','pedI','obs','repId','sem'].forEach(k=>{if(v[k]==null)v[k]=''});v.proxH=!!v.proxH;/* tipo de visita: las antiguas (sin tipo) son presenciales */if(v.tipo!=='telefonica')v.tipo='presencial';return v});c.codigo=c.codigo||'';c.email=c.email||'';c.cp=c.cp==null?'':String(c.cp);c.zona=c.zona==null?'':String(c.zona);c.acumul=c.acumul&&typeof c.acumul==='object'?c.acumul:{};c.comp=c.comp&&typeof c.comp==='object'?c.comp:{};c.catalogo=c.catalogo&&typeof c.catalogo==='object'?c.catalogo:{ok:null,f:''};c.prodPend=c.prodPend||[];c.expObs=c.expObs||'';mayusCli(c);c.nombreFact=c.nombreFact||'';c.semaforo=c.semaforo||'amarillo';
+  d.clientes.forEach(c=>{c.fact=c.fact||{};c.exposicion=c.exposicion||[];c.pend=c.pend||[];c.visitas=c.visitas||[];c.pedidos=c.pedidos||[];c.obs=c.obs||'';c.visitas=c.visitas.map(v=>{v.id=v.id||uid();if(v.hablamos==null)v.hablamos=v.t||'';['pidio','compromisos','productos','prox','proxF','persona','expoNueva','expoPend','pedT','pedTxt','pedI','obs','repId','sem'].forEach(k=>{if(v[k]==null)v[k]=''});v.proxH=!!v.proxH;/* tipo de visita: las antiguas (sin tipo) son presenciales */if(v.tipo!=='telefonica')v.tipo='presencial';return v});c.codigo=c.codigo||'';c.email=c.email||'';c.cp=c.cp==null?'':String(c.cp);c.zona=c.zona==null?'':String(c.zona);c.acumul=c.acumul&&typeof c.acumul==='object'?c.acumul:{};c.comp=c.comp&&typeof c.comp==='object'?c.comp:{};c.catalogo=c.catalogo&&typeof c.catalogo==='object'?c.catalogo:{ok:null,f:''};c.prodPend=c.prodPend||[];c.expObs=c.expObs||'';mayusCli(c);c.factMedia=c.factMedia&&typeof c.factMedia==='object'?c.factMedia:{};c.nombreFact=c.nombreFact||'';c.semaforo=c.semaforo||'amarillo';
     if(!c.repHist||!c.repHist.length)c.repHist=[{r:c.repId,d:null}]});
   d.equiv=Array.isArray(d.equiv)?d.equiv:[];d.imports=Array.isArray(d.imports)?d.imports:[];d.plan=Array.isArray(d.plan)?d.plan:[];d.semanas=Array.isArray(d.semanas)?d.semanas:[];d.semanas.forEach(x=>{if(x.expoV===undefined)x.expoV=null;if(x.expoU===undefined)x.expoU=null});d.festivos=Array.isArray(d.festivos)?d.festivos:[];if(d.changes==null)d.changes=0; if(d.lastBackup===undefined)d.lastBackup=null; return d;
 }
@@ -920,7 +921,8 @@ function vCli(id){
   const yrsAll=[...new Set(Object.keys(c.fact||{}).concat(Object.keys(c.comp||{}),Object.keys((c.acumul&&c.acumul.principal)||{}),Object.keys((c.acumul&&c.acumul.comp)||{})).map(Number))].filter(y=>hasAny(c,y,'total')).sort((x,y)=>y-x);
   const fyr=FY,mm3=fyr===YEAR?m:12;
   const yopt=[...new Set(yrsAll.concat([YEAR]))].sort((x,y)=>y-x);
-  const m3=MES.map((n,i)=>`<tr><td>${cap(n)}</td><td class="r">${ev(fy(c,fyr,'principal')[i])}</td><td class="r">${ev(fy(c,fyr,'comp')[i])}</td><td class="r"><b>${ev(fy(c,fyr)[i])}</b></td></tr>`).join('');
+  const fmd=(c.factMedia&&c.factMedia[fyr])||{},esMd=i=>(fmd.p||[]).includes(i)||(fmd.c||[]).includes(i),hayMd=MES.some((_,i)=>esMd(i));
+  const m3=MES.map((n,i)=>`<tr><td>${cap(n)}${esMd(i)?'<span class="mdl" title="Importe repartido a partes iguales (no es el real del mes)">media</span>':''}</td><td class="r">${ev(fy(c,fyr,'principal')[i])}</td><td class="r">${ev(fy(c,fyr,'comp')[i])}</td><td class="r"><b>${ev(fy(c,fyr)[i])}</b></td></tr>`).join('');
   const t3=k=>has(c,fyr,mm3,k)?eur(acum(c,fyr,mm3,k)):mut;
   const pvA=fy(c,YEAR-1,VC),xA=fy(c,YEAR,VC);
   const mrows=MES.map((n,i)=>{const pv=pvA[i],x=xA[i],ok=x!=null&&pv!=null;
@@ -947,7 +949,7 @@ function vCli(id){
       <div class="card"><div class="hb" style="margin-bottom:8px"><h3 style="margin:0">Mes a mes: principal + complementos</h3><select class="sel" onchange="setFY(+this.value)">${yopt.map(y=>`<option ${y===fyr?'selected':''}>${y}</option>`).join('')}</select></div>
         <table class="tb"><thead><tr><th>Mes ${fyr}</th><th class="r">Principal</th><th class="r">Complementos</th><th class="r">Total</th></tr></thead><tbody>${m3}
         <tr class="tot"><td>Acumulado ${per(mm3)}</td><td class="r">${t3('principal')}</td><td class="r">${t3('comp')}</td><td class="r">${t3('total')}</td></tr></tbody></table>
-        <p class="hint">El total se calcula solo: principal + complementos. «—» = sin dato (no es 0 €).</p></div>
+        <p class="hint">El total se calcula solo: principal + complementos. «—» = sin dato (no es 0 €).${hayMd?' «media» = importe repartido a partes iguales entre varios meses (no es lo facturado de verdad ese mes).':''}</p></div>
       <div class="card" style="margin-top:16px"><h3>Comparativa ${CAT[VC].toLowerCase()} con ${YEAR-1}</h3>
         <table class="tb"><thead><tr><th>Mes</th><th class="r">${YEAR-1}</th><th class="r">${YEAR}</th><th class="r">Dif. €</th><th class="r">Dif. %</th></tr></thead><tbody>${mrows}
         <tr class="tot"><td>Acumulado ${per(m)}</td><td class="r">${oV.hp?eur(oV.p):mut}</td><td class="r">${oV.ha?eur(oV.a):mut}</td><td class="r ${oV.d>=0?'up':'dn'}">${oV.ok?sg(oV.d):mut}</td><td class="r">${cmpHTML(oV)}</td></tr></tbody></table>
@@ -1182,13 +1184,21 @@ function factForm(id,y){
   const c=cli(id);y=+y||YEAR;
   const ys=[...new Set(Object.keys(c.fact||{}).concat(Object.keys(c.comp||{})).map(Number).concat([YEAR,YEAR-1,YEAR-2,YEAR-3,YEAR-4,YEAR-5]))].sort((a,b)=>b-a);
   const P=rawF(c,y,'principal'),C=rawF(c,y,'comp'),v=x=>x==null?'':String(x).replace('.',',');
+  const md=(c.factMedia&&c.factMedia[y])||{};FMED={p:new Set(md.p||[]),c:new Set(md.c||[])};FREP='';
+  const mopt=sel=>MESL.map((n,i)=>`<option value="${i}" ${i===sel?'selected':''}>${cap(n)}</option>`).join('');
   modal(`<h2>Facturación mensual de ${esc(c.nombre)}</h2><div class="fg"><label class="f"><span>Año</span><select onchange="factForm('${id}',+this.value)">${ys.map(a=>`<option ${a===y?'selected':''}>${a}</option>`).join('')}</select></label></div>
+  <details class="card rep6" style="margin:0 0 12px;background:#faf7f1"><summary style="cursor:pointer;font-weight:600;color:var(--v)">➗ Repartir un total entre meses</summary>
+   <p class="hint" style="margin-top:6px">Para cuando solo tienes el total de varios meses (por ejemplo, un semestre). Se divide a partes iguales y los meses quedan marcados como «media». No se guarda hasta que pulses «Guardar».</p>
+   <div class="r25" style="margin-top:8px"><label class="f"><span>Tipo</span><select id="rtipo"><option value="p">Principal</option><option value="c">Complementos</option></select></label>
+    <label class="f"><span>Importe total (€)</span><input id="rimp" inputmode="decimal" autocomplete="off" placeholder="Ej. 23.611"></label>
+    <label class="f"><span>Desde</span><select id="rdesde">${mopt(0)}</select></label><label class="f"><span>Hasta</span><select id="rhasta">${mopt(5)}</select></label>
+    <button type="button" class="b1" onclick="factRepartir()">Repartir</button></div><p class="hint" id="rmsg" style="margin:8px 0 0"></p></details>
   <form id="frm"><table class="tb fmes"><thead><tr><th>Mes ${y}</th><th class="r">Principal (€)</th><th class="r">Complementos (€)</th><th class="r">Total (€)</th></tr></thead><tbody>
-  ${MES.map((n,i)=>`<tr><td><b>${cap(n)}</b></td><td><input class="fin" name="p${i}" inputmode="decimal" autocomplete="off" value="${v(P[i])}" placeholder="—" oninput="factTot()"></td><td><input class="fin" name="c${i}" inputmode="decimal" autocomplete="off" value="${v(C[i])}" placeholder="—" oninput="factTot()"></td><td class="r"><b id="ft${i}"></b></td></tr>`).join('')}
+  ${MES.map((n,i)=>`<tr><td><b>${cap(n)}</b><span class="mdl" id="fm${i}"></span></td><td><input class="fin" name="p${i}" inputmode="decimal" autocomplete="off" value="${v(P[i])}" placeholder="—" oninput="factEdit(this)"></td><td><input class="fin" name="c${i}" inputmode="decimal" autocomplete="off" value="${v(C[i])}" placeholder="—" oninput="factEdit(this)"></td><td class="r"><b id="ft${i}"></b></td></tr>`).join('')}
   <tr class="tot"><td>Total ${y}</td><td class="r" id="ftp"></td><td class="r" id="ftc"></td><td class="r" id="ftt"></td></tr></tbody></table>
   <p class="hint">El total de cada mes se calcula solo: principal + complementos. Deja en blanco un mes sin datos; escribe 0 si no hubo facturación. Al guardar, el representante se actualiza solo (no hay que escribirlo dos veces).</p><p class="err" id="err"></p>
   <div class="acts"><button type="button" class="b2" onclick="closeModal()">Cancelar</button><button type="submit" class="b1">Guardar</button></div></form>`);
-  factTot();
+  factTot();factMark();
   $('#frm').onsubmit=e=>{e.preventDefault();const F=$('#frm').elements,aP=[],aC=[],quita=[];
     for(let i=0;i<12;i++){for(const [k,arr,old,lab] of [['p',aP,P,'principal'],['c',aC,C,'complementos']]){const raw=F[k+i].value,n=num(raw);
         if(String(raw).trim()!==''&&(n==null||isNaN(n))){$('#err').textContent='El importe de '+lab+' de '+MESL[i]+' no es válido.';return}
@@ -1196,9 +1206,30 @@ function factForm(id,y){
     const aplicar=()=>{snap('Editar facturación '+y+' de '+c.nombre);
       if(aP.some(x=>x!=null)||c.fact[y])c.fact[y]=aP;
       c.comp=c.comp||{};if(aC.some(x=>x!=null)||c.comp[y])c.comp[y]=aC;
+      /* meses repartidos («media»): solo se guardan los que siguen teniendo importe */
+      const mp=[...FMED.p].filter(i=>aP[i]!=null).sort((a,b)=>a-b),mc=[...FMED.c].filter(i=>aC[i]!=null).sort((a,b)=>a-b);c.factMedia=c.factMedia||{};
+      if(mp.length||mc.length)c.factMedia[y]={p:mp,c:mc};else delete c.factMedia[y];
       save();closeModal();render(true);toast('Facturación guardada.')};
     if(quita.length)return ask('Has dejado vacíos importes que ya estaban guardados: <b>'+esc(quita.join(', '))+'</b>. ¿Quitarlos? (Se puede deshacer en Copias de seguridad.)','Quitar y guardar',aplicar);
     aplicar()}}
+let FMED={p:new Set(),c:new Set()},FREP='';
+/* escribir a mano en un mes repartido: deja de ser «media» */
+function factEdit(el){const k=el.name[0],i=+el.name.slice(1);if(FMED[k])FMED[k].delete(i);FREP='';factMark();factTot()}
+function factMark(){for(let i=0;i<12;i++){const e=$('#fm'+i);if(e){const p=FMED.p.has(i),c=FMED.c.has(i);e.textContent=p||c?'media'+(p&&c?'':p?' (principal)':' (compl.)'):''}}}
+/* reparte un total a partes iguales entre los meses elegidos; los céntimos que sobran van al último mes */
+function factRepartir(){const k=$('#rtipo').value,imp=num($('#rimp').value),d=+$('#rdesde').value,h=+$('#rhasta').value,msg=$('#rmsg'),F=$('#frm').elements;
+  msg.className='hint';
+  if(imp==null||Number.isNaN(imp)){msg.className='hint dn';msg.textContent='Escribe el importe total, por ejemplo 23.611 o 23.611,50.';return}
+  if(h<d){msg.className='hint dn';msg.textContent='El mes «Hasta» no puede ser anterior a «Desde».';return}
+  const n=h-d+1,ct=Math.round(imp*100);let base=Math.round(ct/n),ult=ct-base*(n-1);if((ct>=0&&ult<0)||(ct<0&&ult>0)){base=Math.trunc(ct/n);ult=ct-base*(n-1)}const lab=k==='p'?'principal':'complementos';
+  const ocup=[];for(let i=d;i<=h;i++)if(String(F[k+i].value).trim()!=='')ocup.push(MESL[i]);
+  const clave=[k,ct,d,h].join('|');
+  if(ocup.length&&FREP!==clave){FREP=clave;msg.className='hint dn';msg.innerHTML='Ya hay importes de '+lab+' en: <b>'+esc(ocup.join(', '))+'</b>. Pulsa «Repartir» otra vez para sustituirlos (todavía no se guarda nada).';return}
+  FREP='';const fmt=x=>String(x/100).replace('.',',');
+  for(let i=d;i<=h;i++){F[k+i].value=fmt(i===h?ult:base);FMED[k].add(i)}
+  factMark();factTot();
+  const f2=x=>eur2(x/100);
+  msg.innerHTML='✔ Repartido: '+(n>1?(base===ult?f2(base)+' en cada uno de los '+n+' meses':f2(base)+' en '+(n-1)+(n-1===1?' mes':' meses')+' y '+f2(ult)+' en '+MESL[h]):f2(ult)+' en '+MESL[h])+' ('+lab+', total '+f2(ct)+'). Revisa y pulsa <b>Guardar</b>.'}
 function factTot(){const F=$('#frm').elements,g=n=>{const x=num(F[n].value);return x==null||isNaN(x)?null:x},fm=v=>v==null?'—':v%1?eur2(v):eur(v);let tp=null,tc=null;
   for(let i=0;i<12;i++){const a=g('p'+i),b=g('c'+i);if(a!=null)tp=(tp||0)+a;if(b!=null)tc=(tc||0)+b;$('#ft'+i).textContent=a==null&&b==null?'—':fm((a||0)+(b||0))}
   $('#ftp').textContent=fm(tp);$('#ftc').textContent=fm(tc);$('#ftt').textContent=tp==null&&tc==null?'—':fm((tp||0)+(tc||0))}
