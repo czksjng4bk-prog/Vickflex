@@ -44,6 +44,17 @@ h1{font-size:26px;color:var(--v)} h2{font-size:20px;color:var(--v);margin-bottom
 .pill.u{background:#e3f3e8;color:var(--ok)} .pill.d{background:#fbe6e2;color:var(--ro)} .pill.n{background:var(--b2);color:var(--g)}
 .dot{display:inline-block;width:16px;height:16px;border-radius:50%;flex:none}
 .dot.verde{background:var(--ok)} .dot.amarillo{background:var(--am)} .dot.rojo{background:var(--ro)}
+.dot.naranja{background:#e9a04f} .dot.gris{background:#cfc8bb}
+.grid.rk3{grid-template-columns:repeat(3,minmax(0,1fr));align-items:start}
+@media(max-width:1000px){.grid.rk3{grid-template-columns:1fr}}
+.rkl{max-height:62vh;overflow:auto;margin:0 -6px;padding:0 6px}
+.rkr{display:grid;grid-template-columns:30px 44px minmax(0,1fr) auto;gap:6px;align-items:center;padding:8px 2px;border-bottom:1px solid #f0ebe0;cursor:pointer}
+.rkr:active{background:#faf7f1}
+.rkp{font-weight:700;color:var(--v);text-align:right}
+.rkn{min-width:0}.rkn b{display:block;font-size:14px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}.rkn small{display:block;font-size:12px;color:var(--g);overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+.rki{font-weight:700;font-size:14px;white-space:nowrap}
+.rkf{font-size:12px;font-weight:700;text-align:center;border-radius:10px;padding:2px 0}
+.rkf.up{color:#2f7a4a;background:#dff1e5}.rkf.dn{color:#b23a2e;background:#f8ddd5}.rkf.eq{color:#8a857c;background:#f0ede6}.rkf.nw{color:var(--v);background:#eef4ef;font-size:10px}
 /* Coche expositor: un punto por trimestre del año en curso */
 .q4{display:inline-flex;gap:5px;white-space:nowrap;vertical-align:middle;cursor:pointer;padding:4px 0}.q4 i{display:block;width:12px;height:12px;border-radius:50%;background:var(--ro)}.q4 i.on{background:var(--ok)}.q4 i.pend{background:var(--am)}
 .q4h{display:block;font-size:10px;letter-spacing:.3px;color:#a39d92;font-weight:600;margin-top:2px;white-space:nowrap}
@@ -188,7 +199,7 @@ body.locked nav,body.locked main{visibility:hidden}
   <button data-v="reps" onclick="go('reps')">Representantes</button>
   <button data-v="copias" onclick="go('copias')">Copias de seguridad</button>
   <button data-v="coche" onclick="go('coche')">Coche expositor</button>
-  <button data-v="alertas" onclick="go('alertas')">Alertas <span id="nbadge" class="badge"></span></button>
+  <button data-v="ranking" onclick="go('ranking')">Ranking comercial</button>
   <div id="nube" class="nube" onclick="nubeSubir()" title="Pulsa para guardar ahora en la nube"></div>
 </nav>
 <main>
@@ -500,8 +511,8 @@ function infPer(){const I=INF,y=I.y;if(I.t==='mes'&&I.m===12)return 'Todo el añ
   const m=y===YEAR?corte():12;return 'Año '+y+(m<12?' (enero–'+MESL[m-1]+')':'')}
 const INFT={mes:'Facturación mensual',tri:'Facturación trimestral',cli:'Facturación de clientes'};
 function infWho(){const r=rep(INF.rep),c=INF.cli?cli(INF.cli):null;return c?c.nombre+(r?' ('+r.nombre+')':''):(r?r.nombre:'')}
-function infSubj(){if(INF.mod)return INF.subjEdited?INF.subj:modSubj();if(INF.exp)return INF.subjEdited?INF.subj:expSubj();if(INF.sem)return INF.subjEdited?INF.subj:semSubj();return INF.subjEdited?INF.subj:'Informe '+INFT[INF.t].toLowerCase()+' · '+infWho()+' · '+infPer()}
-function infBody(){if(INF.mod)return modBody();if(INF.exp)return expBody();if(INF.sem)return semBody();const r=rep(INF.rep);return 'Hola'+(r&&!INF.cli?' '+r.nombre.split(' ')[0]:'')+',\n\nTe adjunto el informe de '+INFT[INF.t].toLowerCase()+' de '+infWho()+' correspondiente a '+infPer()+'.\n\nUn saludo.'}
+function infSubj(){if(INF.rk)return INF.subjEdited?INF.subj:rkSubj();if(INF.mod)return INF.subjEdited?INF.subj:modSubj();if(INF.exp)return INF.subjEdited?INF.subj:expSubj();if(INF.sem)return INF.subjEdited?INF.subj:semSubj();return INF.subjEdited?INF.subj:'Informe '+INFT[INF.t].toLowerCase()+' · '+infWho()+' · '+infPer()}
+function infBody(){if(INF.rk)return rkBody();if(INF.mod)return modBody();if(INF.exp)return expBody();if(INF.sem)return semBody();const r=rep(INF.rep);return 'Hola'+(r&&!INF.cli?' '+r.nombre.split(' ')[0]:'')+',\n\nTe adjunto el informe de '+INFT[INF.t].toLowerCase()+' de '+infWho()+' correspondiente a '+infPer()+'.\n\nUn saludo.'}
 function infBuild(){const I=INF,cs=(I.cli||I.t==='cli')?infCS():repCS(I.rep),r=rep(I.rep),c=I.cli?cli(I.cli):null,y=I.y,ms=infMs(),per=infPer(),notas=[];
   const info=[['Representante',r?r.nombre:'Sin representante']];if(c)info.push(['Cliente',c.nombre+(c.codigo?' · Código '+c.codigo:'')+(c.poblacion?' · '+c.poblacion:'')]);info.push(['Período',per]);
   const cmpRow=(k,lab)=>{const o=perCalc(cs,y,k,ms);if(!o.ok&&o.why&&(o.ha||o.hp))notas.push(lab+': '+o.why+'.');return {o:o,row:[lab,o.ha?eur(o.s):null,o.hp?eur(o.p):null,o.ok?pdfS(o.d):null,pdfPct(o)]}};
@@ -819,6 +830,96 @@ function modModal(){const I=INF,X=bmDatos();
 function modPrep(){try{const o=modPDF(),name='VICKFLEX_Modelo_en_exposicion_'+slug(BM.q.trim()).replace(/-/g,'_')+(BM.rep?'_'+slug(repNom(BM.rep)).replace(/-/g,'_'):'')+'_'+hoy()+'.pdf';
   INF.file=new File([o.blob],name,{type:'application/pdf'});INF.pages=o.pages;INF.ops=o.ops;INF.W=o.W;INF.H=o.H;modModal()}catch(e){console.error(e);toast('No se ha podido preparar el PDF.',1)}}
 
+/* ===================== RANKING COMERCIAL =====================
+   Solo LEE la facturación de las fichas (acum / has, las mismas funciones que el resto de la app). No guarda ni cambia nada.
+   Período: año seleccionado, de enero al último mes con datos (año en curso) o el año completo (años anteriores).
+   Flechas: posición frente al ranking al cierre del mes anterior (enero hasta el mes anterior al último con datos). */
+const RKN={total:100,principal:50,comp:50},RKT={total:'Facturación total',principal:'Facturación principal',comp:'Complementos'};
+let RK={y:YEAR,all:{}};
+function rkYears(){const s=new Set([YEAR]);D.clientes.forEach(c=>{['fact','comp'].forEach(f=>Object.keys(c[f]||{}).forEach(y=>s.add(+y)));Object.values(c.acumul||{}).forEach(o=>Object.keys(o||{}).forEach(y=>s.add(+y)))});
+  return [...s].filter(y=>y>2000&&y<=YEAR).sort((a,b)=>b-a)}
+function rkMes(y){return y===YEAR?corte():12}
+function rkLista(k,y,m){if(m<1)return [];return D.clientes.filter(c=>has(c,y,m,k)).map(c=>({c:c,v:acum(c,y,m,k)})).filter(o=>o.v>0)
+  .sort((a,b)=>b.v-a.v||String(a.c.nombre).localeCompare(String(b.c.nombre),'es'))}
+function rkDatos(k,y){const m=rkMes(y),L=rkLista(k,y,m),P=m>1?rkLista(k,y,m-1):null,pos={};
+  if(P)P.forEach((o,i)=>pos[o.c.id]=i+1);
+  L.forEach((o,i)=>{o.p=i+1;o.ant=P?(pos[o.c.id]||0):null;o.d=o.ant?o.ant-o.p:null});
+  return {k:k,y:y,m:m,L:L,cmp:!!P,tot:L.reduce((t,o)=>t+o.v,0)}}
+const rkPer=X=>X.m>=12?'Año '+X.y+' completo':'Enero–'+MESL[X.m-1]+' '+X.y;
+const rkCmp=X=>X.cmp?'frente al cierre de '+MESL[X.m-2]+' '+X.y:'sin comparación (es el primer mes del año)';
+function rkFlecha(o){if(o.ant===null)return '<span class="rkf mut">·</span>';if(!o.ant)return '<span class="rkf nw" title="No estaba en el ranking del mes anterior">Nuevo</span>';
+  if(o.d>0)return `<span class="rkf up" title="Sube ${o.d} ${o.d===1?'puesto':'puestos'}">▲${o.d}</span>`;if(o.d<0)return `<span class="rkf dn" title="Baja ${-o.d} ${o.d===-1?'puesto':'puestos'}">▼${-o.d}</span>`;return '<span class="rkf eq" title="Misma posición">=</span>'}
+function rkCard(k){const X=rkDatos(k,RK.y),n=RKN[k],todo=!!RK.all[k],V=todo?X.L:X.L.slice(0,n);
+  return `<div class="card rkc"><div class="hb" style="margin-bottom:6px"><div><h3 style="margin:0">${RKT[k]}</h3><small class="mut">${todo?'Todos los clientes':'Los '+n+' mejores clientes'} · ${X.L.length} con facturación</small></div>
+    <button class="b2 sm" onclick="rkMail('${k}')">📄 PDF</button></div>
+   ${X.L.length?`<div class="rkl">${V.map(o=>`<div class="rkr" onclick="go('cli/${o.c.id}')"><span class="rkp">${o.p}</span>${rkFlecha(o)}<span class="rkn"><b>${esc(o.c.nombre)}</b><small>${esc(repNom(o.c.repId))}</small></span><span class="rki">${eur(o.v)}</span></div>`).join('')}</div>
+    <div class="row" style="border:0;padding:8px 2px 0"><span class="mut">Total ${todo?'':'del top '+Math.min(n,X.L.length)}</span><b>${eur(V.reduce((t,o)=>t+o.v,0))}</b></div>
+    ${X.L.length>n?`<button class="b2 sm" style="width:100%;margin-top:8px" onclick="RK.all['${k}']=${todo?'false':'true'};render(true)">${todo?'Ver solo los '+n+' mejores':'Ver todos ('+X.L.length+' clientes)'}</button>`:''}`
+   :`<p class="mut" style="padding:12px 0">Sin datos de ${RKT[k].toLowerCase()} en ${rkPer(X).toLowerCase()}.</p>`}</div>`}
+function vRanking(){if(rkYears().indexOf(RK.y)<0)RK.y=YEAR;const X=rkDatos('total',RK.y);
+  return `<div class="hb"><div><h1>🏆 Ranking comercial</h1><p class="sub" style="margin-bottom:0">Clientes ordenados de mayor a menor facturación · <b>${rkPer(X)}</b> · flechas ${rkCmp(X)}. Pulsa un cliente para abrir su ficha.</p></div>
+    <div class="acts"><select class="sel" onchange="RK.y=+this.value;render(true)">${rkYears().map(y=>`<option ${y===RK.y?'selected':''}>${y}</option>`).join('')}</select></div></div>
+  <div class="grid rk3">${['total','principal','comp'].map(rkCard).join('')}</div>
+  <p class="hint">▲ sube puestos · ▼ baja puestos · = misma posición · «Nuevo»: no estaba en el ranking al cierre del mes anterior. Solo aparecen clientes con facturación en el período. Las ventas del coche expositor no se incluyen.</p>`}
+
+/* --- PDF del ranking: A4 vertical, intervalo de posiciones a elegir --- */
+function rkMail(k){const X=rkDatos(k,RK.y);if(!X.L.length)return toast('Este ranking todavía no tiene clientes con facturación.',1);
+  INF={rk:1,t:'rk',k:k,y:RK.y,de:1,a:Math.min(RKN[k],X.L.length),rep:'',cli:'',to:'',subj:'',subjEdited:false,file:null};rkModal()}
+function rkSubj(){return 'VICKFLEX DESCANSO — RANKING '+RKT[INF.k].toUpperCase()+' — '+rkPer(rkDatos(INF.k,INF.y)).toUpperCase()+' — POSICIONES '+INF.de+' A '+INF.a}
+function rkBody(){return 'Hola,\n\nTe adjunto el ranking de '+RKT[INF.k].toLowerCase()+' ('+rkPer(rkDatos(INF.k,INF.y))+'), posiciones '+INF.de+' a '+INF.a+'.\n\nUn saludo.'}
+function rkRango(de,a){const n=rkDatos(INF.k,INF.y).L.length;de=Math.max(1,Math.min(n,parseInt(de,10)||1));a=Math.max(de,Math.min(n,parseInt(a,10)||n));INF.de=de;INF.a=a;INF.file=null;rkModal()}
+function rkModal(){const I=INF,X=rkDatos(I.k,I.y),n=X.L.length;
+  const pre=[[1,25],[26,50],[51,75],[76,100],[1,50],[1,100]].filter(p=>p[0]<=n).map(p=>[p[0],Math.min(p[1],n)]).concat([[1,n]]);
+  const seen={},P=pre.filter(p=>{const s=p.join('-');if(seen[s])return false;seen[s]=1;return true});
+  modalW(`<h2>📄 PDF · Ranking ${esc(RKT[I.k].toLowerCase())}</h2><p class="sub" style="margin-bottom:6px">${rkPer(X)} · ${n} clientes con facturación · flechas ${rkCmp(X)}</p>
+  <h3 class="fsec" style="margin-top:8px">Posiciones que quieres en el PDF</h3>
+  <div class="acts l" style="flex-wrap:wrap;justify-content:flex-start;margin:6px 0 10px">${P.map(p=>`<button class="${I.de===p[0]&&I.a===p[1]?'b1':'b2'} sm" onclick="rkRango(${p[0]},${p[1]})">${p[0]===1&&p[1]===n?'Todos (1 al '+n+')':'Del '+p[0]+' al '+p[1]}</button>`).join('')}</div>
+  <div class="fg"><label class="f"><span>Desde la posición</span><input id="rkde" type="number" inputmode="numeric" min="1" max="${n}" value="${I.de}"></label>
+   <label class="f"><span>Hasta la posición</span><input id="rka" type="number" inputmode="numeric" min="1" max="${n}" value="${I.a}"></label>
+   <label class="f w"><span>Para (opcional, solo si lo vas a enviar por correo)</span><input type="email" list="semto" autocomplete="off" autocapitalize="none" value="${esc(I.to)}" placeholder="correo@ejemplo.com" oninput="INF.to=this.value.trim()"></label>
+   <datalist id="semto">${D.reps.filter(z=>z.email).map(z=>`<option value="${esc(z.email)}">${esc(z.nombre)}</option>`).join('')}</datalist>
+   <label class="f w"><span>Asunto</span><input value="${esc(infSubj())}" oninput="INF.subj=this.value;INF.subjEdited=true"></label></div>
+  <div id="infout">${I.file?infReady()+`<div class="acts l" style="margin-top:0"><button class="b2" onclick="infPrint()">🖨 Imprimir</button></div><h3 style="margin:14px 0 0">Vista previa del PDF · A4 · ${I.pages} ${I.pages===1?'página':'páginas'}</h3><div class="semprev" id="semprev"></div>`:''}</div>
+  <div class="acts"><button class="b2" onclick="closeModal()">Cerrar</button>${I.file?'<button class="b2" onclick="rkPrep()">↻ Volver a generar</button>':'<button class="b1" onclick="rkPrep()">Generar PDF</button>'}</div>`);
+  if(I.file)setTimeout(semPreview,30)}
+function rkPrep(){const de=$('#rkde'),a=$('#rka');if(de&&a){const n=rkDatos(INF.k,INF.y).L.length,x=Math.max(1,Math.min(n,parseInt(de.value,10)||1)),z=Math.max(x,Math.min(n,parseInt(a.value,10)||n));INF.de=x;INF.a=z}
+  try{const o=rkPDF(),name='VICKFLEX_Ranking_'+slug(RKT[INF.k]).replace(/-/g,'_')+'_'+INF.y+'_pos_'+INF.de+'-'+INF.a+'_'+hoy()+'.pdf';
+  INF.file=new File([o.blob],name,{type:'application/pdf'});INF.pages=o.pages;INF.ops=o.ops;INF.W=o.W;INF.H=o.H;rkModal()}catch(e){console.error(e);toast('No se ha podido preparar el PDF.',1)}}
+function rkPDF(){const I=INF,X=rkDatos(I.k,I.y),R=X.L.slice(I.de-1,I.a),d=semRec(new PDFDoc());d.img=logoJPG();const M=42,W=PDFW-2*M;let y=0;
+  const head=()=>{if(d.img){const h=44,w=Math.min(190,d.img.w*h/d.img.h);d.image(M,30,w,w*d.img.h/d.img.w)}else d.text(M,58,'VICKFLEX Descanso',{sz:16,b:1,col:PDFV});
+    d.text(PDFW-M,50,'VICKFLEX Descanso',{sz:13,b:1,col:PDFV,al:'r'});d.text(PDFW-M,64,'Ranking comercial',{sz:9,col:PDFG,al:'r'});d.rect(M,86,W,2.2,PDFB2);d.rect(M,86,64,2.2,PDFV);y=108};
+  head();d.text(M,y+14,pdfFit('Ranking · '+RKT[I.k],1,19,W),{sz:19,b:1,col:PDFV});y+=32;
+  [['Período',rkPer(X)],['Posiciones','Del '+I.de+' al '+I.a+' (de '+X.L.length+' clientes con facturación)'],['Variación',X.cmp?'Puestos ganados o perdidos frente al cierre de '+MESL[X.m-2]+' '+X.y:'Sin comparación (primer mes del año)']]
+    .forEach(([k,v])=>{d.text(M,y+10,k,{sz:9.5,col:PDFG});d.text(M+92,y+10,pdfFit(v,1,10,W-92),{sz:10,b:1});y+=15});y+=10;
+  const sR=R.reduce((t,o)=>t+o.v,0),kp=[['Total de las posiciones '+I.de+'–'+I.a,eur(sR)],['Total de todo el ranking',eur(X.tot)],['Peso de este intervalo',X.tot?(sR/X.tot*100).toFixed(1).replace('.',',')+' %':'—']],bw=(W-20)/3;
+  kp.forEach((k,i)=>{const x=M+i*(bw+10);d.rect(x,y,bw,52,i?PDFB:PDFL);if(!i)d.rect(x,y,3,52,PDFV);d.text(x+12,y+17,pdfFit(k[0].toUpperCase(),1,7.5,bw-20),{sz:7.5,b:1,col:PDFG});d.text(x+12,y+40,pdfFit(k[1],1,16,bw-20),{sz:16,b:1,col:i?'#2b2b2b':PDFV})});y+=68;
+  const C=[{t:'Pos.',w:40,al:'r'},{t:'Var.',w:50,al:'c'},{t:'Cliente (nombre comercial)',w:185,b:1},{t:'Representante',w:150},{t:'Importe',w:91,al:'r'}],tw=C.reduce((a,c)=>a+c.w,0);C.forEach(c=>c.w=c.w*W/tw);
+  const tx=(c,x)=>c.al==='r'?x+c.w-6:c.al==='c'?x+c.w/2:x+6;
+  const th=()=>{d.rect(M,y,W,20,PDFB);let x=M;C.forEach(c=>{d.text(tx(c,x),y+13.5,c.t,{sz:8,b:1,col:PDFV,al:c.al});x+=c.w});y+=20};th();
+  R.forEach((o,i)=>{if(y+17>788){d.page();head();th()}if(i%2)d.rect(M,y,W,17,'#fbf9f5');
+    const vr=o.ant===null?['',PDFG]:!o.ant?['Nuevo','#2f6b4f']:o.d>0?['+'+o.d,'#2f7a4a']:o.d<0?['-'+(-o.d),'#b23a2e']:['=',PDFG];
+    const cel=[[String(o.p),'#2b2b2b',1],vr.concat([1]),[o.c.nombre,'#2b2b2b',1],[repNom(o.c.repId)||'Sin representante','#2b2b2b',0],[eur(o.v),'#2b2b2b',1]];let x=M;
+    C.forEach((c,j)=>{d.text(tx(c,x),y+12,pdfFit(cel[j][0],cel[j][2],9,c.w-10),{sz:9,b:cel[j][2],al:c.al,col:cel[j][1]});x+=c.w});d.line(M,y+17,M+W,y+17,'#ece5d8',.5);y+=17});
+  if(y+22>788){d.page();head();th()}d.rect(M,y,W,22,PDFL);d.text(M+6,y+14.5,'Total posiciones '+I.de+'–'+I.a+' ('+R.length+' clientes)',{sz:9,b:1,col:PDFV});d.text(M+W-6,y+14.5,eur(sR),{sz:9,b:1,col:PDFV,al:'r'});y+=30;
+  pdfWrap('Importes acumulados de la facturación '+(I.k==='total'?'total (principal + complementos)':I.k==='principal'?'principal':'de complementos')+' registrada en las fichas de clientes. Var.: puestos ganados (+) o perdidos (-) frente al ranking del mes anterior; «Nuevo»: no tenía facturación al cierre del mes anterior. Las ventas del coche expositor no se incluyen.',0,8.5,W).forEach(l=>{if(y+12>788){d.page();head()}d.text(M,y+9,l,{sz:8.5,col:PDFG});y+=12});
+  const N=d.pages.length;d.pages.forEach((pc,i)=>{d.c=pc;d.pi=i;d.line(M,806,PDFW-M,806,PDFB2,.6);d.text(M,820,'Documento confidencial · Información comercial de VICKFLEX Descanso · Emitido el '+fd(hoy()),{sz:7.5,col:PDFG});d.text(PDFW-M,820,'Página '+(i+1)+' de '+N,{sz:7.5,col:PDFG,al:'r'})});
+  return {blob:d.blob(),pages:N,ops:d.ops,W:PDFW,H:PDFH}}
+
+/* ===================== SEMÁFORO AUTOMÁTICO DE COMPRAS =====================
+   Se calcula solo, cada vez que se abre la ficha, con la facturación mensual (principal + complementos) del último trimestre
+   cerrado: el último trimestre cuyos tres meses ya tienen datos para los clientes de su representante.
+   Verde: compró los 3 meses · Naranja: 1 o 2 meses · Rojo: ninguno. No guarda nada ni cambia el estado comercial manual. */
+function semAuto(c){const cs=c.repId&&rep(c.repId)?clientsOf(c.repId):[c],ult=y=>{let m=0;cs.forEach(x=>fy(x,y,'total').forEach((v,i)=>{if(v!=null&&i+1>m)m=i+1}));return m};
+  let y=YEAR,m=ult(y),q=Math.floor(m/3)-1;if(q<0){y=YEAR-1;m=ult(y);q=Math.floor(m/3)-1}
+  if(q<0)return {s:'gris',t:'Sin datos mensuales',q:null};
+  const f=fy(c,y,'total'),ms=[q*3,q*3+1,q*3+2],n=ms.filter(i=>(f[i]||0)>0).length;
+  return {s:n===3?'verde':n?'naranja':'rojo',t:n===3?'Ha comprado los tres meses':n?'Ha comprado '+n+(n===1?' mes':' meses')+' de tres':'No ha comprado ningún mes',q:q,y:y,ms:ms,f:f,n:n}}
+function semAutoCard(c){const A=semAuto(c);
+  return `<div class="card" style="margin-bottom:16px"><div class="hb" style="margin-bottom:0;align-items:center"><div style="display:flex;gap:14px;align-items:center"><span class="dot ${A.s}" style="width:34px;height:34px"></span>
+    <div><h3 style="margin:0">Semáforo de compras (automático)</h3><b style="font-size:17px">${A.t}</b>${A.q!=null?`<br><small class="mut">${A.q+1}.º trimestre ${A.y} (${A.ms.map(i=>MESL[i]).join(', ')}) · último trimestre cerrado</small>`:''}</div></div>
+    ${A.q!=null?`<div style="display:flex;gap:8px">${A.ms.map(i=>{const v=A.f[i];return `<span class="pill ${(v||0)>0?'u':'d'}" style="font-size:14px;padding:6px 12px">${cap(MES[i])} ${(v||0)>0?'✔':'✖'}</span>`}).join('')}</div>`:''}</div>
+   <p class="hint" style="margin:8px 0 0">${A.q!=null?'Se actualiza solo al introducir o modificar la facturación. Verde: compró los 3 meses · Naranja: 1 o 2 meses · Rojo: ninguno.':'Aparecerá en cuanto haya facturación mensual de un trimestre completo para los clientes de su representante.'}</p></div>`}
+
 /* ---------- Pantallas ---------- */
 function banner(){const s=syncGet();
   if(!(s.pend&&(NUBE.est==='offline'||NUBE.est==='error')))return '';
@@ -942,8 +1043,9 @@ function vCli(id){
   const hrows=yrsAll.map(y=>{const cur=y===YEAR,bm=cur?m:(CATS2.some(t=>rawF(c,y,t).some(v=>v!=null))?12:(Math.max(0,...CATS2.flatMap(t=>Object.keys(accRec(c,y,t)).map(Number)))||12)),mm=bm,o=cmpL([c],y,mm,VC),pa=CATS2.some(t=>hasAny(c,y-1,t)),h=k=>has(c,y,mm,k)?eur(acum(c,y,mm,k)):mut;
     return `<tr><td>${y}${mm<12?' <small>ene–'+MES[mm-1]+'</small>':''}</td><td class="r">${h('principal')}</td><td class="r">${h('comp')}</td><td class="r"><b>${h('total')}</b></td><td class="r">${pa?cmpHTML(o):mut}</td></tr>`}).join('');
   const stk=VC==='total'&&has(c,YEAR,12,'comp')?{p:fy(c,YEAR,'principal').map(v=>v||0),c:fy(c,YEAR,'comp').map(v=>v||0)}:null;
-  return `<div class="hb"><div class="head">${dot(c.semaforo)}<div><h1>${esc(c.nombre)}</h1><p class="sub" style="margin:0">${esc(c.poblacion)}${c.provincia?', '+esc(c.provincia):''} · Representante: ${r?`<a style="color:var(--v);font-weight:600;cursor:pointer" onclick="go('rep/${r.id}')">${esc(r.nombre)}</a>`:'sin asignar'}</p></div></div>
+  return `<div class="hb"><div class="head">${dot(semAuto(c).s)}<div><h1>${esc(c.nombre)}</h1><p class="sub" style="margin:0">${esc(c.poblacion)}${c.provincia?', '+esc(c.provincia):''} · Representante: ${r?`<a style="color:var(--v);font-weight:600;cursor:pointer" onclick="go('rep/${r.id}')">${esc(r.nombre)}</a>`:'sin asignar'}</p></div></div>
     <div class="acts"><button class="b2" onclick="cliForm('${c.id}')">Editar</button><button class="b2 dng" onclick="delCli('${c.id}')">Eliminar</button></div></div>
+  ${semAutoCard(c)}
   <div class="card" style="margin-bottom:16px"><h3>Estado comercial (se cambia a mano)</h3><div class="semsel">
     ${['verde','amarillo','rojo'].map(s=>`<button class="${c.semaforo===s?'on':''}" onclick="setSem('${c.id}','${s}')">${dot(s)} ${{verde:'Verde · va bien',amarillo:'Amarillo · seguimiento',rojo:'Rojo · atención'}[s]}</button>`).join('')}</div></div>
   <div class="grid k">
@@ -1036,19 +1138,19 @@ function vCopias(){
 function go(h){if(location.hash==='#'+h)render();else location.hash=h}
 function crumbs(v,id){
   const l=(h,t)=>`<a onclick="go('${h}')">${esc(t)}</a>`,s=' <i>›</i> ';
-  if(v==='panel')return '<b>Panel</b>';if(v==='modelos')return l('panel','Panel')+s+'<b>Buscador de modelos en exposición</b>';if(v==='reps')return '<b>Representantes</b>';if(v==='copias')return '<b>Copias de seguridad</b>';{const l2=(h,t)=>`<a onclick="go('${h}')">${esc(t)}</a>`,s2=' <i>›</i> ',pc=l2('coche','Coche expositor')+s2;if(v==='coche')return pc+'<b>Calendario '+CY+'</b>';if(v==='cochehist')return pc+'<b>Historial</b>';if(v==='semana'){const x=semOf(id);return pc+l2('coche/'+x.ini.slice(0,4),'Calendario '+x.ini.slice(0,4))+s2+'<b>Semana '+fcorta(x.ini)+'–'+fcorta(x.fin)+'</b>'}}if(v==='alertas')return '<b>Alertas</b>';
+  if(v==='panel')return '<b>Panel</b>';if(v==='modelos')return l('panel','Panel')+s+'<b>Buscador de modelos en exposición</b>';if(v==='reps')return '<b>Representantes</b>';if(v==='copias')return '<b>Copias de seguridad</b>';if(v==='ranking')return '<b>Ranking comercial</b>';{const l2=(h,t)=>`<a onclick="go('${h}')">${esc(t)}</a>`,s2=' <i>›</i> ',pc=l2('coche','Coche expositor')+s2;if(v==='coche')return pc+'<b>Calendario '+CY+'</b>';if(v==='cochehist')return pc+'<b>Historial</b>';if(v==='semana'){const x=semOf(id);return pc+l2('coche/'+x.ini.slice(0,4),'Calendario '+x.ini.slice(0,4))+s2+'<b>Semana '+fcorta(x.ini)+'–'+fcorta(x.fin)+'</b>'}}if(v==='alertas')return '<b>Alertas</b>';
   if(v==='rep')return l('reps','Representantes')+s+'<b>'+esc(rep(id).nombre)+'</b>';
   const c=cli(id),r=rep(c.repId);return l('reps','Representantes')+s+(r?l('rep/'+r.id,r.nombre)+s:'')+'<b>'+esc(c.nombre)+'</b>'}
 function render(keep){
   if(LOCKED)return;
   const p=(location.hash.slice(1)||'panel').split('/');let v=p[0],id=p[1];
-  if(v==='plan')v='coche';if(v==='rep'&&!rep(id))v='reps';if(v==='cli'&&!cli(id))v='reps';if(['panel','reps','rep','cli','copias','plan','alertas','coche','cochehist','semana','modelos'].indexOf(v)<0)v='panel';if(v==='semana'&&!semOf(id))v='coche';if(v==='coche'&&id&&+id>1990)CY=+id;
-  const f={modelos:vModelos,panel:vPanel,reps:vReps,rep:()=>vRep(id),cli:()=>vCli(id),copias:vCopias,plan:vPlan,alertas:vAlertas,coche:vCoche,cochehist:vCocheHist,semana:()=>vSemana(id)}[v];
+  if(v==='plan')v='coche';if(v==='rep'&&!rep(id))v='reps';if(v==='cli'&&!cli(id))v='reps';if(['panel','reps','rep','cli','copias','plan','alertas','ranking','coche','cochehist','semana','modelos'].indexOf(v)<0)v='panel';if(v==='semana'&&!semOf(id))v='coche';if(v==='coche'&&id&&+id>1990)CY=+id;
+  const f={modelos:vModelos,panel:vPanel,reps:vReps,rep:()=>vRep(id),cli:()=>vCli(id),copias:vCopias,plan:vPlan,alertas:vAlertas,ranking:vRanking,coche:vCoche,cochehist:vCocheHist,semana:()=>vSemana(id)}[v];
   const st=$('#view').scrollTop;
   $('#view').innerHTML=(v==='copias'?'':banner())+f();
   if(v==='modelos')bmPaint();
   if(v==='rep'&&$('#r25m'))rep25Tot();
-  $('#crumbs').innerHTML=crumbs(v,id);{const n=alertas().filter(a=>a.sev==='rojo').length,b=$('#nbadge');b.textContent=n;b.style.display=n?'inline-block':'none'}
+  $('#crumbs').innerHTML=crumbs(v,id);{const b=$('#nbadge');if(b){const n=alertas().filter(a=>a.sev==='rojo').length;b.textContent=n;b.style.display=n?'inline-block':'none'}}
   document.querySelectorAll('nav button[data-v]').forEach(b=>b.classList.toggle('on',b.dataset.v===(v==='modelos'?'panel':(v==='rep'||v==='cli')?'reps':(v==='coche'||v==='cochehist'||v==='semana')?'coche':v)));
   $('#view').scrollTop=keep===true?st:0}
 window.addEventListener('hashchange',()=>render());
